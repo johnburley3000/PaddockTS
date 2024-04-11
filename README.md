@@ -15,8 +15,8 @@ Include these options on the launch site:
     - DONE
 2. calendar plots
     - DONE mostly, needing some updates:
-   - mark when interpolated
-   - incorporate planetscope data?
+       - mark when interpolated
+       - incorporate planetscope data?
 3. paddock segmentation and clustering.
    - DONE
 4. paddock quick-look flipbook
