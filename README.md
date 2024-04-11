@@ -4,9 +4,9 @@ Paddock-level phenology visualizations and spatiotemporal analyses using (for no
 
 ### Note for JupyterLab setup on GADI
 Include these options on the launch site:
-  Storage: gdata/<my project>+gdata/v10
-  Module Directories: /g/data/v10/public/modules/modulefiles/
-  Modules: dea/20231204
+- Storage: gdata/<my project>+gdata/v10
+- Module Directories: /g/data/v10/public/modules/modulefiles/
+- Modules: dea/20231204
 
 
 
