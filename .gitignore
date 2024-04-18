@@ -1,0 +1,5 @@
+## Things not to try and sync through github
+
+Results/*
+Data/*
+tmp/*
