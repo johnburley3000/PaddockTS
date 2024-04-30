@@ -37,7 +37,9 @@ from samgeo import SamGeo, sam_model_registry
 logging.basicConfig(level=logging.INFO)
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(description='Process satellite imagery to segment paddocks.')
+    parser = argparse.ArgumentParser(description="""Process satellite imagery to segment paddocks.
+Example usage:
+python3 Code/SAMGeo_paddocks.py test1 /g/data/xe2/John/Data/PadSeg/ --min_area_ha 10 --max_area_ha 1500 --max_perim_area_ratio 30""")
     parser.add_argument('stub', type=str, help='Stub name for file naming.')
     parser.add_argument('base_directory', type=str, help='Base directory for input/output files.')
     parser.add_argument('--min_area_ha', type=float, default=10, help='Minimum area in hectares for paddock to be kept.')
