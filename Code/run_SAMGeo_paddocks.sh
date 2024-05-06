@@ -19,10 +19,12 @@ cd /home/106/jb5097/Projects/PaddockTS
 source /g/data/xe2/John/geospatenv/bin/activate
 
 # Run script:
-python Code/SAMGeo_paddocks.py $stub /g/data/xe2/John/Data/PadSeg/ --min_area_ha 10 --max_area_ha 1500 --max_perim_area_ratio 30
+python Code/02_SAMGeo_paddocks.py $stub /g/data/xe2/John/Data/PadSeg/ --min_area_ha 10 --max_area_ha 1500 --max_perim_area_ratio 30
 
 # stub: unique id that specifies the input image and sets output name
 # minimum area for the resulting polygons
 # maximum perimeter:area ratio for resulting polygons
 
+# Now run the code that extracts paddock-level reflectance and saves the paddock-variavle-time (pvariable-time arrau
 
+python Code/03_paddock-ts.py --stub $stub --outdir /g/data/xe2/John/Data/PadSeg/
