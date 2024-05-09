@@ -7,8 +7,6 @@
 #PBS -P xe2
 #PBS -lwalltime=04:00:00
 #PBS -l storage=gdata/xe2
-#PBS -o Logs
-#PBS -e Logs
 
 # Print out input variables to the error log
 echo "Running SamGeo script and extract paddock ts script using the following input variables:"
@@ -19,7 +17,8 @@ echo "max_area_ha: $max_area_ha"
 echo "max_perim_area_ratio: $max_perim_area_ratio"
 ###
 
-cd /home/106/jb5097/Projects/PaddockTS
+#cd /home/106/jb5097/Projects/PaddockTS
+cd $wd
 
 ## run it like:
 # qsub -v stub=<>,dir=<>,min_area_ha=<>,max_area_ha=<>,max_perim_area_ratio=<> Code/run_SAMGeo_paddocks-ts.sh

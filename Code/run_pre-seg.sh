@@ -5,8 +5,6 @@
 #PBS -P xe2
 #PBS -l walltime=04:00:00
 #PBS -l storage=gdata/xe2+gdata/v10+gdata/ka08
-#PBS -o Logs
-#PBS -e Logs
 #PBS -q normal
 
 
@@ -21,7 +19,12 @@ echo "start date: $start_time"
 echo "end date: $end_time"
 echo "-------------------"
 
-cd /home/106/jb5097/Projects/PaddockTS
+# Requirements:
+# Needs access to project v10 and to load the dea modules
+# (also ka08 and xe2)
+
+#cd /home/106/jb5097/Projects/PaddockTS
+cd $wd
 
 # Setup DEA environment modules for running the Python script
 module use /g/data/v10/public/modules/modulefiles
