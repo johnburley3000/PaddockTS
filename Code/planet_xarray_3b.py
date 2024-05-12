@@ -5,6 +5,21 @@ import numpy as np
 import xarray as xr
 import rasterio
 from datetime import datetime
+import argparse
+
+def parse_arguments():
+    parser = argparse.ArgumentParser(
+        description="""Load 3 band Planetscope data into an xarray named {stub}_xarray.pkl
+        
+Example usage:
+python3 Code/01_pre-segment.py --indir /g/data/xe2/datasets/Planet/Farms/MULL/ --orderids 79f404e3-6b72-43fa-ac13-1b33d0afa755,ffadc3be-6e37-4492-85ba-afd9151743c6 --outpath /g/data/xe2/chris/Data/MULL_xarray_3b.pkl
+""",
+        formatter_class=argparse.RawTextHelpFormatter
+    )
+    parser.add_argument("--indir", type=str, required=True, help="Input directory containing planet orders")
+    parser.add_argument("--orderids", type=str, required=True, help="Comma seperated list of order ids")
+    parser.add_argument("--outpath", type=str, required=True, help="Output path including filename for the xarray .pkl")
+    return parser.parse_args()
 
 def find_timestamps(directory):
     """
@@ -101,13 +116,14 @@ def load_single_order_3band(base_directory, order_id):
     images = load_images(directory, good_timestamps)
     image_array = np.array(images)
     datetimestamps = create_datetimes(good_timestamps)
-    x, y = create_lat_lon(bboxs[0], (image_array.shape[1], image_array.shape[2]))
-    transposed_images = image_array.transpose(3,0,1,2)
+    x, y = create_lat_lon(bboxs[0], (image_array.shape[3], image_array.shape[2]))
+    transposed_images = image_array.transpose(1,0,3,2)
+    flipped_images = np.array([[np.flipud(image) for image in band] for band in transposed_images])
     ds_planetscope = xr.Dataset(
         {
-            "nbart_red":(["time", "y", "x"], transposed_images[0]),
-            "nbart_green":(["time", "y", "x"], transposed_images[1]),
-            "nbart_blue":(["time", "y", "x"], transposed_images[2]),
+            "nbart_red":(["time", "y", "x"], flipped_images[0]),
+            "nbart_green":(["time", "y", "x"], flipped_images[1]),
+            "nbart_blue":(["time", "y", "x"], flipped_images[2]),
         }, coords={
             "time": datetimestamps,
             "y": ("y", y),
@@ -168,13 +184,17 @@ def merge_all_xarrays(xarrays):
     return fully_merged
 
 if __name__ == '__main__':
-    print("hello world")
+    args = parse_arguments()
 
-    base_directory = "../SPRV"
-    order_ids = ["5fb7ea5a-05ec-4784-a2c1-e4a59540f914", "5fb7ea5a-05ec-4784-a2c1-e4a59540f914"]
-    xarray_outpath = 'testing.pickle'
+    base_directory = args.indir
+    order_ids = args.orderids.split(",")
+    outpath = args.outpath
 
-    xarrays = [load_single_order_3band(order_id) for order_id in order_ids]
+    print(f"{datetime.now()} Starting planet_xarray_3b in {base_directory} for {order_ids}")
+
+    xarrays = [load_single_order_3band(base_directory, order_id) for order_id in order_ids]
     merged_xarray = merge_all_xarrays(xarrays)
-    with open(xarray_outpath, 'wb') as handle:
+    with open(outpath, 'wb') as handle:
         pickle.dump(merged_xarray, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+    print(f"{datetime.now()} Finished planet_xarray_3b and exported to {outpath}")
