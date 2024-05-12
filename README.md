@@ -1,6 +1,6 @@
-# PaddockTS
+# PaddockTS  
 Paddock-level phenology visualizations and spatiotemporal analyses using (for now) Sentinel2 data
-
+  
 ### Initialization
 Things you must do before the code will run:
 
