@@ -5,6 +5,21 @@ import numpy as np
 import xarray as xr
 import rasterio
 from datetime import datetime
+import argparse
+
+def parse_arguments():
+    parser = argparse.ArgumentParser(
+        description="""Load 3 band Planetscope data into an xarray named {stub}_xarray.pkl
+        
+Example usage:
+python3 Code/01_pre-segment.py --indir /g/data/xe2/datasets/Planet/Farms/MULL/ --orderid 79f404e3-6b72-43fa-ac13-1b33d0afa755 --outpath /g/data/xe2/chris/Data/MULL_xarray_3b.pkl
+""",
+        formatter_class=argparse.RawTextHelpFormatter
+    )
+    parser.add_argument("--indir", type=str, required=True, help="Input directory containing planet orders")
+    parser.add_argument("--orderid", type=str, required=True, help="the orderid of the folder")
+    parser.add_argument("--outpath", type=str, required=True, help="Output path including filename for the xarray .pkl")
+    return parser.parse_args()
 
 def find_timestamps(directory):
     """
@@ -101,8 +116,8 @@ def load_single_order_3band(base_directory, order_id):
     images = load_images(directory, good_timestamps)
     image_array = np.array(images)
     datetimestamps = create_datetimes(good_timestamps)
-    x, y = create_lat_lon(bboxs[0], (image_array.shape[1], image_array.shape[2]))
-    transposed_images = image_array.transpose(3,0,1,2)
+    transposed_images = image_array.transpose(1,0,2,3)
+    y, x = create_lat_lon(bboxs[0], (transposed_images.shape[3], transposed_images.shape[2]))
     ds_planetscope = xr.Dataset(
         {
             "nbart_red":(["time", "y", "x"], transposed_images[0]),
@@ -116,65 +131,18 @@ def load_single_order_3band(base_directory, order_id):
     )
     return ds_planetscope
 
-def normalized(band):
-    return band / np.sqrt(np.sum(band**2))
-
-def merge_two_xarrays(ds1, ds2):
-    """ 
-    Combines two xarrays
-    Assumes both datasets have the same bands each with dimensions (time, y, x)
-    Sorts by timestamp for compatibility with dea_tools.plotting.xr_animation
-
-    Parameters
-    ----------
-    ds1: xarray.Dataset
-    ds2: xarray.Dataset
-
-    Returns
-    ----------
-    ds_merged: xarray.Dataset
-    """
-    bands = list(ds1.keys())
-    x = ds1.x.values
-    y = ds1.y.values
-
-    ds1_normalized = [normalized(ds1[band]) for band in bands]
-    ds2_normalized = [normalized(ds2[band]) for band in bands]
-
-    ds1_bands = [[ds1["time"][i]] + [band[i] for band in ds1_normalized] for i in range(len(ds1["time"]))]
-    ds2_bands = [[ds2["time"][i]] + [band[i] for band in ds2_normalized] for i in range(len(ds2["time"]))]
-
-    ds_merged_bands = ds1_bands + ds2_bands
-    ds_merged_bands.sort(key=lambda x:x[0])
-    
-    time_merged = [t[0].values for t in ds_merged_bands]
-    band_dict = {bands[i]: (["time",  "y", "x"], [t[i+1] for t in ds_merged_bands]) for i in range(len(bands))}
-
-    ds_merged = xr.Dataset(
-        band_dict,
-        coords={
-            "time": time_merged,
-            "y": ("y", y),
-            "x": ("x", x),
-        },
-    )
-    return ds_merged
-
-def merge_all_xarrays(xarrays):
-    """Combines all the xarrays"""
-    fully_merged = xarrays[0]
-    for xarray in xarrays[1:]:
-        fully_merged = merge_two_xarrays(fully_merged, xarray)
-    return fully_merged
-
 if __name__ == '__main__':
-    print("hello world")
+    args = parse_arguments()
 
-    base_directory = "../SPRV"
-    order_ids = ["5fb7ea5a-05ec-4784-a2c1-e4a59540f914", "5fb7ea5a-05ec-4784-a2c1-e4a59540f914"]
-    xarray_outpath = 'testing.pickle'
+    base_directory = args.indir
+    order_id = args.orderid
+    outpath = args.outpath
 
-    xarrays = [load_single_order_3band(order_id) for order_id in order_ids]
-    merged_xarray = merge_all_xarrays(xarrays)
-    with open(xarray_outpath, 'wb') as handle:
-        pickle.dump(merged_xarray, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    print(f"{datetime.now()} Starting planet_xarray_3b in {base_directory} for {order_id}")
+
+    xarray = load_single_order_3band(base_directory, order_id)
+
+    with open(outpath, 'wb') as handle:
+        pickle.dump(xarray, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+    print(f"{datetime.now()} Finished planet_xarray_3b and exported to {outpath}")
