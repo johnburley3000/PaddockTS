@@ -1,3 +1,7 @@
+'''
+Something in this script causes imagery to be offset along the X-axis. See example outputs June 7 2024.
+'''
+
 import os
 import json
 import pickle
@@ -132,14 +136,14 @@ def load_single_order_8band(base_directory, order_id):
     y, x = create_lat_lon(bboxs[0], (transposed_images.shape[3], transposed_images.shape[2]))
     ds_planetscope = xr.Dataset(
         {
-        "Coastal Blue":(["time", "y", "x"], flipped_transposed_image[0]),
-        "nbart_blue":(["time", "y", "x"], flipped_transposed_image[1]),
-        "Green I":(["time", "y", "x"], flipped_transposed_image[2]),
-        "nbart_green":(["time", "y", "x"], flipped_transposed_image[3]),
-        "Yellow":(["time", "y", "x"], flipped_transposed_image[4]),
-        "nbart_red":(["time", "y", "x"], flipped_transposed_image[5]),
-        "Red Edge":(["time", "y", "x"], flipped_transposed_image[6]),
-        "nbart_nir_1":(["time", "y", "x"], flipped_transposed_image[7]),
+        "Coastal Blue":(["time", "y", "x"], transposed_images[0]),
+        "nbart_blue":(["time", "y", "x"], transposed_images[1]),
+        "Green I":(["time", "y", "x"], transposed_images[2]),
+        "nbart_green":(["time", "y", "x"], transposed_images[3]),
+        "Yellow":(["time", "y", "x"], transposed_images[4]),
+        "nbart_red":(["time", "y", "x"], transposed_images[5]),
+        "Red Edge":(["time", "y", "x"], transposed_images[6]),
+        "nbart_nir_1":(["time", "y", "x"], transposed_images[7]),
         }, coords={
             "time": datetimestamps,
             "y": ("y", y),
