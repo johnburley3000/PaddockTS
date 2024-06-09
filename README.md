@@ -6,7 +6,7 @@ Things you must do before the code will run:
 
 ### Note for JupyterLab setup on GADI
 Include these options on the launch site:
-- Storage: gdata/<my project>+gdata/v10
+- Storage: gdata/<my project>+gdata/v10+gdata/ka08
 - Module Directories: /g/data/v10/public/modules/modulefiles/
 - Modules: dea/20231204
 
