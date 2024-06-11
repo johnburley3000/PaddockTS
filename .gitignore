@@ -9,3 +9,4 @@ Planet_dl/x*
 Logs/*
 *.e*
 *.o*
+*.ipynb_checkpoints*
