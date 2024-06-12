@@ -7,6 +7,76 @@ import xarray as xr
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import numpy as np
+from datetime import datetime
+
+# Region of interest
+lat = -34.38904277303204
+lon = 148.46949938279096
+buffer = 0.1
+
+# +
+# Load the silo data for 2017-2023 for just the region of interest
+variables = ["daily_rain", "max_temp", "min_temp", "radiation", "vp"]
+print("SILO variables: ", variables)
+
+start = datetime.now()
+silo_data = {}
+for variable in variables:
+    silo_filepaths = [
+        f"/g/data/ub8/au/SILO/{variable}/2017.{variable}.nc",
+        f"/g/data/ub8/au/SILO/{variable}/2018.{variable}.nc",
+        f"/g/data/ub8/au/SILO/{variable}/2019.{variable}.nc",
+        f"/g/data/ub8/au/SILO/{variable}/2020.{variable}.nc",
+        f"/g/data/ub8/au/SILO/{variable}/2021.{variable}.nc",
+        f"/g/data/ub8/au/SILO/{variable}/2022.{variable}.nc",
+        f"/g/data/ub8/au/SILO/{variable}/2023.{variable}.nc"
+    ]
+    
+    # Load the data for each year and select just the region of interest 
+    silo_datasets = []
+    for filepath in silo_filepaths:
+        ds = xr.open_dataset(filepath)
+        ds_region = ds.sel(lat=slice(lat - buffer, lat + buffer), lon=slice(lon - buffer, lon + buffer))
+        silo_datasets.append(ds_region)
+    combined_ds = xr.concat(silo_datasets, dim='time')
+    silo_data[variable] = combined_ds[variable]
+    
+end = datetime.now()
+print("Time taken to load SILO datasets: ", end - start)
+
+# +
+# Comparing variation between pixels 5km away from each other
+years = [2017, 2018, 2019, 2020, 2021, 2022, 2023]
+
+fig, axes = plt.subplots(nrows=2, ncols=4, figsize=(20, 10))
+axes = axes.flatten()  # Flatten the 2D array of axes to 1D for easier iteration
+
+for i, year in enumerate(years):
+    date_range = slice(f'{year}-01-01', f'{year}-12-31')
+
+    silo_ts = silo_data['daily_rain'].sel(time=date_range)
+    silo_pixel1_ts = silo_ts.sel(lat=lat - buffer, lon=lon - buffer, method='nearest').cumsum(dim='time')
+    silo_pixel2_ts = silo_ts.sel(lat=lat - buffer, lon=lon + buffer, method='nearest').cumsum(dim='time')
+    silo_pixel3_ts = silo_ts.sel(lat=lat + buffer, lon=lon - buffer, method='nearest').cumsum(dim='time')
+    silo_pixel4_ts = silo_ts.sel(lat=lat + buffer, lon=lon + buffer, method='nearest').cumsum(dim='time')
+
+    ax = axes[i]  # Get the current subplot
+    ax.plot(silo_pixel1_ts.time, silo_pixel1_ts, label='SILO Northwest pixel')
+    ax.plot(silo_pixel2_ts.time, silo_pixel2_ts, label='SILO Northeast pixel')
+    ax.plot(silo_pixel3_ts.time, silo_pixel3_ts, label='SILO Southwest pixel')
+    ax.plot(silo_pixel4_ts.time, silo_pixel4_ts, label='SILO Southeast pixel')
+    ax.set_xlabel('Time')
+    ax.set_ylabel('Rainfall (mm)')
+    ax.set_title(f'Rainfall Time Series for {year}')
+    ax.legend()
+
+if len(years) < len(axes):
+    for j in range(len(years), len(axes)):
+        fig.delaxes(axes[j])
+
+plt.tight_layout()
+plt.show()
+# -
 
 # filepaths
 anuclim_filepath = "/g/data/gh70/ANUClimate/v2-0/stable/day/rain/2023/ANUClimate_v2-0_rain_daily_202306.nc"
@@ -18,7 +88,7 @@ silo_full = xr.open_dataset(silo_filepath)
 # Region of interest
 lat = -34.38904277303204
 lon = 148.46949938279096
-buffer = 3
+buffer = 0.1
 
 # When slicing the latitude anuclim needs the order (north, south) whereas silo needs (south, north).
 anuclim_region = anuclim_full.sel(lat=slice(lat + buffer, lat - buffer), lon=slice(lon - buffer, lon + buffer))
@@ -30,7 +100,7 @@ silo_rain = silo_region['daily_rain']
 
 # +
 # Visualising a map at a single time point
-time_point = '2023-06-23'
+time_point = '2023-06-13'
 
 fig, axes = plt.subplots(1, 2, figsize=(21, 7))
 
