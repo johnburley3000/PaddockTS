@@ -78,40 +78,83 @@ if len(years) < len(axes):
 
 plt.tight_layout()
 plt.show()
-# -
-
-variables
 
 # +
 # Comparing cumulative rainfall between different years
 years = [2017, 2018, 2019, 2020, 2021, 2022, 2023]
+variable = "daily_rain"  # corrected variable name
+
+total = {}
+for year in years:
+    date_range = slice(f'{year}-01-01', f'{year}-12-31')
+    silo_ts = silo_data[variable].sel(time=date_range)
+    silo_pixel1_ts = silo_ts.sel(lat=lat, lon=lon, method='nearest').cumsum(dim='time')
+    total[year] = silo_pixel1_ts[-1].item()  # Get the total rainfall for the year
+sorted_years = sorted(total, key=total.get, reverse=True)
+
+for year in sorted_years:
+    date_range = slice(f'{year}-01-01', f'{year}-12-31')
+    silo_ts = silo_data[variable].sel(time=date_range)
+    silo_pixel1_ts = silo_ts.sel(lat=lat, lon=lon, method='nearest').cumsum(dim='time')
+
+    # Convert time to an arbitrary year (2020) so they can be overlayed on the one plot
+    time_values = pd.to_datetime(silo_pixel1_ts.time.values)
+    normalized_time_values = time_values.map(lambda x: x.replace(year=2020))
+
+    plt.plot(normalized_time_values, silo_pixel1_ts, label=f'{year} ({total[year]:.1f}mm)')
+
+# Accessing and setting x-axis properties
+plt.gca().xaxis.set_major_locator(mdates.MonthLocator())
+plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%b'))
+plt.xlim(pd.Timestamp('2020-01-01'), pd.Timestamp('2020-12-31')) 
+
+# Format x-axis to show month names and ensure all months appear
+plt.xlabel('Month') 
+plt.ylabel(f'{variable}') 
+plt.title(f'{variable} yearly cumulative time series at centre pixel') 
+
+# Moving the legend outside the plot to the right
+plt.legend(title=f'Year (total {variable})', bbox_to_anchor=(1.05, 1), loc='upper left')
+
+plt.show()
+
+# +
+# Comparing monthly averages for different years
+years = [2017, 2018, 2019, 2020, 2021, 2022, 2023]
 variables = ["daily_rain", "max_temp", "min_temp", "radiation", "vp"]
 
-fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(20, 10))
+fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(20, 10))
 axes = axes.flatten()
 
+# Find the year with the highest rainfall to sort the legend
+total = {}
+variable = 'daily_rain'
+for year in years:
+    date_range = slice(f'{year}-01-01', f'{year}-12-31')
+    silo_ts = silo_data[variable].sel(time=date_range)
+    silo_pixel1_ts = silo_ts.sel(lat=lat, lon=lon, method='nearest').cumsum(dim='time')
+    total[year] = silo_pixel1_ts[-1].item()  # Get the total rainfall for the year
+sorted_years = sorted(total, key=total.get, reverse=True)
+
+# Plot each variable
 for i, variable in enumerate(variables):
-
-    ax = axes[i]  # Get the current subplot
-
-    total = {}
-    for year in years:
-        date_range = slice(f'{year}-01-01', f'{year}-12-31')
-        silo_ts = silo_data[variable].sel(time=date_range)
-        silo_pixel1_ts = silo_ts.sel(lat=lat, lon=lon, method='nearest').cumsum(dim='time')
-        total[year] = silo_pixel1_ts[-1].item()  # Get the total rainfall for the year
-    sorted_years = sorted(total, key=total.get, reverse=True)
-
+    ax = axes[i]
     for year in sorted_years:
         date_range = slice(f'{year}-01-01', f'{year}-12-31')
         silo_ts = silo_data[variable].sel(time=date_range)
-        silo_pixel1_ts = silo_ts.sel(lat=lat, lon=lon, method='nearest').cumsum(dim='time')
+        silo_pixel1_ts = silo_ts.sel(lat=lat, lon=lon, method='nearest')
+        
+        if variable == 'daily_rain':
+                silo_pixel1_ts = silo_pixel1_ts.cumsum(dim='time')
+
+        # Resample the time series data to monthly intervals and calculate the mean for each month
+        monthly_mean = silo_pixel1_ts.resample(time='1M').mean()
 
         # Convert time to an arbitrary year (2020) so they can be overlayed on the one plot
-        time_values = pd.to_datetime(silo_pixel1_ts.time.values)
+        time_values = pd.to_datetime(monthly_mean.time.values)
         normalized_time_values = time_values.map(lambda x: x.replace(year=2020))
 
-        ax.plot(normalized_time_values, silo_pixel1_ts, label=f'{year} ({total_rainfall[year]:.1f})')
+        ax.plot(normalized_time_values, monthly_mean, label=f'{year}')
 
     ax.xaxis.set_major_locator(mdates.MonthLocator())
     ax.xaxis.set_major_formatter(mdates.DateFormatter('%b'))
@@ -120,13 +163,16 @@ for i, variable in enumerate(variables):
     # Format x-axis to show month names and ensure all months appear
     ax.set_xlabel('Month') 
     ax.set_ylabel(f'{variable}') 
-    ax.set_title(f'{variable} time series at centre pixel') 
-    ax.legend(title=f'Year (total {variable})') 
+    ax.set_title(f'{variable} monthly averages at centre pixel') \
+    
+    # Moving the legend outside the plot to the right
+    ax.legend(title=f'Year', bbox_to_anchor=(1.05, 1), loc='upper left') 
 
+# Remove the empty plot
 if len(variables) < len(axes):
     for j in range(len(variables), len(axes)):
         fig.delaxes(axes[j])
-
+    
 plt.tight_layout()
 plt.show()
 # -
