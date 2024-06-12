@@ -6,7 +6,9 @@
 import xarray as xr
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
+import matplotlib.dates as mdates
 import numpy as np
+import pandas as pd
 from datetime import datetime
 
 # Region of interest
@@ -75,6 +77,41 @@ if len(years) < len(axes):
         fig.delaxes(axes[j])
 
 plt.tight_layout()
+plt.show()
+
+# +
+# Comparing cumulative rainfall between different years
+years = [2017, 2018, 2019, 2020, 2021, 2022, 2023]
+
+total = {}
+for year in years:
+    date_range = slice(f'{year}-01-01', f'{year}-12-31')
+    silo_ts = silo_data['daily_rain'].sel(time=date_range)
+    silo_pixel1_ts = silo_ts.sel(lat=lat, lon=lon, method='nearest').cumsum(dim='time')
+    total[year] = silo_pixel1_ts[-1].item()  # Get the total rainfall for the year
+sorted_years = sorted(total, key=total.get, reverse=True)
+
+plt.figure(figsize=(10, 5))
+for year in sorted_years:
+    date_range = slice(f'{year}-01-01', f'{year}-12-31')
+    silo_ts = silo_data['daily_rain'].sel(time=date_range)
+    silo_pixel1_ts = silo_ts.sel(lat=lat, lon=lon, method='nearest').cumsum(dim='time')
+
+    # Convert time to an arbitrary year (2020) so they can be overlayed on the one plot
+    time_values = pd.to_datetime(silo_pixel1_ts.time.values)
+    normalized_time_values = time_values.map(lambda x: x.replace(year=2020))
+
+    plt.plot(normalized_time_values, silo_pixel1_ts, label=f'{year} ({total_rainfall[year]:.1f} mm)')
+
+# Format x-axis to show month names and ensure all months appear
+plt.gca().xaxis.set_major_locator(mdates.MonthLocator())
+plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%b'))
+plt.xlim(pd.Timestamp('2020-01-01'), pd.Timestamp('2020-12-31'))
+
+plt.xlabel('Month')
+plt.ylabel('Rainfall (mm)')
+plt.title('Rainfall Time Series at the Centre Pixel')
+plt.legend(title='Year (Total Rainfall)')
 plt.show()
 # -
 
