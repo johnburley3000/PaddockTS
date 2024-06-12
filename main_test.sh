@@ -4,11 +4,11 @@
 # specify working directory:
 wd=/home/106/jb5097/Projects/PaddockTS
 # params
-stub=AO_b02_y20-22
+stub=ARBO_tmp
 dir=/g/data/xe2/John/Data/PadSeg/
-lat=-33.504022
-lon=148.638517
-buffer=0.02
+lat=-35.289561061551844
+lon=149.06381325367872
+buffer=0.033 # this distance in all directions from (lat,lon)
 start='2020-01-01'
 end_='2022-12-31'
 # params for paddock filtering

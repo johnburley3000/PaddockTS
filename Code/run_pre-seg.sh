@@ -1,9 +1,10 @@
 #!/bin/bash
 #PBS -N PreSegment
-#PBS -l mem=16GB
-#PBS -l ncpus=8
+#PBS -l mem=186GB
+#PBS -l ncpus=24
+#PBS -l jobfs=24GB
 #PBS -P xe2
-#PBS -l walltime=04:00:00
+#PBS -l walltime=10:00:00
 #PBS -l storage=gdata/xe2+gdata/v10+gdata/ka08
 #PBS -q normal
 

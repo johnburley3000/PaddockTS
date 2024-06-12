@@ -1,7 +1,7 @@
 #!/bin/bash
 #PBS -N SAMGeo
-#PBS -l mem=20GB
-#PBS -ljobfs=3GB
+#PBS -l mem=128GB
+#PBS -ljobfs=24GB
 #PBS -q gpuvolta
 #PBS -lncpus=12,ngpus=1
 #PBS -P xe2
