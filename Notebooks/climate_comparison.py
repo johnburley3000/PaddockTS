@@ -119,43 +119,7 @@ plt.legend(title=f'Year (total {variable})', bbox_to_anchor=(1.05, 1), loc='uppe
 plt.show()
 
 # +
-# Comparing cumulative rainfall between different years
-years = [2017, 2018, 2019, 2020, 2021, 2022, 2023]
-variable = "daily_rain"  # corrected variable name
-
-total = {}
-for year in years:
-    date_range = slice(f'{year}-01-01', f'{year}-12-31')
-    silo_ts = silo_data[variable].sel(time=date_range)
-    silo_pixel1_ts = silo_ts.sel(lat=lat, lon=lon, method='nearest').cumsum(dim='time')
-    total[year] = silo_pixel1_ts[-1].item()  # Get the total rainfall for the year
-sorted_years = sorted(total, key=total.get, reverse=True)
-
-for year in sorted_years:
-    date_range = slice(f'{year}-01-01', f'{year}-12-31')
-    silo_ts = silo_data[variable].sel(time=date_range)
-    silo_pixel1_ts = silo_ts.sel(lat=lat, lon=lon, method='nearest')
-    
-    # Aggregate by month and then sum the months cumulatively
-    monthly_values = silo_pixel1_ts.resample(time='M').sum().cumsum()
-    monthly_start_dates = pd.date_range(start='2020-01-01', periods=12, freq='MS')
-    monthly_values['time'] = monthly_start_dates
-
-    plt.plot(monthly_values, label=f'{year} ({total[year]:.1f}mm)')
-
-plt.xticks(ticks=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], 
-           labels=["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"])
-plt.xlabel('Month') 
-plt.ylabel(f'{variable}') 
-plt.title(f'{variable} yearly cumulative time series at centre pixel') 
-
-# Moving the legend outside the plot to the right
-plt.legend(title=f'Year (total {variable})', bbox_to_anchor=(1.05, 1), loc='upper left')
-
-plt.show()
-
-# +
-# Comparing monthly averages for different years
+# Comparing variables for different years
 years = [2017, 2018, 2019, 2020, 2021, 2022, 2023]
 variables = ["daily_rain", "max_temp", "min_temp", "radiation", "vp"]
 
@@ -180,33 +144,27 @@ for i, variable in enumerate(variables):
         silo_ts = silo_data[variable].sel(time=date_range)
         silo_pixel1_ts = silo_ts.sel(lat=lat, lon=lon, method='nearest')
         
+        # Aggregate by month showing a cumulative sum of rainfall, and a monthly average for everything else
         if variable == 'daily_rain':
-                silo_pixel1_ts = silo_pixel1_ts.cumsum(dim='time')
+            monthly_values = silo_pixel1_ts.resample(time='M').sum().cumsum()
+            label=f'{year} ({total[year]:.1f}mm)'
+        else:
+            monthly_values = silo_pixel1_ts.resample(time='M').mean()
+            label = f'{year}'
 
-        # Convert time to an arbitrary year (2020) so they can be overlayed on the one plot
-        time_values = pd.to_datetime(silo_pixel1_ts.time.values)
-        normalized_time_values = time_values.map(lambda x: x.replace(year=2020))
+        monthly_start_dates = pd.date_range(start='2020-01-01', periods=12, freq='MS')
+        monthly_values['time'] = monthly_start_dates
+        
+        ax.plot(monthly_values, label=label)
 
-        ax.plot(normalized_time_values, silo_pixel1_ts, label=f'{year} ({total[year]:.1f}mm)')
-
-                
-#         # Resample the time series data to monthly intervals and calculate the mean for each month
-#         monthly_mean = silo_pixel1_ts.resample(time='1M').mean()
-
-#         # Convert time to an arbitrary year (2020) so they can be overlayed on the one plot
-#         time_values = pd.to_datetime(monthly_mean.time.values)
-#         normalized_time_values = time_values.map(lambda x: x.replace(year=2020))
-
-#         ax.plot(normalized_time_values, monthly_mean, label=f'{year}')
-
-    ax.xaxis.set_major_locator(mdates.MonthLocator())
-    ax.xaxis.set_major_formatter(mdates.DateFormatter('%b'))
-    ax.set_xlim(pd.Timestamp('2020-01-01'), pd.Timestamp('2020-12-31')) 
-           
     # Format x-axis to show month names and ensure all months appear
+    ax.set_xticks(ticks=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], 
+           labels=["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"])
     ax.set_xlabel('Month') 
     ax.set_ylabel(f'{variable}') 
-    ax.set_title(f'{variable} monthly averages at centre pixel') \
+    
+    metric = "cumulative sum" if variable == 'daily_rain' else "average"
+    ax.set_title(f'{variable} monthly {metric} at centre pixel') \
     
     # Moving the legend outside the plot to the right
     ax.legend(title=f'Year', bbox_to_anchor=(1.05, 1), loc='upper left') 
