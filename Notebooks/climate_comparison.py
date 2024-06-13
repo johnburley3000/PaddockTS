@@ -234,29 +234,6 @@ plt.show()
 # ### Notable features in ANUClim rain comparison between pixels
 # - Consistently higher rainfall in the northeast pixel
 
-monthly_values
-
-xr.DataArray(
-    np.append(monthly_values.values, [0, 0, 0, 0, 0, 0]),
-    coords={"lat": monthly_values.lat, "lon": monthly_values.lon},
-)
-
-xr.DataArray(
-    np.append(monthly_values.values, [0, 0, 0, 0, 0, 0]),
-    coords={"lat": monthly_values.lat, "lon": monthly_values.lon},
-    dims=['rain']
-)
-
-np.append(monthly_values.values, [0, 0, 0, 0, 0, 0])
-
-monthly_values
-
-xr.DataArray(
-        np.append(monthly_values.values, [0, 0, 0, 0, 0, 0]),
-        coords={"time": monthly_start_dates, "lat": monthly_values.lat, "lon": monthly_values.lon},
-        dims=["time"]
-    )
-
 # +
 # Comparing variables for different years
 years = [2017, 2018, 2019, 2020, 2021, 2022, 2023]
@@ -276,38 +253,47 @@ for year in years:
     total[year] = pixel1_ts[-1].item()
 sorted_years = sorted(total, key=total.get, reverse=True)
 
-for year in sorted_years:
-    date_range = slice(f'{year}-01-01', f'{year}-12-31')
-    ts = ds_anuclim_rain[variable].sel(time=date_range)
-    pixel1_ts = ts.sel(lat=lat, lon=lon, method='nearest')
+# Plot each variable
+for i, variable in enumerate(variables):
+    ax = axes[i]
+    for year in sorted_years:
+        date_range = slice(f'{year}-01-01', f'{year}-12-31')
+        ts = ds_anuclim_rain[variable].sel(time=date_range)
+        pixel1_ts = ts.sel(lat=lat, lon=lon, method='nearest')
 
-    # Aggregate by month showing a cumulative sum of rainfall, and a monthly average for everything else
-    monthly_values = pixel1_ts.resample(time='M').sum().cumsum()
-    label=f'{year} ({total[year]:.1f}mm)'
-    monthly_start_dates = pd.date_range(start='2020-01-01', periods=12, freq='MS')
+        # Aggregate by month showing a cumulative sum of rainfall, and a monthly average for everything else
+        monthly_values = pixel1_ts.resample(time='M').sum().cumsum()
+        label=f'{year} ({total[year]:.1f}mm)'
+        monthly_start_dates = pd.date_range(start='2020-01-01', periods=12, freq='MS')
 
-    # ANUClim only has rainfall up to June for 2023 so append 6 months of no rain for visualisation
-    if year == 2023:
-        xr.DataArray(
-            np.append(monthly_values.values, [0, 0, 0, 0, 0, 0]),
-            coords={"time": monthly_start_dates, "lat": monthly_values.lat, "lon": monthly_values.lon},
-            dims=['time']
-        ) 
-    else: 
-        monthly_values['time'] = monthly_start_dates
-    plt.plot(monthly_values, label=label)
+        # ANUClim only has rainfall up to June for 2023 so append 6 months of no rain for visualisation
+        if year == 2023:
+            xr.DataArray(
+                np.append(monthly_values.values, [0, 0, 0, 0, 0, 0]),
+                coords={"time": monthly_start_dates, "lat": monthly_values.lat, "lon": monthly_values.lon},
+                dims=['time']
+            ) 
+        else: 
+            monthly_values['time'] = monthly_start_dates
+        ax.plot(monthly_values, label=label)
+        
+        # Moving the legend outside the plot to the right
+        ax.legend(title=f'Year', bbox_to_anchor=(1, 1), loc='upper left') 
 
-# Format x-axis to show month names and ensure all months appear
-# plt.set_xticks(ticks=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], 
-#        labels=["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"])
-# plt.set_xlabel('Month') 
-# plt.set_ylabel(f'{variable}') 
+    # Format x-axis to show month names and ensure all months appear
+    ax.set_xticks(ticks=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], 
+           labels=["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"])
+    ax.set_xlabel('Month') 
+    ax.set_ylabel(f'{variable}') 
 
-metric = "cumulative sum" if variable == 'rain' else "average"
-# plt.set_title(f'{variable} monthly {metric} at centre pixel') \
+    metric = "cumulative sum" if variable == 'rain' else "average"
+    ax.set_title(f'{variable} monthly {metric} at centre pixel') \
 
-# Moving the legend outside the plot to the right
-plt.legend(title=f'Year', bbox_to_anchor=(1.05, 1), loc='upper left') 
+if len(years) < len(axes):
+    for j in range(len(years), len(axes)):
+        fig.delaxes(axes[j])
+
+plt.tight_layout()
 plt.show()
 # -
 
