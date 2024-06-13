@@ -152,6 +152,9 @@ plt.show()
 # - Low spring temperature in 2021-2022
 # - Low vapour pressure in December 2019
 
+# Creating a dataframe with columns: time, lat, lon, rainfall to match the animation creation code.
+silo_data['daily_rain']
+
 # +
 # Playing with video creation
 
