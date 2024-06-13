@@ -19,7 +19,7 @@ buffer = 0.1
 # +
 # Load the silo data for 2017-2023 for just the region of interest
 variables = ["daily_rain", "max_temp", "min_temp", "radiation", "vp"]
-print("SILO variables: ", variables)
+print("Loading SILO variables: ", variables)
 
 start = datetime.now()
 silo_data = {}
@@ -53,6 +53,7 @@ years = [2017, 2018, 2019, 2020, 2021, 2022, 2023]
 fig, axes = plt.subplots(nrows=2, ncols=4, figsize=(20, 10))
 axes = axes.flatten()  # Flatten the 2D array of axes to 1D for easier iteration
 
+buffer = 0.05
 for i, year in enumerate(years):
     date_range = slice(f'{year}-01-01', f'{year}-12-31')
 
@@ -63,13 +64,13 @@ for i, year in enumerate(years):
     silo_pixel4_ts = silo_ts.sel(lat=lat + buffer, lon=lon + buffer, method='nearest').cumsum(dim='time')
 
     ax = axes[i]  # Get the current subplot
-    ax.plot(silo_pixel1_ts.time, silo_pixel1_ts, label='SILO Northwest pixel')
-    ax.plot(silo_pixel2_ts.time, silo_pixel2_ts, label='SILO Northeast pixel')
-    ax.plot(silo_pixel3_ts.time, silo_pixel3_ts, label='SILO Southwest pixel')
-    ax.plot(silo_pixel4_ts.time, silo_pixel4_ts, label='SILO Southeast pixel')
+    ax.plot(silo_pixel1_ts.time, silo_pixel1_ts, label='SILO northwest pixel')
+    ax.plot(silo_pixel2_ts.time, silo_pixel2_ts, label='SILO northeast pixel')
+    ax.plot(silo_pixel3_ts.time, silo_pixel3_ts, label='SILO southwest pixel')
+    ax.plot(silo_pixel4_ts.time, silo_pixel4_ts, label='SILO southeast pixel')
     ax.set_xlabel('Time')
     ax.set_ylabel('Rainfall (mm)')
-    ax.set_title(f'Rainfall Time Series for {year}')
+    ax.set_title(f'SILO Rainfall Time Series for {year}')
     ax.legend()
 
 if len(years) < len(axes):
@@ -78,52 +79,18 @@ if len(years) < len(axes):
 
 plt.tight_layout()
 plt.show()
+# -
 
-# +
-# Comparing cumulative rainfall between different years
-years = [2017, 2018, 2019, 2020, 2021, 2022, 2023]
-variable = "daily_rain"  # corrected variable name
-
-total = {}
-for year in years:
-    date_range = slice(f'{year}-01-01', f'{year}-12-31')
-    silo_ts = silo_data[variable].sel(time=date_range)
-    silo_pixel1_ts = silo_ts.sel(lat=lat, lon=lon, method='nearest').cumsum(dim='time')
-    total[year] = silo_pixel1_ts[-1].item()  # Get the total rainfall for the year
-sorted_years = sorted(total, key=total.get, reverse=True)
-
-for year in sorted_years:
-    date_range = slice(f'{year}-01-01', f'{year}-12-31')
-    silo_ts = silo_data[variable].sel(time=date_range)
-    silo_pixel1_ts = silo_ts.sel(lat=lat, lon=lon, method='nearest').cumsum(dim='time')
-
-    # Convert time to an arbitrary year (2020) so they can be overlayed on the one plot
-    time_values = pd.to_datetime(silo_pixel1_ts.time.values)
-    normalized_time_values = time_values.map(lambda x: x.replace(year=2020))
-
-    plt.plot(normalized_time_values, silo_pixel1_ts, label=f'{year} ({total[year]:.1f}mm)')
-
-# Accessing and setting x-axis properties
-plt.gca().xaxis.set_major_locator(mdates.MonthLocator())
-plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%b'))
-plt.xlim(pd.Timestamp('2020-01-01'), pd.Timestamp('2020-12-31')) 
-
-# Format x-axis to show month names and ensure all months appear
-plt.xlabel('Month') 
-plt.ylabel(f'{variable}') 
-plt.title(f'{variable} yearly cumulative time series at centre pixel') 
-
-# Moving the legend outside the plot to the right
-plt.legend(title=f'Year (total {variable})', bbox_to_anchor=(1.05, 1), loc='upper left')
-
-plt.show()
+# ### Notable features SILO rain comparison between pixels
+# - Mostly similar rainfall between nearby pixels
+# - 50mm less rain in the nNotableorthwest pixel in 2018
 
 # +
 # Comparing variables for different years
 years = [2017, 2018, 2019, 2020, 2021, 2022, 2023]
 variables = ["daily_rain", "max_temp", "min_temp", "radiation", "vp"]
 
-fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(20, 10))
+fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(20, 20))
 axes = axes.flatten()
 
 # Find the year with the highest rainfall to sort the legend
@@ -175,6 +142,172 @@ if len(variables) < len(axes):
         fig.delaxes(axes[j])
     
 plt.tight_layout()
+plt.show()
+# -
+
+# ### Notable features in the above plots
+# - Low rainfall in 2017-2019 and the start of 2020 (& 2023)
+# - High summer temperature in 2019
+# - High winter temperature in 2023
+# - Low spring temperature in 2021-2022
+# - Low vapour pressure in December 2019
+
+# +
+# Create a list of all the ANUClim filepaths from 2017 to 2023 (stored monthly)
+# example_filepath = "/g/data/gh70/ANUClimate/v2-0/stable/day/rain/2023/ANUClimate_v2-0_rain_daily_202306.nc"
+
+variable = "rain"
+anuclim_filepaths = []
+for year in range(2017,2023):
+    for month in range(1,13):
+        filepath = f"/g/data/gh70/ANUClimate/v2-0/stable/day/{variable}/{year}/ANUClimate_v2-0_{variable}_daily_{year}{month:02}.nc"
+        anuclim_filepaths.append(filepath)
+
+# This ANUClim directory only has data up to June 2023
+anucim_2023_filepaths = [
+        f"/g/data/gh70/ANUClimate/v2-0/stable/day/{variable}/2023/ANUClimate_v2-0_{variable}_daily_202301.nc",
+        f"/g/data/gh70/ANUClimate/v2-0/stable/day/{variable}/2023/ANUClimate_v2-0_{variable}_daily_202302.nc",
+        f"/g/data/gh70/ANUClimate/v2-0/stable/day/{variable}/2023/ANUClimate_v2-0_{variable}_daily_202303.nc",
+        f"/g/data/gh70/ANUClimate/v2-0/stable/day/{variable}/2023/ANUClimate_v2-0_{variable}_daily_202304.nc",
+        f"/g/data/gh70/ANUClimate/v2-0/stable/day/{variable}/2023/ANUClimate_v2-0_{variable}_daily_202305.nc",
+        f"/g/data/gh70/ANUClimate/v2-0/stable/day/{variable}/2023/ANUClimate_v2-0_{variable}_daily_202306.nc",
+    ]
+
+anuclim_filepaths.extend(anucim_2023_filepaths)
+anuclim_filepaths[0]
+
+# +
+variables = ["rain"]
+variable = "rain"
+
+# Load the data for each year and select just the region of interest 
+print("Loading ANUClim variables: ", variables)
+start = datetime.now()
+
+datasets = []
+for filepath in anuclim_filepaths:
+    ds = xr.open_dataset(filepath)
+
+    # When slicing the latitude anuclim needs the order (north, south) whereas silo needs (south, north).
+    ds_region = ds.sel(lat=slice(lat + buffer, lat - buffer), lon=slice(lon - buffer, lon + buffer))
+    datasets.append(ds_region)
+ds_anuclim_rain = xr.concat(datasets, dim='time')
+
+end = datetime.now()
+print("Time taken to load ANUClim datasets: ", end - start)
+
+# +
+# Comparing ANUClim rain variation between pixels 5km away from each other
+years = [2017, 2018, 2019, 2020, 2021, 2022, 2023]
+
+fig, axes = plt.subplots(nrows=2, ncols=4, figsize=(20, 10))
+axes = axes.flatten()  # Flatten the 2D array of axes to 1D for easier iteration
+
+buffer = 0.05
+for i, year in enumerate(years):
+    date_range = slice(f'{year}-01-01', f'{year}-12-31')
+
+    ts = ds_anuclim_rain['rain'].sel(time=date_range)
+    pixel1_ts = ts.sel(lat=lat - buffer, lon=lon - buffer, method='nearest').cumsum(dim='time')
+    pixel2_ts = ts.sel(lat=lat - buffer, lon=lon + buffer, method='nearest').cumsum(dim='time')
+    pixel3_ts = ts.sel(lat=lat + buffer, lon=lon - buffer, method='nearest').cumsum(dim='time')
+    pixel4_ts = ts.sel(lat=lat + buffer, lon=lon + buffer, method='nearest').cumsum(dim='time')
+
+    ax = axes[i]  # Get the current subplot
+    ax.plot(pixel1_ts.time, pixel1_ts, label='northwest pixel')
+    ax.plot(pixel2_ts.time, pixel2_ts, label='northeast pixel')
+    ax.plot(pixel3_ts.time, pixel3_ts, label='southwest pixel')
+    ax.plot(pixel4_ts.time, pixel4_ts, label='southeast pixel')
+    ax.set_xlabel('Time')
+    ax.set_ylabel('Rainfall (mm)')
+    ax.set_title(f'ANUClim Rainfall Time Series for {year}')
+    ax.legend()
+
+if len(years) < len(axes):
+    for j in range(len(years), len(axes)):
+        fig.delaxes(axes[j])
+
+plt.tight_layout()
+plt.show()
+# -
+
+# ### Notable features in ANUClim rain comparison between pixels
+# - Consistently higher rainfall in the northeast pixel
+
+monthly_values
+
+xr.DataArray(
+    np.append(monthly_values.values, [0, 0, 0, 0, 0, 0]),
+    coords={"lat": monthly_values.lat, "lon": monthly_values.lon},
+)
+
+xr.DataArray(
+    np.append(monthly_values.values, [0, 0, 0, 0, 0, 0]),
+    coords={"lat": monthly_values.lat, "lon": monthly_values.lon},
+    dims=['rain']
+)
+
+np.append(monthly_values.values, [0, 0, 0, 0, 0, 0])
+
+monthly_values
+
+xr.DataArray(
+        np.append(monthly_values.values, [0, 0, 0, 0, 0, 0]),
+        coords={"time": monthly_start_dates, "lat": monthly_values.lat, "lon": monthly_values.lon},
+        dims=["time"]
+    )
+
+# +
+# Comparing variables for different years
+years = [2017, 2018, 2019, 2020, 2021, 2022, 2023]
+variables = ["rain"]
+variable = "rain"
+
+fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(20, 20))
+axes = axes.flatten()
+
+# Find the year with the highest rainfall to sort the legend
+total = {}
+variable = 'rain'
+for year in years:
+    date_range = slice(f'{year}-01-01', f'{year}-12-31')
+    ts = ds_anuclim_rain['rain'].sel(time=date_range)
+    pixel1_ts = ts.sel(lat=lat, lon=lon, method='nearest').cumsum(dim='time')
+    total[year] = pixel1_ts[-1].item()
+sorted_years = sorted(total, key=total.get, reverse=True)
+
+for year in sorted_years:
+    date_range = slice(f'{year}-01-01', f'{year}-12-31')
+    ts = ds_anuclim_rain[variable].sel(time=date_range)
+    pixel1_ts = ts.sel(lat=lat, lon=lon, method='nearest')
+
+    # Aggregate by month showing a cumulative sum of rainfall, and a monthly average for everything else
+    monthly_values = pixel1_ts.resample(time='M').sum().cumsum()
+    label=f'{year} ({total[year]:.1f}mm)'
+    monthly_start_dates = pd.date_range(start='2020-01-01', periods=12, freq='MS')
+
+    # ANUClim only has rainfall up to June for 2023 so append 6 months of no rain for visualisation
+    if year == 2023:
+        xr.DataArray(
+            np.append(monthly_values.values, [0, 0, 0, 0, 0, 0]),
+            coords={"time": monthly_start_dates, "lat": monthly_values.lat, "lon": monthly_values.lon},
+            dims=['time']
+        ) 
+    else: 
+        monthly_values['time'] = monthly_start_dates
+    plt.plot(monthly_values, label=label)
+
+# Format x-axis to show month names and ensure all months appear
+# plt.set_xticks(ticks=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], 
+#        labels=["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"])
+# plt.set_xlabel('Month') 
+# plt.set_ylabel(f'{variable}') 
+
+metric = "cumulative sum" if variable == 'rain' else "average"
+# plt.set_title(f'{variable} monthly {metric} at centre pixel') \
+
+# Moving the legend outside the plot to the right
+plt.legend(title=f'Year', bbox_to_anchor=(1.05, 1), loc='upper left') 
 plt.show()
 # -
 
