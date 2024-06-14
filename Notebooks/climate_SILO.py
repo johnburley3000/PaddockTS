@@ -86,7 +86,7 @@ plt.show()
 # - 50mm less rain in the nNotableorthwest pixel in 2018
 
 # +
-# Comparing variables for different years
+# Comparing monthly variables for different years
 years = [2017, 2018, 2019, 2020, 2021, 2022, 2023]
 variables = ["max_temp", "min_temp", "radiation", "vp", "daily_rain"]
 
@@ -127,11 +127,11 @@ for i, variable in enumerate(variables):
     # Format x-axis to show month names and ensure all months appear
     ax.set_xticks(ticks=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], 
            labels=["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"])
-    ax.set_xlabel('Month') 
+    ax.set_xlabel('Day of year') 
     ax.set_ylabel(f'{variable}') 
     
     metric = "cumulative sum" if variable == 'daily_rain' else "average"
-    ax.set_title(f'SILO {variable} monthly {metric} at centre pixel') \
+    ax.set_title(f'SILO {variable} daily {metric} at centre pixel') \
     
     # Moving the legend outside the plot to the right
     ax.legend(title=f'Year', bbox_to_anchor=(1.05, 1), loc='upper left') 
@@ -152,55 +152,73 @@ plt.show()
 # - Low spring temperature in 2021-2022
 # - Low vapour pressure in December 2019
 
-# Creating a dataframe with columns: time, lat, lon, rainfall to match the animation creation code.
-silo_data['daily_rain']
-
 # +
-# Playing with video creation
+# Comparing cumulative rainfall between different years
+years = [2017, 2018, 2019, 2020, 2021, 2022, 2023]
+variables = ["radiation", "vp", "max_temp", "min_temp", "daily_rain"]
+summed = "max_temp", "min_temp", "daily_rain"
 
-# +
-import numpy as np
-import pandas as pd
-import plotly.express as px
 
-# Example data
-times = pd.date_range('2023-01-01', periods=10, freq='D')
-latitudes = np.linspace(-90, 90, 20)
-longitudes = np.linspace(-180, 180, 20)
-rainfall_data = np.random.rand(len(times), len(latitudes), len(longitudes))
+fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(20, 20))
+axes = axes.flatten()
 
-data = []
-for t, time in enumerate(times):
-    for i, lat in enumerate(latitudes):
-        for j, lon in enumerate(longitudes):
-            data.append([time, lat, lon, rainfall_data[t, i, j]])
+for i, variable in enumerate(variables):
 
-df = pd.DataFrame(data, columns=['time', 'lat', 'lon', 'rainfall'])
+    ax = axes[i]  # Get the current subplot
 
-# Create the plotly figure
-fig = px.scatter_geo(df, 
-                     lon='lon', 
-                     lat='lat', 
-                     color='rainfall', 
-                     animation_frame='time',
-                     color_continuous_scale='Blues',
-                     projection='natural earth',
-                     title='Time Series Rainfall Data')
+    total = {}
+    for year in years:
+        date_range = slice(f'{year}-01-01', f'{year}-12-31')
+        silo_ts = silo_data[variable].sel(time=date_range)
+        silo_pixel1_ts = silo_ts.sel(lat=lat, lon=lon, method='nearest').cumsum(dim='time')
+        total[year] = silo_pixel1_ts[-1].item()  # Get the total rainfall for the year
+    sorted_years = sorted(total, key=total.get, reverse=True)
 
-fig.update_layout(
-    geo=dict(
-        showland=True,
-        landcolor="white",
-        showocean=True,
-        oceancolor="lightblue"
-    ),
-    coloraxis_colorbar=dict(
-        title="Rainfall"
-    )
-)
+    ordered_years = sorted_years if variable in summed else years
+    for year in ordered_years:
+        date_range = slice(f'{year}-01-01', f'{year}-12-31')
+        silo_ts = silo_data[variable].sel(time=date_range)
+        silo_pixel1_ts = silo_ts.sel(lat=lat, lon=lon, method='nearest')
+        
+        if variable in summed:
+            silo_pixel1_ts = silo_pixel1_ts.cumsum(dim='time')
 
-# Save the animation as an HTML file
-fig.write_html("rainfall_animation.html")
+        # Convert time to an arbitrary year (2020) so they can be overlayed on the one plot
+        time_values = pd.to_datetime(silo_pixel1_ts.time.values)
+        normalized_time_values = time_values.map(lambda x: x.replace(year=2020))
+
+        label = f'{year} ({total[year]:.1f})' if variable in summed else year 
+        ax.plot(normalized_time_values, silo_pixel1_ts, label=label)
+
+    ax.xaxis.set_major_locator(mdates.MonthLocator())
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%b'))
+    ax.set_xlim(pd.Timestamp('2020-01-01'), pd.Timestamp('2020-12-31')) 
+           
+    # Format x-axis to show month names and ensure all months appear
+    ax.set_xlabel('Month') 
+    ax.set_ylabel(f'{variable}') 
+    
+    if variable in summed:
+        title = f'daily cumulative sum of {variable} time series at centre pixel'
+    else:
+        title = f'daily {variable} time series at centre pixel'
+    ax.set_title(title) 
+    
+    if variable in summed:
+        # Moving the legend outside the plot to the right
+        ax.legend(title=f'Year (total {variable})', bbox_to_anchor=(1, 1), loc='upper left') 
+    else:
+        ax.legend(title=f'Year') 
+
+
+
+if len(variables) < len(axes):
+    for j in range(len(variables), len(axes)):
+        fig.delaxes(axes[j])
+
+plt.tight_layout()
+plt.show()
 # -
+
 
 

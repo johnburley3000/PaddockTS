@@ -1,7 +1,7 @@
 # Make sure to include these paths when creating the interactive session on NCI ARE
 # gdata/xe2+gdata/v10+gdata/ka08+gdata/ub8+gdata/gh70
-# !ls /g/data/gh70/ANUClimate/v2-0/stable/day/rain/2023/ANUClimate_v2-0_rain_daily_202306.nc
 # !ls /g/data/ub8/au/SILO/daily_rain/2023.daily_rain.nc
+# !ls /g/data/gh70/ANUClimate/v2-0/stable/day/rain/2023/ANUClimate_v2-0_rain_daily_202306.nc
 
 import xarray as xr
 import matplotlib.pyplot as plt
