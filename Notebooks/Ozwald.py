@@ -166,8 +166,17 @@ plt.show()
 variables = ["Ssoil", "LAI", "GPP", "NDVI",]
 colours = ["Blues", "YlGn", "BuGn", "Greens"]
 
+variables = ["LAI", "GPP"]
+colours = ["Greens", "YlGn"]
+
+
 for variable, colour in zip(variables, colours):
-    ds = silo_data[variable]
+    ds = data[variable]
+    ds = ds.dropna(dim='time', how='all')
+    
+    # Forward fill missing values along the time dimension
+    ds = ds.ffill(dim='time')
+    
     time_series = ds
     times = ds['time']
 
@@ -196,24 +205,21 @@ for variable, colour in zip(variables, colours):
     print(f"Time taken to create animation for {variable}: {end - start}")
 
 
-# -
 
-data[variable]
-
-
-
-# + endofcell="--"
+# +
 # Small example for testing colours
-date_range = slice('2020-01-01', '2022-12-31')
+date_range = slice('2022-10-01', '2022-12-31')
 ts = data[variable].sel(time=date_range)
 
-variable = 'Ssoil'
-colour = 'Blues'
+variable = 'LAI'
+colour = 'Greens'
 
 ds = ts
+ds= ds.dropna(dim='time', how='all')
 time_series = ds 
 times = ds['time']
 
+# + endofcell="--"
 # Create the animation
 fig, ax = plt.subplots(figsize=(10, 6))
 def animate(time_index):
