@@ -2,6 +2,7 @@
 # gdata/xe2+gdata/v10+gdata/ka08+gdata/ub8+gdata/gh70
 # !ls /g/data/ub8/au/SILO/daily_rain/2023.daily_rain.nc
 # !ls /g/data/gh70/ANUClimate/v2-0/stable/day/rain/2023/ANUClimate_v2-0_rain_daily_202306.nc
+# !ls /g/data/ub8/au/OzWALD/8day/Ssoil/OzWALD.Ssoil.2020.nc
 
 import xarray as xr
 import matplotlib.pyplot as plt
@@ -15,54 +16,88 @@ import gc
 # Region of interest
 lat = -34.38904277303204
 lon = 148.46949938279096
-buffer = 0.1
+buffer = 0.2 # 20km
 
 # +
-# Create a list of all the ANUClim filepaths from 2017 to 2023 (stored monthly)
-# example_filepath = "/g/data/gh70/ANUClimate/v2-0/stable/day/rain/2023/ANUClimate_v2-0_rain_daily_202306.nc"
+# Create a list of Ozwald filepaths from 2017 to 2023 (stored yearly)
+# example_filepath = "/g/data/ub8/au/OzWALD/8day/Ssoil/OzWALD.Ssoil.2020.nc"
 
-variables = ["evap", "rain", "srad", "tavg", "tmax", "tmin", "vp", "vpd"]
-anuclim_filepaths = {}
+variables = ["Ssoil", "LAI", "NDVI", "GPP"]
+filepaths = {}
 for variable in variables:
-    anuclim_filepaths[variable] = []
+    filepaths[variable] = []
     for year in range(2017,2023):
-        for month in range(1,13):
-            filepath = f"/g/data/gh70/ANUClimate/v2-0/stable/day/{variable}/{year}/ANUClimate_v2-0_{variable}_daily_{year}{month:02}.nc"
-            anuclim_filepaths[variable].append(filepath)
+        filepath = f"/g/data/ub8/au/OzWALD/8day/{variable}/OzWALD.{variable}.{year}.nc"
+        filepaths[variable].append(filepath)
+filepaths.keys()
+# -
 
-    # This ANUClim directory only has data up to June 2023
-    anuclim_2023_filepaths = [
-            f"/g/data/gh70/ANUClimate/v2-0/stable/day/{variable}/2023/ANUClimate_v2-0_{variable}_daily_202301.nc",
-            f"/g/data/gh70/ANUClimate/v2-0/stable/day/{variable}/2023/ANUClimate_v2-0_{variable}_daily_202302.nc",
-            f"/g/data/gh70/ANUClimate/v2-0/stable/day/{variable}/2023/ANUClimate_v2-0_{variable}_daily_202303.nc",
-            f"/g/data/gh70/ANUClimate/v2-0/stable/day/{variable}/2023/ANUClimate_v2-0_{variable}_daily_202304.nc",
-            f"/g/data/gh70/ANUClimate/v2-0/stable/day/{variable}/2023/ANUClimate_v2-0_{variable}_daily_202305.nc",
-            f"/g/data/gh70/ANUClimate/v2-0/stable/day/{variable}/2023/ANUClimate_v2-0_{variable}_daily_202306.nc",
-        ]
-    anuclim_filepaths[variable].extend(anuclim_2023_filepaths)
-    
-anuclim_filepaths.keys()
+filepath = filepaths['Ssoil'][0]
+filepath
+
+"/g/data/ub8/au/OzWALD/8day/Ssoil/OzWALD.Ssoil.2017.nc"
+
+ds = xr.open_dataset(filepath)
+
+ds_region = ds.sel(latitude=slice(lat + buffer, lat - buffer), longitude=slice(lon - buffer, lon + buffer))
+
+
+ds_region
+
+# +
+# Comparing ANUClim rain variation between pixels 5km away from each other
+years = [2017]
+
+fig, axes = plt.subplots(nrows=2, ncols=4, figsize=(20, 10))
+axes = axes.flatten()  # Flatten the 2D array of axes to 1D for easier iteration
+
+buffer = 0.05
+for i, year in enumerate(years):
+    date_range = slice(f'{year}-01-01', f'{year}-12-31')
+
+    ts = ds_region['Ssoil'].sel(time=date_range)
+    pixel1_ts = ts.sel(latitude=lat - buffer, longitude=lon - buffer, method='nearest').cumsum(dim='time')
+    pixel2_ts = ts.sel(latitude=lat - buffer, longitude=lon + buffer, method='nearest').cumsum(dim='time')
+    pixel3_ts = ts.sel(latitude=lat + buffer, longitude=lon - buffer, method='nearest').cumsum(dim='time')
+    pixel4_ts = ts.sel(latitude=lat + buffer, longitude=lon + buffer, method='nearest').cumsum(dim='time')
+
+    ax = axes[i]  # Get the current subplot
+    ax.plot(pixel1_ts.time, pixel1_ts, label='northwest pixel')
+    ax.plot(pixel2_ts.time, pixel2_ts, label='northeast pixel')
+    ax.plot(pixel3_ts.time, pixel3_ts, label='southwest pixel')
+    ax.plot(pixel4_ts.time, pixel4_ts, label='southeast pixel')
+    ax.set_xlabel('Time')
+    ax.set_ylabel('Soil Moisture (mm)')
+    ax.set_title(f'Time Series for {year}')
+    ax.legend()
+
+if len(years) < len(axes):
+    for j in range(len(years), len(axes)):
+        fig.delaxes(axes[j])
+
+plt.tight_layout()
+plt.show()
 # -
 
 # Load the data for each year and select just the region of interest 
-anuclim_data = {}
+data = {}
 datasets = []
 variables = ["tavg", "tmax", "tmin", "vp", "vpd"]
 for variable in variables:
     start = datetime.now()
-    print(datetime.now(), "Loading ANUClim variable: ", variable)
-    for i, filepath in enumerate(anuclim_filepaths[variable]):
-        print(f"{datetime.now()} {i}/{len(anuclim_filepaths[variable])}", end='\r')
+    print(datetime.now(), "Loading variable: ", variable)
+    for i, filepath in enumerate(filepaths[variable]):
+        print(f"{datetime.now()} {i}/{len(filepaths[variable])}", end='\r')
         ds = xr.open_dataset(filepath)
 
         # When slicing the latitude anuclim needs the order (north, south) whereas silo needs (south, north).
         ds_region = ds.sel(lat=slice(lat + buffer, lat - buffer), lon=slice(lon - buffer, lon + buffer))
         datasets.append(ds_region)
         combined_ds = xr.concat(datasets, dim='time')
-        anuclim_data[variable] = combined_ds[variable]
+        data[variable] = combined_ds[variable]
 
-        filepath = f'/scratch/xe2/cb8590/MILG/anuclim_{variable}_2017-2023.nc'
-        anuclim_data[variable].to_netcdf(filepath)
+        filepath = f'/scratch/xe2/cb8590/MILG/OzWALD_{variable}_2017-2023.nc'
+        data[variable].to_netcdf(filepath)
 
     end = datetime.now()
     print(f"Time taken to load {variable}: ", end - start)

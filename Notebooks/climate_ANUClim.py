@@ -47,7 +47,7 @@ anuclim_filepaths.keys()
 # Load the data for each year and select just the region of interest 
 anuclim_data = {}
 datasets = []
-variables = ["tavg", "tmax", "tmin", "vp", "vpd"]
+variables = ["tmax", "tmin", "vp", "vpd"]
 for variable in variables:
     start = datetime.now()
     print(datetime.now(), "Loading ANUClim variable: ", variable)
