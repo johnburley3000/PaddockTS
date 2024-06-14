@@ -11,7 +11,7 @@ import matplotlib.dates as mdates
 import numpy as np
 import pandas as pd
 from datetime import datetime
-import gc
+from matplotlib import animation
 
 # Region of interest
 lat = -34.38904277303204
@@ -161,6 +161,79 @@ if len(variables) < len(axes):
 
 plt.tight_layout()
 plt.show()
+
+# +
+variables = ["Ssoil", "LAI", "GPP", "NDVI",]
+colours = ["Blues", "YlGn", "BuGn", "Greens"]
+
+for variable, colour in zip(variables, colours):
+    ds = silo_data[variable]
+    time_series = ds
+    times = ds['time']
+
+    # Determine the global min and max for the color scale
+    vmin = float(time_series.min().values)
+    vmax = float(time_series.max().values)
+
+    # Create the animation
+    fig, ax = plt.subplots(figsize=(10, 6))
+    
+    def animate(time_index):
+        ax.clear()
+        time_slice = time_series.isel(time=time_index)
+        c = ax.pcolormesh(time_slice['longitude'], time_slice['latitude'], time_slice, shading='auto', cmap=colour, vmin=vmin, vmax=vmax)
+        if not hasattr(ax, 'colorbar') or ax.colorbar is None:
+            ax.colorbar = fig.colorbar(c, ax=ax, label=variable)
+        ax.set_title(f"{variable} on {str(times[time_index].values)[:10]}")
+        ax.set_xlabel('Longitude')
+        ax.set_ylabel('Latitude')
+
+    start = datetime.now()
+    ani = animation.FuncAnimation(fig, animate, frames=len(times), interval=33)
+    ani.save(f'{variable}_animation.mp4', writer='ffmpeg')
+    end = datetime.now()
+
+    print(f"Time taken to create animation for {variable}: {end - start}")
+
+
 # -
+
+data[variable]
+
+
+
+# + endofcell="--"
+# Small example for testing colours
+date_range = slice('2020-01-01', '2022-12-31')
+ts = data[variable].sel(time=date_range)
+
+variable = 'Ssoil'
+colour = 'Blues'
+
+ds = ts
+time_series = ds 
+times = ds['time']
+
+# Create the animation
+fig, ax = plt.subplots(figsize=(10, 6))
+def animate(time_index):
+    ax.clear()
+    time_slice = time_series.isel(time=time_index)
+    c = ax.pcolormesh(time_slice['longitude'], time_slice['latitude'], time_slice, shading='auto', cmap=colour)
+    if not hasattr(ax, 'colorbar'):
+        ax.colorbar = fig.colorbar(c, ax=ax, label=variable)
+    ax.set_title(f"{variable} on {str(times[time_index].values)[:10]}")
+    ax.set_xlabel('Longitude')
+    ax.set_ylabel('Latitude')
+
+start = datetime.now()
+ani = animation.FuncAnimation(fig, animate, frames=len(times), interval=33)
+ani.save(f'{variable}_animation.mp4', writer='ffmpeg')
+end = datetime.now()
+
+print(f"Time taken to create animation for {variable} {end - start}")
+# -
+
+# --
 
 
