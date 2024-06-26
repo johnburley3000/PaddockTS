@@ -12,8 +12,8 @@ import pandas as pd
 from datetime import datetime
 
 # Region of interest
-lat = -34.38904277303204
-lon = 148.46949938279096
+# lat, lon = -34.38904277303204, 148.46949938279096   # Ronda Milgdara
+lat, lon = -34.755489, 139.295124  # Titiana South Australia
 buffer = 0.1
 
 # +
@@ -47,119 +47,15 @@ end = datetime.now()
 print("Time taken to load SILO datasets: ", end - start)
 
 # +
-# Comparing variation between pixels 5km away from each other
-years = [2017, 2018, 2019, 2020, 2021, 2022, 2023]
-
-fig, axes = plt.subplots(nrows=2, ncols=4, figsize=(20, 10))
-axes = axes.flatten()  # Flatten the 2D array of axes to 1D for easier iteration
-
-buffer = 0.05
-for i, year in enumerate(years):
-    date_range = slice(f'{year}-01-01', f'{year}-12-31')
-
-    silo_ts = silo_data['daily_rain'].sel(time=date_range)
-    silo_pixel1_ts = silo_ts.sel(lat=lat - buffer, lon=lon - buffer, method='nearest').cumsum(dim='time')
-    silo_pixel2_ts = silo_ts.sel(lat=lat - buffer, lon=lon + buffer, method='nearest').cumsum(dim='time')
-    silo_pixel3_ts = silo_ts.sel(lat=lat + buffer, lon=lon - buffer, method='nearest').cumsum(dim='time')
-    silo_pixel4_ts = silo_ts.sel(lat=lat + buffer, lon=lon + buffer, method='nearest').cumsum(dim='time')
-
-    ax = axes[i]  # Get the current subplot
-    ax.plot(silo_pixel1_ts.time, silo_pixel1_ts, label='SILO northwest pixel')
-    ax.plot(silo_pixel2_ts.time, silo_pixel2_ts, label='SILO northeast pixel')
-    ax.plot(silo_pixel3_ts.time, silo_pixel3_ts, label='SILO southwest pixel')
-    ax.plot(silo_pixel4_ts.time, silo_pixel4_ts, label='SILO southeast pixel')
-    ax.set_xlabel('Time')
-    ax.set_ylabel('Rainfall (mm)')
-    ax.set_title(f'SILO Rainfall Time Series for {year}')
-    ax.legend()
-
-if len(years) < len(axes):
-    for j in range(len(years), len(axes)):
-        fig.delaxes(axes[j])
-
-plt.tight_layout()
-plt.show()
-# -
-
-# ### Notable features SILO rain comparison between pixels
-# - Mostly similar rainfall between nearby pixels
-# - 50mm less rain in the nNotableorthwest pixel in 2018
-
-# +
-# Comparing monthly variables for different years
-years = [2017, 2018, 2019, 2020, 2021, 2022, 2023]
-variables = ["max_temp", "min_temp", "radiation", "vp", "daily_rain"]
-
-fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(15, 15))
-axes = axes.flatten()
-
-# Find the year with the highest rainfall to sort the legend
-total = {}
-variable = 'daily_rain'
-for year in years:
-    date_range = slice(f'{year}-01-01', f'{year}-12-31')
-    silo_ts = silo_data[variable].sel(time=date_range)
-    silo_pixel1_ts = silo_ts.sel(lat=lat, lon=lon, method='nearest').cumsum(dim='time')
-    total[year] = silo_pixel1_ts[-1].item()
-sorted_years = sorted(total, key=total.get, reverse=True)
-
-# Plot each variable
-for i, variable in enumerate(variables):
-    ax = axes[i]
-    for year in sorted_years:
-        date_range = slice(f'{year}-01-01', f'{year}-12-31')
-        silo_ts = silo_data[variable].sel(time=date_range)
-        silo_pixel1_ts = silo_ts.sel(lat=lat, lon=lon, method='nearest')
-        
-        # Aggregate by month showing a cumulative sum of rainfall, and a monthly average for everything else
-        if variable == 'daily_rain':
-            monthly_values = silo_pixel1_ts.resample(time='M').sum().cumsum()
-            label=f'{year} ({total[year]:.1f}mm)'
-        else:
-            monthly_values = silo_pixel1_ts.resample(time='M').mean()
-            label = f'{year}'
-
-        monthly_start_dates = pd.date_range(start='2020-01-01', periods=12, freq='MS')
-        monthly_values['time'] = monthly_start_dates
-        
-        ax.plot(monthly_values, label=label)
-
-    # Format x-axis to show month names and ensure all months appear
-    ax.set_xticks(ticks=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], 
-           labels=["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"])
-    ax.set_xlabel('Day of year') 
-    ax.set_ylabel(f'{variable}') 
-    
-    metric = "cumulative sum" if variable == 'daily_rain' else "average"
-    ax.set_title(f'SILO {variable} daily {metric} at centre pixel') \
-    
-    # Moving the legend outside the plot to the right
-    ax.legend(title=f'Year', bbox_to_anchor=(1.05, 1), loc='upper left') 
-
-# Remove the empty plot
-if len(variables) < len(axes):
-    for j in range(len(variables), len(axes)):
-        fig.delaxes(axes[j])
-    
-plt.tight_layout()
-plt.show()
-# -
-
-# ### Notable features in the above plots
-# - Low rainfall in 2017-2019 and the start of 2020 (& 2023)
-# - High summer temperature in 2019
-# - High winter temperature in 2023
-# - Low spring temperature in 2021-2022
-# - Low vapour pressure in December 2019
-
-# +
 # Comparing cumulative rainfall between different years
 years = [2017, 2018, 2019, 2020, 2021, 2022, 2023]
-variables = ["radiation", "vp", "max_temp", "min_temp", "daily_rain"]
-summed = "max_temp", "min_temp", "daily_rain"
+# variables = ["radiation", "vp", "max_temp", "min_temp", "daily_rain"]
+# summed = "max_temp", "min_temp", "daily_rain"
 
+variables = ["daily_rain", "max_temp", "min_temp"]
+summed = "daily_rain"
 
-fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(20, 20))
+fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(15, 15))
 axes = axes.flatten()
 
 for i, variable in enumerate(variables):
@@ -187,7 +83,7 @@ for i, variable in enumerate(variables):
         time_values = pd.to_datetime(silo_pixel1_ts.time.values)
         normalized_time_values = time_values.map(lambda x: x.replace(year=2020))
 
-        label = f'{year} ({total[year]:.1f})' if variable in summed else year 
+        label = f'{year} ({total[year]:.1f}mm)' if variable in summed else year 
         ax.plot(normalized_time_values, silo_pixel1_ts, label=label)
 
     ax.xaxis.set_major_locator(mdates.MonthLocator())
@@ -199,9 +95,9 @@ for i, variable in enumerate(variables):
     ax.set_ylabel(f'{variable}') 
     
     if variable in summed:
-        title = f'daily cumulative sum of {variable} time series at centre pixel'
+        title = f'daily cumulative sum of {variable}'
     else:
-        title = f'daily {variable} time series at centre pixel'
+        title = f'daily {variable}'
     ax.set_title(title) 
     
     if variable in summed:
@@ -219,6 +115,4 @@ if len(variables) < len(axes):
 plt.tight_layout()
 plt.show()
 # -
-
-
 
