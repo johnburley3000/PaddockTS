@@ -10,7 +10,8 @@ Because there's a limit of 500 items per order. Need to split a list over severa
 
 Need to have planet CLI installed and activated with user Key
 
-### Variables:
+### Variables/Env:
+source /g/data/xe2/John/geospatenv/bin/activate # just need planet CLI loaded
 ID=new1 # name of the ROI. At this stage, assumes that a .geojson and _clip.json exist. Ideally, generate these from coords and buffer distance 
 
 ### STEP 1: 
@@ -39,24 +40,24 @@ cat item_list.txt | split --lines=500 -d
 for i in x*
 do
 
-unique name
+#unique name
 order_name=${ID}_$i
 
-convert product ids to comma separated
+#convert product ids to comma separated
 ids=$(cat $i | tr "\n" "," | rev | cut -c2- | rev) 
 
-create order for visual data
-planet orders request \
---item-type PSScene \
---bundle visual \
---name ${order_name}_Vis \
-$ids \
---clip ${ID}_clip.json \
---pretty \
---email \
-| planet orders create -
+##create order for visual data
+#planet orders request \
+#--item-type PSScene \
+#--bundle visual \
+#--name ${order_name}_Vis \
+#$ids \
+#--clip ${ID}_clip.json \
+#--pretty \
+#--email \
+#| planet orders create -
 
-create order for 8band data
+#create order for 8band data
 planet orders request \
 --item-type PSScene \
 --bundle analytic_8b_sr_udm2 \
@@ -72,17 +73,18 @@ done
 
 
 ## STEP 3 download the data
-For each list wait for order to be ready, then download
+#For each list wait for order to be ready, then download
 
-set the directory to dump into, based on the data:
-DIR=/g/data/xe2/datasets/Planet/Trees/$ID
+#set the directory to dump into, based on the data:
+# note: 'Farms' is for sites, 'Trees' is for individual trees.
+DIR=/g/data/xe2/datasets/Planet/Farms/$ID
 mkdir $DIR
 
-get the unique order ids
+#get the unique order ids
 orders=$(planet orders list | jq -rs '.[] | "\(.id) \(.name)"' | grep "$ID" | awk '{print $1}')
-orders=$(planet orders list | jq -rs '.[] | "\(.id) \(.name)"' | grep "$ID" | grep "Vis" | awk '{print $1}')
+#orders=$(planet orders list | jq -rs '.[] | "\(.id) \(.name)"' | grep "$ID" | grep "Vis" | awk '{print $1}')
 
-for each order id, wait, then download:
+#for each order id, wait, then download:
 ### MIGHT NEED TO BE RUN REMOTELY IN CASE IT TIMES OUT
 for order_id in $orders
 do
