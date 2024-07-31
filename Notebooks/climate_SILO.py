@@ -13,7 +13,7 @@ from datetime import datetime
 
 # Region of interest
 # lat, lon = -34.38904277303204, 148.46949938279096   # Ronda Milgdara
-lat, lon = -34.755489, 139.295124  # Titiana South Australia
+lat, lon = -34.755489, 139.295124  # Tatiana South Australia
 buffer = 0.1
 
 # +
