@@ -1,4 +1,5 @@
 ## Things not to try and sync through github
+*.csv
 *.nc
 Results/*
 Data/*
