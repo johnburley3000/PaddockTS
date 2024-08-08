@@ -4,6 +4,10 @@
 # !ls /g/data/gh70/ANUClimate/v2-0/stable/day/rain/2023/ANUClimate_v2-0_rain_daily_202306.nc
 # !ls /g/data/ub8/au/OzWALD/8day/Ssoil/OzWALD.Ssoil.2020.nc
 
+# !ls /g/data/ub8/au/OzWALD/8day
+
+# !ls /g/data/gh70/ANUClimate/v2-0/stable/day
+
 import xarray as xr
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
@@ -16,7 +20,14 @@ from matplotlib import animation
 # Region of interest
 lat = -34.38904277303204
 lon = 148.46949938279096
-buffer = 1 # 20km
+# buffer = 0.5 # 10km
+buffer = 0.3
+
+north = lat + buffer 
+south = lat - buffer 
+west = lon - buffer
+east = lon + buffer
+west, north, east, south
 
 # +
 # Create a list of Ozwald filepaths from 2017 to 2023 (stored yearly)
