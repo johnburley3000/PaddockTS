@@ -1,6 +1,11 @@
+# This script gathers data from OzWald and ANUClimate for a single location over the specified years.
+
 import os
 import pandas as pd
 
+print(os.getcwd())
+
+# Need to change directory to whichever folder contains the python files for the imports to work
 os.chdir('/home/147/cb8590/Projects/PaddockTS/Notebooks/DAESIM_preprocess')
 
 from ozwald_8day import ozwald_8day_multivariable
@@ -22,7 +27,7 @@ df_ozwald_8day.head()
 # +
 # %%time
 
-# anuclimate takes a lot longer than ozwald because the files are stored monthly instead of yearly
+# anuclimate takes longer because files are stored monthly instead of yearly
 df_anuclimate = anuclimate_multivariable(["rain", "tmin", "tmax", "srad"], latitude, longitude, years)
 df_anuclimate.head()
 # -
