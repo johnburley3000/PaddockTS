@@ -1,3 +1,7 @@
+# +
+# Catalog is here: https://dapds00.nci.org.au/thredds/catalog/ub8/au/OzWALD/daily/meteo/catalog.html
+# -
+
 import requests
 import os
 import xarray as xr
@@ -5,7 +9,6 @@ import pandas as pd
 import glob
 
 
-# +
 def ozwald_daily_singleyear(var="VPeff", latitude=-34.3890427, longitude=148.469499, year="2021"):
     
     buffer = 0.0000000001    # This buffer is less than the grid size of 500m (0.005 degrees), so you get a single point
@@ -35,11 +38,7 @@ def ozwald_daily_singleyear(var="VPeff", latitude=-34.3890427, longitude=148.469
 
     return df_dropped
 
-df = ozwald_daily_singleyear()
-df.head()
 
-
-# +
 def ozwald_daily_multiyear(var="VPeff", latitude=-34.3890427, longitude=148.469499, years=["2020", "2021"]):
     dfs = []
     for year in years:
@@ -48,11 +47,6 @@ def ozwald_daily_multiyear(var="VPeff", latitude=-34.3890427, longitude=148.4694
     df_concat = pd.concat(dfs)
     return df_concat
 
-df = ozwald_daily_multiyear()
-df.head()
-
-
-# -
 
 def ozwald_daily_multivariable(variables=["VPeff", "Uavg"], latitude=-34.3890427, longitude=148.469499, years=["2020", "2021"], cleanup=True):
     dfs = []
@@ -70,19 +64,17 @@ def ozwald_daily_multivariable(variables=["VPeff", "Uavg"], latitude=-34.3890427
 
 
 # %%time
-df = ozwald_daily_multivariable()
-df.head()
-
-abbreviations = {
-    "Ssoil":"Soil moisture",
-    "Qtot":"Runoff",
-    "LAI":"Vegetation leaf area",
-    "GPP":"Vegetation growth"
-}
-df.rename(columns=abbreviations, inplace=True)
-df.rename_axis("date", inplace=True)
-df.head()
-
-df.to_csv("ozwald_daily.csv")
+if __name__ == '__main__':
+    df = ozwald_daily_multivariable()  # Took 2 seconds (0.5 seconds per variable per year)
+    abbreviations = {
+        "Ssoil":"Soil moisture",
+        "Qtot":"Runoff",
+        "LAI":"Vegetation leaf area",
+        "GPP":"Vegetation growth"
+    }
+    df.rename(columns=abbreviations, inplace=True)
+    df.rename_axis("date", inplace=True)
+    df.to_csv("ozwald_daily.csv")
+    print(df.head())
 
 

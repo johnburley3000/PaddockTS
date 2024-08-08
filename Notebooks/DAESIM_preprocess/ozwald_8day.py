@@ -1,3 +1,7 @@
+# +
+# Catalog is here: https://dapds00.nci.org.au/thredds/catalog/ub8/au/OzWALD/8day/catalog.html
+# -
+
 import requests
 import os
 import xarray as xr
@@ -58,19 +62,21 @@ def ozwald_8day_multivariable(variables=["Ssoil", "Qtot", "LAI", "GPP"], latitud
             
     return df_concat
 
-
 # %%time
-df = ozwald_8day_multivariable()
-df.head()
+if __name__ == '__main__':
 
-abbreviations = {
-    "Ssoil":"Soil moisture",
-    "Qtot":"Runoff",
-    "LAI":"Vegetation leaf area",
-    "GPP":"Vegetation growth"
-}
-df.rename(columns=abbreviations, inplace=True)
-df.rename_axis("date", inplace=True)
-df.head()
+    df = ozwald_8day_multivariable()  # Took 8 seconds (1 second per variable per year)
+    df.head()
 
-df.to_csv("ozwald_8day.csv")
+    abbreviations = {
+        "Ssoil":"Soil moisture",
+        "Qtot":"Runoff",
+        "LAI":"Vegetation leaf area",
+        "GPP":"Vegetation growth"
+    }
+    df.rename(columns=abbreviations, inplace=True)
+    df.rename_axis("date", inplace=True)
+    df.to_csv("ozwald_8day.csv")
+    print(df.head())
+
+

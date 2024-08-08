@@ -1,3 +1,7 @@
+# +
+# Catalog is here: https://dapds00.nci.org.au/thredds/catalog/gh70/ANUClimate/v2-0/stable/day/catalog.html
+# -
+
 import requests
 import os
 import xarray as xr
@@ -6,7 +10,6 @@ import glob
 
 
 # +
-# %%time
 def anuclimate_singlemonth(var="rain", latitude=-34.3890427, longitude=148.469499, year="2021", month="01"):
     
     buffer = 0.0000000001    # This buffer is less than the grid size of 1km (0.01 degrees), so you get a single point
@@ -35,11 +38,12 @@ def anuclimate_singlemonth(var="rain", latitude=-34.3890427, longitude=148.46949
 
     return df_dropped
 
-df = anuclimate_singlemonth()
-df.head()
+# df = anuclimate_singlemonth()  # Took 2 secs
+# df.head()
 
 
-# +
+# -
+
 def anuclimate_singleyear(var="rain", latitude=-34.3890427, longitude=148.469499, year="2021"):
     months = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
     dfs = []
@@ -49,12 +53,7 @@ def anuclimate_singleyear(var="rain", latitude=-34.3890427, longitude=148.469499
     df_concat = pd.concat(dfs)
     return df_concat
 
-df = anuclimate_singleyear()
-df.head()
 
-
-# +
-# %%time
 def anuclimate_multiyear(var="rain", latitude=-34.3890427, longitude=148.469499, years=["2020", "2021"]):
     dfs = []
     for year in years:
@@ -63,12 +62,7 @@ def anuclimate_multiyear(var="rain", latitude=-34.3890427, longitude=148.469499,
     df_concat = pd.concat(dfs)
     return df_concat
 
-df = anuclimate_multiyear()
-df.head()
 
-
-# +
-# %%time
 def anuclimate_multivariable(variables=["rain", "tmin", "tmax", "srad"], latitude=-34.3890427, longitude=148.469499, years=["2020", "2021"], cleanup=True):
     dfs = []
     for variable in variables:
@@ -83,18 +77,16 @@ def anuclimate_multivariable(variables=["rain", "tmin", "tmax", "srad"], latitud
             
     return df_concat
 
-df = anuclimate_multivariable(["rain", "tmin"])  # Took 2 mins (30 secs per variable per year)
-df.head()
-# -
 
-abbreviations = {
-    "rain":"Precipitation",
-    "tmin":"Minimum temperature",
-    "tmax":"Maximum temperature",
-    "srad":"SRAD"
-}
-df.rename(columns=abbreviations, inplace=True)
-df.rename_axis("date", inplace=True)
-df.head()
-
-df.to_csv("anuclimate_daily.csv")
+if __name__ == '__main__':
+    df = anuclimate_multivariable(["rain", "tmin"])  # Took 2 mins (30 secs per variable per year)
+    abbreviations = {
+        "rain":"Precipitation",
+        "tmin":"Minimum temperature",
+        "tmax":"Maximum temperature",
+        "srad":"SRAD"
+    }
+    df.rename(columns=abbreviations, inplace=True)
+    df.rename_axis("date", inplace=True)
+    df.to_csv("anuclimate_daily.csv")
+    print(df.head())
