@@ -5,7 +5,8 @@ import pandas as pd
 import glob
 
 
-def ozwald_8day_singleyear(var="Ssoil", latitude=-34.3890427, longitude=148.469499, year="2021"):
+# +
+def ozwald_daily_singleyear(var="VPeff", latitude=-34.3890427, longitude=148.469499, year="2021"):
     
     buffer = 0.0000000001    # This buffer is less than the grid size of 500m (0.005 degrees), so you get a single point
     
@@ -19,7 +20,7 @@ def ozwald_8day_singleyear(var="Ssoil", latitude=-34.3890427, longitude=148.4694
     
     # base_url = "https://thredds.nci.org.au"  # This is the new url (dapds00 is supposedly deprecated), but LAI only works with the old url
     base_url = "https://dapds00.nci.org.au"
-    url = f'{base_url}/thredds/ncss/grid/ub8/au/OzWALD/8day/{var}/OzWALD.{var}.{year}.nc?var={var}&north={north}&west={west}&east={east}&south={south}&time_start={time_start}&time_end={time_end}' 
+    url = f'{base_url}/thredds/ncss/grid/ub8/au/OzWALD/daily/meteo/{var}/OzWALD.{var}.{year}.nc?var={var}&north={north}&west={west}&east={east}&south={south}&time_start={time_start}&time_end={time_end}' 
     print(url)
     
     response = requests.get(url)
@@ -34,20 +35,29 @@ def ozwald_8day_singleyear(var="Ssoil", latitude=-34.3890427, longitude=148.4694
 
     return df_dropped
 
+df = ozwald_daily_singleyear()
+df.head()
 
-def ozwald_8day_multiyear(var="Ssoil", latitude=-34.3890427, longitude=148.469499, years=["2020", "2021"]):
+
+# +
+def ozwald_daily_multiyear(var="VPeff", latitude=-34.3890427, longitude=148.469499, years=["2020", "2021"]):
     dfs = []
     for year in years:
-        df_year = ozwald_8day_singleyear(var, latitude, longitude, year)
+        df_year = ozwald_daily_singleyear(var, latitude, longitude, year)
         dfs.append(df_year)
     df_concat = pd.concat(dfs)
     return df_concat
 
+df = ozwald_daily_multiyear()
+df.head()
 
-def ozwald_8day_multivariable(variables=["Ssoil", "Qtot", "LAI", "GPP"], latitude=-34.3890427, longitude=148.469499, years=["2020", "2021"], cleanup=True):
+
+# -
+
+def ozwald_daily_multivariable(variables=["VPeff", "Uavg"], latitude=-34.3890427, longitude=148.469499, years=["2020", "2021"], cleanup=True):
     dfs = []
     for variable in variables:
-        df_variable = ozwald_8day_multiyear(variable, latitude, longitude, years)
+        df_variable = ozwald_daily_multiyear(variable, latitude, longitude, years)
         dfs.append(df_variable)
     df_concat = pd.concat(dfs, axis=1)
     
@@ -60,7 +70,7 @@ def ozwald_8day_multivariable(variables=["Ssoil", "Qtot", "LAI", "GPP"], latitud
 
 
 # %%time
-df = ozwald_8day_multivariable()
+df = ozwald_daily_multivariable()
 df.head()
 
 abbreviations = {
@@ -73,4 +83,6 @@ df.rename(columns=abbreviations, inplace=True)
 df.rename_axis("date", inplace=True)
 df.head()
 
-df.to_csv("ozwald_8day.csv")
+df.to_csv("ozwald_daily.csv")
+
+

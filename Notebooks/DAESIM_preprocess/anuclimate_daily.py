@@ -6,40 +6,10 @@ import glob
 
 
 # +
-# var="rain"
-# latitude=-34.3890427
-# longitude=148.469499
-# year="2021"
-# month="01"
-
-# buffer = 0.0000000001    # This buffer is less than the grid size of 500m (0.005 degrees), so you get a single point
-
-# north = latitude + buffer 
-# south = latitude - buffer 
-# west = longitude - buffer
-# east = longitude + buffer
-
-# time_start = f"{year}-01-01"
-# time_end = f"{year}-12-31"
-
-# # base_url = "https://thredds.nci.org.au"  # This is the new url (dapds00 is supposedly deprecated), but LAI only works with the old url
-# base_url = "https://dapds00.nci.org.au"
-# url = f'{base_url}/thredds/ncss/gh70/ANUClimate/v2-0/stable/day/{var}/{year}/ANUClimate_v2-0_{var}_daily_{year}{month}.nc?var={var}&north={north}&west={west}&east={east}&south={south}&time_start={time_start}&time_end={time_end}' 
-# print(url)
-
-# response = requests.get(url)
-# filename = f'{var}_{year}_{month}.nc' 
-# with open(filename, 'wb') as f:
-#     f.write(response.content)
-
-# ds = xr.open_dataset(filename)
-# df = ds.to_dataframe().reset_index()
-
-# +
 # %%time
 def anuclimate_singlemonth(var="rain", latitude=-34.3890427, longitude=148.469499, year="2021", month="01"):
     
-    buffer = 0.0000000001    # This buffer is less than the grid size of 500m (0.005 degrees), so you get a single point
+    buffer = 0.0000000001    # This buffer is less than the grid size of 1km (0.01 degrees), so you get a single point
     
     north = latitude + buffer 
     south = latitude - buffer 
