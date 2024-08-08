@@ -24,7 +24,8 @@ def anuclimate_singlemonth(var="rain", latitude=-34.3890427, longitude=148.46949
     
     base_url = "https://dapds00.nci.org.au"
     url = f'{base_url}/thredds/ncss/gh70/ANUClimate/v2-0/stable/day/{var}/{year}/ANUClimate_v2-0_{var}_daily_{year}{month}.nc?var={var}&north={north}&west={west}&east={east}&south={south}&time_start={time_start}&time_end={time_end}' 
-    print(url)
+    if month == "01":
+        print(url)
     
     response = requests.get(url)
     filename = f'{var}_{year}_{month}.nc' 

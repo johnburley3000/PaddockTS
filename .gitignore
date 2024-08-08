@@ -11,3 +11,5 @@ Logs/*
 *.o*
 .DS_Store
 .ipynb_checkpoints
+__pycache__
+*.csv
