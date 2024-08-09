@@ -9,3 +9,7 @@ Planet_dl/x*
 Logs/*
 *.e*
 *.o*
+.DS_Store
+.ipynb_checkpoints
+__pycache__
+*.csv
