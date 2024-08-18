@@ -16,3 +16,4 @@ __pycache__
 *.tiff
 *.tif
 *.pkl
+gdalwmscache

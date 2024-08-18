@@ -4,25 +4,27 @@
 # +
 # I'm using python 3.9
 # # !pip install jupyter jupytext xarray pandas scipy cftime matplotlib seaborn rasterio
-# -
 
-import requests
+# +
+# Standard libraries
 import os
-import xarray as xr
-import pandas as pd
 import glob
-import seaborn as sns
+
+# Dependencies
 import numpy as np
-import matplotlib.pyplot as plt
+import pandas as pd
+import xarray as xr
 import rasterio
-from rasterio.transform import from_origin
+import requests
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 
 # +
 common_names = {
-    "Tmax":"Maximum Temperature",
-    "Tmin":"Minimum Temperature",
-    "Pg":"Annual Rainfall" 
+    "Tmax":"Maximum_Temperature",
+    "Tmin":"Minimum_Temperature",
+    "Pg":"Annual_Rainfall" 
 }
 aggregations = {
     "Tmax":"AnnualMaxima",
@@ -40,7 +42,7 @@ pixel_sizes = {
 
 # -
 
-def ozwald_yearly(var="Tmax", latitude=-34.3890427, longitude=148.469499, year="2021", buffer=0.1):
+def ozwald_yearly(var="Tmax", latitude=-34.3890427, longitude=148.469499, buffer=0.1, year="2021", stub="test", tmp_dir=""):
     
     # For the buffer size, 0.001 degrees is roughly 1km
     north = latitude + buffer 
@@ -57,10 +59,9 @@ def ozwald_yearly(var="Tmax", latitude=-34.3890427, longitude=148.469499, year="
     aggregation = aggregations[var]
     prefix = ".annual" if var == "Pg" else ""
     url = f'{base_url}/thredds/ncss/grid/ub8/au/OzWALD/annual/OzWALD{prefix}.{var}.{aggregation}.nc?var={aggregation}&north={north}&west={west}&east={east}&south={south}&time_start={time_start}&time_end={time_end}' 
-    print(url)
     
     response = requests.get(url)
-    filename = f'{var}_{year}.nc' 
+    filename = os.path.join(tmp_dir, f'{stub}_{var}_{year}.nc')
     with open(filename, 'wb') as f:
         f.write(response.content)
         
@@ -68,32 +69,31 @@ def ozwald_yearly(var="Tmax", latitude=-34.3890427, longitude=148.469499, year="
     df = ds.to_dataframe().reset_index()
 
     return df
-    
 
 
-def ozwald_multiyear(var="Tmax", latitude=-34.3890427, longitude=148.469499, years=["2020", "2021"], buffer=0.1, cleanup=True):
+def ozwald_multiyear(var="Tmax", latitude=-34.3890427, longitude=148.469499, buffer=0.1, years=["2020", "2021"], stub="test", tmp_dir="", cleanup=True):
     dfs = []
     for year in years:
-        df_year = ozwald_yearly(var, latitude, longitude, year, buffer)
+        df_year = ozwald_yearly(var, latitude, longitude, buffer, year, stub, tmp_dir)
         dfs.append(df_year)
     df_combined = pd.concat(dfs, ignore_index=True)
     df_notime = df_combined.drop(columns=['time'])
-    df_average = df_notime.groupby(['latitude', 'longitude'], as_index=False)[aggregations[variable]].mean()
-    
-    nc_files = glob.glob('*.nc')
-    for file in nc_files:
-        os.remove(file)
+    df_average = df_notime.groupby(['latitude', 'longitude'], as_index=False)[aggregations[var]].mean()
+
+    if cleanup:
+        nc_files = glob.glob('*.nc')
+        for file in nc_files:
+            os.remove(file)
         
     return df_average
 
 
 def write_tiff(df, variable="Tmax", filename="output.tiff", pixel_size=0.05):
     # Assumes the df has columns: latitude, longitude and variable 
-    # For the pixel_size, 0.001 degrees is roughly 1km
     
     df_pivot = df.pivot(index='latitude', columns='longitude', values=aggregations[variable])
     grid_array = df_pivot.values    
-    transform = from_origin(df['longitude'].min(), df['latitude'].min(), pixel_size, -pixel_size) 
+    transform = rasterio.transform.from_origin(df['longitude'].min(), df['latitude'].min(), pixel_size, -pixel_size) 
     
     with rasterio.open(
         filename,
@@ -107,35 +107,20 @@ def write_tiff(df, variable="Tmax", filename="output.tiff", pixel_size=0.05):
         transform=transform,
     ) as dst:
         dst.write(grid_array, 1)
+    print("Saved:", filename)
 
 
-def visualise_tiff(filename="output.tiff", title="Maximum Temperature"):
-    with rasterio.open(filename) as src:
-        data = src.read(1)  
-        
-        # Flip the image to match the orientation in QGIS
-        flipped_data = np.flip(data, axis=0)
+def ozwald_yearly_average(variables=["Tmax", "Pg"], lat=-34.3890427, lon=148.469499, buffer=0.005, start_year=2020, end_year=2021, outdir="", stub="test", tmp_dir=""):
+    """Download yearly averages from SILO stored on Ozwald"""
+    years = [str(year) for year in list(range(start_year, end_year + 1))]
+    for variable in variables:
+        df = ozwald_multiyear(var=variable, years=years, stub=stub, tmp_dir=tmp_dir)
+        pixel_size = pixel_sizes[variable]
+        filename = os.path.join(outdir, f'{stub}_{common_names[variable]}_{start_year}_{end_year}_average.tif')
+        write_tiff(df, variable, filename, pixel_size)
 
-        plt.figure(figsize=(8, 6))
-        img = plt.imshow(flipped_data, cmap='viridis', extent=(
-            src.bounds.left, src.bounds.right, src.bounds.bottom, src.bounds.top))
-        plt.title(title)
-        plt.xlabel('Longitude')
-        plt.ylabel('Latitude')
-        cbar = plt.colorbar(img, ax=plt.gca())
-        plt.show()
 
 
 # %%time
 if __name__ == '__main__':
-
-    years = [str(year) for year in list(range(2014, 2024))]
-    for variable in common_names.keys():
-        df = ozwald_multiyear(var=variable, years=years)
-        pixel_size = pixel_sizes[variable]
-        filename = f'{common_names[variable]}.tiff'
-        write_tiff(df, variable, filename, pixel_size)
-        visualise_tiff(filename, common_names[variable])
-
-
-
+    ozwald_yearly_average()

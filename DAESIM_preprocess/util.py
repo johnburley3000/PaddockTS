@@ -1,0 +1,56 @@
+# Standatd libraries
+import os
+
+# Dependencies
+import numpy as np
+import rasterio
+import rioxarray as rxr
+import matplotlib.pyplot as plt
+
+home_dir = os.path.expanduser('~')
+username = os.path.basename(home_dir)
+gdata_dir = os.path.join("/g/data/xe2", username)
+if not os.path.exists(gdata_dir):
+    os.mkdir(gdata_dir)
+scratch_dir = os.path.join('/scratch/xe2', username)
+paddockTS_dir = os.path.join(home_dir, "Projects/PaddockTS")
+
+def create_bbox(lat=-35.274603, lon=149.098498, buffer=0.005):
+    """Generates a bbox in the order [West, North, East, South] that's required for most APIs"""
+    # 0.01 degrees is about 1km in each direction, so 2kmx2km total
+    # From my experimentation, the asris.csiro API allows a maximum bbox of about 40km (0.2 degrees in each direction)
+
+    left, top, right, bottom = lon - buffer, lat - buffer, lon + buffer, lat + buffer 
+    bbox = [left, top, right, bottom] 
+    return bbox
+
+def visualise_tif_rasterio(filename="output.tif", title="Maximum Temperature"):
+    with rasterio.open(filename) as src:
+        data = src.read(1)  
+        
+        # Flip the image to match the orientation in QGIS
+        flipped_data = np.flip(data, axis=0)
+
+        plt.figure(figsize=(8, 6))
+        img = plt.imshow(flipped_data, cmap='viridis', extent=(
+            src.bounds.left, src.bounds.right, src.bounds.bottom, src.bounds.top))
+        plt.title(title)
+        plt.xlabel('Longitude')
+        plt.ylabel('Latitude')
+        cbar = plt.colorbar(img, ax=plt.gca())
+        plt.show()
+
+def visualise_tif_rioxarray(filename="terrain_tiles.tif", title="Terrain Tiles"):
+    ds = rxr.open_rasterio(filename)
+    band = ds.sel(band=1)
+    band.plot()
+    plt.title(title)
+    plt.xlabel('Longitude')
+    plt.ylabel('Latitude')
+    plt.show()
+
+if __name__ == '__main__':
+    print("username:", username)
+    print("home_dir:", home_dir)
+    print("gdata_dir:", gdata_dir)
+    print("scratch_dir:", scratch_dir)

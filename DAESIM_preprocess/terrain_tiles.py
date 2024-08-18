@@ -17,8 +17,7 @@ import rioxarray as rxr
 
 # Local imports
 os.chdir(os.path.join(os.path.expanduser('~'), "Projects/PaddockTS"))
-from DAESIM_preprocess.filepaths import gdata_dir, scratch_dir
-from DAESIM_preprocess.slga_soils import create_bbox
+from DAESIM_preprocess.util import gdata_dir, scratch_dir, create_bbox
 
 def transform_bbox(bbox=[148.464499, -34.394042, 148.474499, -34.384042], inputEPSG="EPSG:4326", outputEPSG="EPSG:3857"):
     transformer = Transformer.from_crs(inputEPSG, outputEPSG)
@@ -107,9 +106,11 @@ def visualise_tif(filename="terrain_tiles.tif", title="Terrain Tiles"):
     band = ds.sel(band=1)
     band.plot()
     plt.title(title)
+    plt.xlabel('Longitude')
+    plt.ylabel('Latitude')
     plt.show()
 
-def terrain_tiles(lat=-34.3890427, lon=148.469499, buffer=0.005, outdir="", tmp_dir="", stub="test"):
+def terrain_tiles(lat=-34.3890427, lon=148.469499, buffer=0.005, outdir="", stub="test", tmp_dir=""):
     """Download 10m resolution elevation from terrain_tiles"""
     
     # Load the raw data
@@ -133,7 +134,7 @@ if __name__ == '__main__':
     tmp_dir = os.path.join(scratch_dir, "tmp")
 
     # Download elevation from terrain tiles
-    terrain_tiles(lat, lon, buffer, outdir, tmp_dir, stub)
+    terrain_tiles(lat, lon, buffer, outdir, stub, tmp_dir)
 
     # Visualise the downloaded data
     filename = os.path.join(outdir, f"{stub}_terrain_cleaned.tif")

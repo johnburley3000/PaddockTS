@@ -2,20 +2,32 @@
 # Catalog is here: https://www.asris.csiro.au/arcgis/rest/services/TERN
 # -
 
-
+# Standard Libraries
+import os
 import pickle
+import time
+
+# Dependencies
 import xarray as xr
 import pandas as pd
 from owslib.wcs import WebCoverageService
 from pyproj import Proj, Transformer
-import time
+
+# Local imports
+os.chdir(os.path.join(os.path.expanduser('~'), "Projects/PaddockTS"))
+from DAESIM_preprocess.util import create_bbox
 
 # Taken from GeoDataHarvester: https://github.com/Sydney-Informatics-Hub/geodata-harvester/blob/main/src/geodata_harvester/getdata_slga.py
 asris_urls = {
     "Clay": "https://www.asris.csiro.au/arcgis/services/TERN/CLY_ACLEP_AU_NAT_C/MapServer/WCSServer",
     "Silt": "https://www.asris.csiro.au/ArcGIS/services/TERN/SLT_ACLEP_AU_NAT_C/MapServer/WCSServer",
     "Sand": "https://www.asris.csiro.au/ArcGIS/services/TERN/SND_ACLEP_AU_NAT_C/MapServer/WCSServer",
-    "pH_CaCl2": "https://www.asris.csiro.au/ArcGIS/services/TERN/PHC_ACLEP_AU_NAT_C/MapServer/WCSServer"
+    "pH_CaCl2": "https://www.asris.csiro.au/ArcGIS/services/TERN/PHC_ACLEP_AU_NAT_C/MapServer/WCSServer",
+    "Bulk_Density": "https://www.asris.csiro.au/ArcGIS/services/TERN/BDW_ACLEP_AU_NAT_C/MapServer/WCSServer",
+    "Available_Water_Capacity": "https://www.asris.csiro.au/ArcGIS/services/TERN/AWC_ACLEP_AU_NAT_C/MapServer/WCSServer",
+    "Effective_Cation_Exchange_Capacity": "https://www.asris.csiro.au/ArcGIS/services/TERN/ECE_ACLEP_AU_NAT_C/MapServer/WCSServer",
+    "Total_Nitrogen": "https://www.asris.csiro.au/ArcGIS/services/TERN/NTO_ACLEP_AU_NAT_C/MapServer/WCSServer",
+    "Total_Phosphorus": "https://www.asris.csiro.au/ArcGIS/services/TERN/PTO_ACLEP_AU_NAT_C/MapServer/WCSServer"
 }
 identifiers = {
     "0-5cm": '0',
@@ -25,17 +37,6 @@ identifiers = {
     "60-100cm":'16',
     "100-200cm":'20'
 }
-
-
-def create_bbox(lat=-35.274603, lon=149.098498, buffer=0.005):
-    """Generates a bbox in the order [West, North, East, South] that's required for most APIs"""
-    # 0.01 degrees is about 1km in each direction, so 2kmx2km total
-    # From my experimentation, the asris.csiro API allows a maximum bbox of about 40km (0.2 degrees in each direction)
-
-    left, top, right, bottom = lon - buffer, lat - buffer, lon + buffer, lat + buffer 
-    bbox = [left, top, right, bottom] 
-    return bbox
-
 
 def download_tif(bbox=[148.46449900000002, -34.3940427, 148.474499, -34.384042699999995], 
                   url="https://www.asris.csiro.au/arcgis/services/TERN/CLY_ACLEP_AU_NAT_C/MapServer/WCSServer", 
@@ -61,18 +62,16 @@ def download_tif(bbox=[148.46449900000002, -34.3940427, 148.474499, -34.38404269
 
     # Make sure to time.sleep(1) if running this multiple times to avoid throttling
 
-
-if __name__ == '__main__':
-    
-    lat, lon = -34.3890427, 148.469499
-    buffer = 0.005  
-    
+def slga_soils(variables=["Clay", "Sand"], lat=-34.3890427, lon=148.469499, buffer=0.005, outdir="", stub="test"):
+    """Download soil variables from CSIRO"""
     bbox = create_bbox(lat, lon, buffer)
     identifier = identifiers["5-15cm"]
-    
-    for variable in asris_urls:
-        filename = f"{variable}.tif"
-        url = asris_urls[layer]
+    for variable in variables:
+        filename = os.path.join(outdir, f"{stub}_{variable}.tif")
+        url = asris_urls[variable]
         download_tif(bbox, url, identifier, filename)
         time.sleep(1)
         print(f"Downloaded {filename}")
+
+if __name__ == '__main__':
+    slga_soils()
