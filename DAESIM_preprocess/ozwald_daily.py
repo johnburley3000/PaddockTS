@@ -24,7 +24,7 @@ ozwald_daily_abbreviations = {
 }
 
 
-def ozwald_daily_singleyear(var="VPeff", latitude=-34.3890427, longitude=148.469499, buffer=0.1, year="2021", stub="test", tmp_dir=""):
+def ozwald_daily_singleyear(var="VPeff", latitude=-34.3890427, longitude=148.469499, buffer=0.1, year="2021", stub="", tmp_dir=""):
     
     # buffer = 0.0000000001    # Using a buffer less than the grid size of 5km (0.05 degrees), so you get a single point
     
@@ -51,7 +51,7 @@ def ozwald_daily_singleyear(var="VPeff", latitude=-34.3890427, longitude=148.469
     return ds
 
 
-def ozwald_daily_multiyear(var="VPeff", latitude=-34.3890427, longitude=148.469499, buffer=0.1, years=["2020", "2021"], stub="test", tmp_dir=""):
+def ozwald_daily_multiyear(var="VPeff", latitude=-34.3890427, longitude=148.469499, buffer=0.1, years=["2020", "2021"], stub="", tmp_dir=""):
     dss = []
     for year in years:
         ds_year = ozwald_daily_singleyear(var, latitude, longitude, buffer, year, stub, tmp_dir)
@@ -60,7 +60,7 @@ def ozwald_daily_multiyear(var="VPeff", latitude=-34.3890427, longitude=148.4694
     return ds_concat
 
 
-def ozwald_daily(variables=["VPeff", "Uavg"], lat=-34.3890427, lon=148.469499, buffer=0.1, start_year=2020, end_year=2021, outdir="", stub="test", tmp_dir="", cleanup=False):
+def ozwald_daily(variables=["VPeff", "Uavg"], lat=-34.3890427, lon=148.469499, buffer=0.1, start_year=2020, end_year=2021, outdir="", stub="", tmp_dir="", cleanup=True):
     dss = []
     years = [str(year) for year in list(range(start_year, end_year + 1))]
     for variable in variables:
@@ -82,7 +82,7 @@ def ozwald_daily(variables=["VPeff", "Uavg"], lat=-34.3890427, lon=148.469499, b
 
 # %%time
 if __name__ == '__main__':
-    ds = ozwald_daily_multivariable(cleanup=True)  # Took 2 seconds (0.5 seconds per variable per year)
+    ds = ozwald_daily_multivariable()  # Took 2 seconds (0.5 seconds per variable per year)
     print(ds)
 
     os.chdir(os.path.join(os.path.expanduser('~'), "Projects/PaddockTS"))
