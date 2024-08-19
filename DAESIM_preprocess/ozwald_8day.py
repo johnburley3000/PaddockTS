@@ -88,12 +88,17 @@ def ozwald_8day(variables=["Ssoil", "GPP"], lat=-34.3890427, lon=148.469499, buf
     return ds_concat
 
 
-def plot_time_series(filename='test_ozwald_8day.nc', variable="Ssoil", lat=-34.3890427, lon=148.46949):
-    ds = xr.open_dataset(filename)
+def plot_time_series(ds, variable="Ssoil", lat=-34.3890427, lon=148.46949):
     ds_point = ds.sel(latitude=lat, longitude=lon, method='nearest')
     ds_var = ds_point[variable]
     ds_var.plot.line()
     plt.title(f"Latitude: {lat}, Longitude: {lon}")
+    plt.show()
+
+
+def plot_time_point(ds, variable="Ssoil", timepoint='2020-03-13'):
+    data = ds[variable].sel(time=timepoint, method='nearest')
+    data.plot()
     plt.show()
 
 
@@ -113,6 +118,6 @@ if __name__ == '__main__':
     ds = ozwald_8day(variables, lat, lon, buffer, start_year, end_year, outdir, stub, tmp_dir, cleanup)
     print(ds)
 
-    filename = os.path.join(outdir, f'{stub}_ozwald_8day.nc')
-    plot_time_series(filename, "Ssoil", lat, lon)
+    plot_time_series(ds, "Ssoil", lat, lon)
+    plot_time_point(ds, "Ssoil", '2020-03-13')
 
