@@ -1,19 +1,33 @@
 # +
 # Catalog is here: https://dapds00.nci.org.au/thredds/catalog/ub8/au/OzWALD/8day/catalog.html
-# -
 
-import requests
+# +
+# Standard Libraries
 import os
+import glob
+
+# Dependencies
+import numpy as np
+import requests
 import xarray as xr
 import pandas as pd
-import glob
 import matplotlib.pyplot as plt
+# -
 
 ozwald_abbreviations = {
-    "Ssoil":"Soil moisture",
-    "Qtot":"Runoff",
-    "LAI":"Vegetation leaf area",
-    "GPP":"Vegetation growth"
+    "Alb": "Albedo",
+    "BS": "Bare Surface",
+    "EVI": "Enhanced Vegetation Index",
+    "FMC": "Fuel Moisture Content",
+    "GPP": "Gross Primary Productivity",
+    "LAI": "Leaf Area Index",
+    "NDVI": "Normalised Difference Vegetation Index",
+    "NPV": "Non Photosynthetic Vegetation",
+    "OW": "Open Water",
+    "PV": "Photosynthetic Vegetation",
+    "QTot": "Streamflow",
+    "SN": "Snow",
+    "Ssoil": "Soil profile moisture change"
 }
 
 
@@ -32,7 +46,6 @@ def ozwald_8day_singleyear(var="Ssoil", latitude=-34.3890427, longitude=148.4694
     # base_url = "https://thredds.nci.org.au"  # This is the new url (dapds00 is supposedly deprecated), but LAI only works with the old url
     base_url = "https://dapds00.nci.org.au"
     url = f'{base_url}/thredds/ncss/grid/ub8/au/OzWALD/8day/{var}/OzWALD.{var}.{year}.nc?var={var}&north={north}&west={west}&east={east}&south={south}&time_start={time_start}&time_end={time_end}' 
-    # print(url)
     
     response = requests.get(url)
     filename = os.path.join(tmp_dir, f"{stub}_{var}_{year}.nc")
@@ -45,20 +58,16 @@ def ozwald_8day_singleyear(var="Ssoil", latitude=-34.3890427, longitude=148.4694
     return ds
 
 
-# +
 def ozwald_8day_multiyear(var="Ssoil", latitude=-34.3890427, longitude=148.469499, buffer=0.01, years=["2020", "2021"], stub="test", tmp_dir=""):
     dss = []
     for year in years:
         ds_year = ozwald_8day_singleyear(var, latitude, longitude, buffer, year, stub, tmp_dir)
-        dss.append(df_year)
+        dss.append(ds_year)
     ds_concat = xr.concat(dss, dim='time')
     return ds_concat
 
-ds_years = ozwald_8day_multiyear()
 
-
-# +
-def ozwald_8day(variables=["Ssoil", "GPP"], lat=-34.3890427, lon=148.469499, buffer=0.01, start_year=2020, end_year=2021, outdir="", stub="test", tmp_dir="", cleanup=True):
+def ozwald_8day(variables=["Ssoil", "GPP"], lat=-34.3890427, lon=148.469499, buffer=0.01, start_year=2020, end_year=2021, outdir="", stub="test", tmp_dir="", cleanup=False):
     """Download 8day variables from OzWald"""
     dss = []
     years = [str(year) for year in list(range(start_year, end_year + 1))]
@@ -78,50 +87,32 @@ def ozwald_8day(variables=["Ssoil", "GPP"], lat=-34.3890427, lon=148.469499, buf
             
     return ds_concat
 
-ds_vars = ozwald_8day()
-# -
+
+def plot_time_series(filename='test_ozwald_8day.nc', variable="Ssoil", lat=-34.3890427, lon=148.46949):
+    ds = xr.open_dataset(filename)
+    ds_point = ds.sel(latitude=lat, longitude=lon, method='nearest')
+    ds_var = ds_point[variable]
+    ds_var.plot.line()
+    plt.title(f"Latitude: {lat}, Longitude: {lon}")
+    plt.show()
+
 
 # %%time
 if __name__ == '__main__':
+    variables=["Ssoil", "GPP"] 
+    lat=-34.3890427 
+    lon=148.469499 
+    buffer=0.01 
+    start_year=2020 
+    end_year=2021
+    outdir=""
+    stub="test" 
+    tmp_dir=""
+    cleanup=True
+    
+    ds = ozwald_8day(variables, lat, lon, buffer, start_year, end_year, outdir, stub, tmp_dir, cleanup)
+    print(ds)
 
-    # ds = ozwald_8day()
-    
-    filename = 'test_ozwald_8day.nc'
-    
-    ds = xr.open_dataset()
-    ds_point = ds.sel(latitude=-34.3890427, longitude=148.469499, method='nearest')
-    df = ds_point.to_dataframe().reset_index()
-    df_dropped = df.drop(columns=['latitude', 'longitude'])
-    df_indexed = df_dropped.set_index('time')
-    
-    # Will want to do some aggregation when visualising the daily variables
-    # aggregation = {
-    #     "Rainfall": 'sum',
-    #     "Soil moisture": 'mean',
-    #     "Radiation": 'mean'
-    # }
-    # weekly_df = df_indexed.resample('W').agg(aggregation)
-    # weekly_df = weekly_df.interpolate('linear')
-    
-    weekly_df = df_indexed
-    plt.figure(figsize=(50, 10))
-    
-    # Plot the data
-    temp_plot = plt.plot(weekly_df.index, weekly_df['GPP'], color='orange')
-    moisture_plot = plt.plot(weekly_df.index, weekly_df['Ssoil']/10, color='blue')
-    
-    # Adjust the size of the tick labels on the x-axis and y-axis
-    plt.xticks(fontsize=20)  
-    plt.yticks(fontsize=20)  
-    
-    # Reorder the legend items
-    handles = [temp_plot[0], moisture_plot[0]]
-    labels = ['GPP', 'Soil Moisture (mm/10)']
-    plt.legend(handles=handles, labels=labels, fontsize=30, loc='upper left')
-    plt.title(f'OzWald 8day', fontsize=30)
-    
-    plt.tight_layout()
-    plt.savefig(f'OzWald_8day.png')
-
-
+    filename = os.path.join(outdir, f'{stub}_ozwald_8day.nc')
+    plot_time_series(filename, "Ssoil", lat, lon)
 
