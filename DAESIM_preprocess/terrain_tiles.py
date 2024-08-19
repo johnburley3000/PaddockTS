@@ -1,4 +1,4 @@
-## NCI ARE Setup
+# # NCI ARE Setup
 # Modules: gdal/3.6.4  
 # Environment base: /g/data/xe2/John/geospatenv
 

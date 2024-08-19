@@ -86,7 +86,7 @@ def ozwald_daily(variables=["VPeff", "Uavg"], lat=-34.3890427, lon=148.469499, b
 
 # %%time
 if __name__ == '__main__':
-    ds = ozwald_daily_multivariable()  # Took 2 seconds (0.5 seconds per variable per year)
+    ds = ozwald_daily()  # Took 2 seconds (0.5 seconds per variable per year)
     print(ds)
 
     os.chdir(os.path.join(os.path.expanduser('~'), "Projects/PaddockTS"))

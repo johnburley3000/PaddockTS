@@ -86,11 +86,12 @@ def ozwald_8day(variables=["Ssoil", "GPP"], lat=-34.3890427, lon=148.469499, buf
     print("Saved:", filename)
             
     return ds_concat
-    
+
 
 # %%time
 if __name__ == '__main__':
-    ds = ozwald_8day()
+    lat, lon = -34.3890427, 148.469499
+    ds = ozwald_8day(lat=lat, lon=lon)
     print(ds)
 
     os.chdir(os.path.join(os.path.expanduser('~'), "Projects/PaddockTS"))
