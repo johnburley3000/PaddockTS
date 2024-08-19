@@ -10,6 +10,7 @@ from scipy import ndimage
 from pysheds.grid import Grid
 import matplotlib.pyplot as plt
 from matplotlib import colors
+import rasterio
 
 # Local imports
 os.chdir(os.path.join(os.path.expanduser('~'), "Projects/PaddockTS"))
@@ -133,15 +134,6 @@ def catchment_ridges(grid, fdir, acc, full_branches):
 
 # -
 
-# !ls /g/data/xe2/cb8590/Data/PadSeg/*_terrain_cleaned.tif
-
-filepath = "/g/data/xe2/cb8590/Data/PadSeg/MILG_6km_terrain_cleaned.tif"
-
-# %%time
-grid, dem, fdir, acc = pysheds_accumulation(filepath)
-
-
-# +
 def show_acc(acc):
     """Very pretty visualisation of water accumulation"""
     fig, ax = plt.subplots(figsize=(8,6))
@@ -155,17 +147,8 @@ def show_acc(acc):
     plt.title('Topographic Index', size=14)
     plt.tight_layout()
     plt.show()
-    
-show_acc(acc)
-# -
-
-# %%time
-num_catchments = 10
-gullies, full_branches = catchment_gullies(grid, fdir, acc, num_catchments)
-ridges = catchment_ridges(grid, fdir, acc, full_branches)
 
 
-# +
 def show_ridge_gullies(dem, ridges, gullies):
     """Very pretty visualisation of ridges and gullies"""
     fig, ax = plt.subplots(figsize=(8, 6))
@@ -184,10 +167,7 @@ def show_ridge_gullies(dem, ridges, gullies):
     plt.tight_layout()
     plt.show()
 
-show_ridge_gullies(dem, ridges, gullies)
 
-
-# +
 def show_aspect(fdir):
     """Somewhat pretty visualisation of the aspect"""
     
@@ -214,9 +194,9 @@ def show_aspect(fdir):
                '#FFFF00',  # Yellow
                '#FFA500',  # Orange
               ]
-    cmap = mcolors.ListedColormap(colours)
+    cmap = colors.ListedColormap(colours)
     bounds = sorted(list(directions.keys()))
-    norm = mcolors.BoundaryNorm(bounds, cmap.N)
+    norm = colors.BoundaryNorm(bounds, cmap.N)
     
     # Plotting the aspect 
     fig, ax = plt.subplots(figsize=(8, 6))
@@ -226,4 +206,56 @@ def show_aspect(fdir):
     plt.title('Aspect', size=14)
     plt.tight_layout()
 
-show_aspect(fdir)
+
+def calculate_slope(tiff_file):
+    """Calculate the slope of a DEM"""
+    with rasterio.open(tiff_file) as src:
+        dem = src.read(1)  
+        transform = src.transform 
+    gradient_y, gradient_x = np.gradient(dem, transform[4], transform[0])
+    slope = np.arctan(np.sqrt(gradient_x**2 + gradient_y**2)) * (180 / np.pi)
+    return slope
+
+
+def show_slope(slope):
+    """Somewhat pretty visualisation of the slope"""
+
+    # Bin the slope into categories
+    bin_edges = np.arange(0, 16, 1) 
+    slope_categories = np.digitize(slope, bin_edges, right=True)
+    
+    # Define a color for each category
+    colours = plt.cm.viridis(np.linspace(0, 1, len(bin_edges) - 1))
+    cmap = colors.ListedColormap(colours)
+    
+    # Plot the values
+    fig, ax = plt.subplots(figsize=(8, 6))
+    im = ax.imshow(slope_categories, cmap=cmap)
+    
+    # Assign the colours
+    labels = [f'{bin_edges[i]}°' for i in range(len(bin_edges))]
+    cbar = plt.colorbar(im, ticks=np.arange(len(bin_edges)))
+    cbar.ax.set_yticklabels(labels)
+    
+    plt.title('Slope', size=14)
+    plt.tight_layout()
+    plt.show()
+
+
+# %%time
+if __name__ == '__main__':
+    filepath = "/g/data/xe2/cb8590/Data/PadSeg/MILG_6km_terrain_cleaned.tif"
+    grid, dem, fdir, acc = pysheds_accumulation(filepath)
+    show_acc(acc)
+    show_aspect(fdir)
+    
+    num_catchments = 10
+    gullies, full_branches = catchment_gullies(grid, fdir, acc, num_catchments)
+    ridges = catchment_ridges(grid, fdir, acc, full_branches)
+    show_ridge_gullies(dem, ridges, gullies)
+
+    slope = calculate_slope(filepath)
+    show_slope(slope)
+
+
+
