@@ -10,8 +10,6 @@ import matplotlib.pyplot as plt
 home_dir = os.path.expanduser('~')
 username = os.path.basename(home_dir)
 gdata_dir = os.path.join("/g/data/xe2", username)
-if not os.path.exists(gdata_dir):
-    os.mkdir(gdata_dir)
 scratch_dir = os.path.join('/scratch/xe2', username)
 paddockTS_dir = os.path.join(home_dir, "Projects/PaddockTS")
 
@@ -24,7 +22,7 @@ def create_bbox(lat=-35.274603, lon=149.098498, buffer=0.005):
     bbox = [left, top, right, bottom] 
     return bbox
 
-def visualise_tif_rasterio(filename="output.tif", title="Maximum Temperature"):
+def visualise_tif_rasterio(filename="output.tif", title=""):
     with rasterio.open(filename) as src:
         data = src.read(1)  
         
@@ -40,7 +38,7 @@ def visualise_tif_rasterio(filename="output.tif", title="Maximum Temperature"):
         cbar = plt.colorbar(img, ax=plt.gca())
         plt.show()
 
-def visualise_tif_rioxarray(filename="terrain_tiles.tif", title="Terrain Tiles"):
+def visualise_tif_rioxarray(filename="output.tif", title=""):
     ds = rxr.open_rasterio(filename)
     band = ds.sel(band=1)
     band.plot()

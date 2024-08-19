@@ -10,9 +10,19 @@ import glob
 import requests
 import xarray as xr
 import pandas as pd
-
-
 # -
+
+ozwald_daily_abbreviations = {
+    "Pg" : "Gross precipitation",
+    "Tmax" : "Maximum temperature",
+    "Tmin" : "Minimum temperature",
+    "Uavg" : "Average 24h windspeed",
+    "Ueff" : "Effective daytime windspeed",
+    "VPeff" : "Volume of effective rainfall",
+    "kTavg" : "Coefficient to calculate mean screen level temperature",
+    "kTeff" : "Coefficient to calculate effective screen level temperature"
+}
+
 
 def ozwald_daily_singleyear(var="VPeff", latitude=-34.3890427, longitude=148.469499, buffer=0.1, year="2021", stub="test", tmp_dir=""):
     

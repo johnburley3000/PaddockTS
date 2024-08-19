@@ -14,7 +14,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 # -
 
-ozwald_abbreviations = {
+ozwald_8day_abbreviations = {
     "Alb": "Albedo",
     "BS": "Bare Surface",
     "EVI": "Enhanced Vegetation Index",
@@ -25,7 +25,7 @@ ozwald_abbreviations = {
     "NPV": "Non Photosynthetic Vegetation",
     "OW": "Open Water",
     "PV": "Photosynthetic Vegetation",
-    "QTot": "Streamflow",
+    "Qtot": "Streamflow",
     "SN": "Snow",
     "Ssoil": "Soil profile moisture change"
 }
