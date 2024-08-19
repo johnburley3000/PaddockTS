@@ -12,10 +12,8 @@ import xarray as xr
 import pandas as pd
 
 os.chdir(os.path.join(os.path.expanduser('~'), "Projects/PaddockTS"))
-from DAESIM_preprocess.util import gdata_dir, scratch_dir
+from DAESIM_preprocess.util import gdata_dir, scratch_dir, create_bbox
 # -
-
-# !du -sh /scratch/xe2/cb8590/tmp/2020.daily_rain.nc
 
 # Taken from https://github.com/Sydney-Informatics-Hub/geodata-harvester/blob/main/src/geodata_harvester/getdata_silo.py
 silo_abbreviations = {
@@ -40,18 +38,65 @@ silo_abbreviations = {
         "mslp": "Mean sea level pressure Mean sea level pressure, hPa",
     }
 
-# +
-# Download data from SILO into gdata
-from geodata_harvester.getdata_silo import download_file
 
-silo_baseurl = "https://s3-ap-southeast-2.amazonaws.com/silo-open-data/Official/annual/"
-layernames = ["radiation", "et_morton_actual", "et_morton_potential", "et_short_crop", "et_tall_crop"]
-years = ["2017","2018","2019","2020", "2021", "2022", "2023", "2024"]
-outpath = os.path.join(gdata_dir, "SILO")
-for layername in layernames:
+# I used this script to download data from SILO into gdata
+def download_from_SILO():
+    from geodata_harvester.getdata_silo import download_file
+    
+    silo_baseurl = "https://s3-ap-southeast-2.amazonaws.com/silo-open-data/Official/annual/"
+    layernames = ["radiation", "et_morton_actual", "et_morton_potential", "et_short_crop", "et_tall_crop"]
+    years = ["2017","2018","2019","2020", "2021", "2022", "2023", "2024"]
+    outpath = os.path.join(gdata_dir, "SILO")
+    for layername in layernames:
+        for year in years:
+            url = silo_baseurl + layername + "/" + str(year) + "." + layername + ".nc"
+            download_file(url, layername, year, outpath)
+            print("Downloaded:", os.path.join(outpath, f"{year}.{layername}.nc"))
+            
+    
+    # Takes about 5 mins per file, so about 40 mins per variable, so about 3 hours for these 5 variables
+    # Uses about 400MB per file, so about 3GB per variable, or 15GB for these 5 variables
+# !ls /g/data/xe2/cb8590/SILO
+
+
+silo_path = "/g/data/xe2/cb8590/SILO"
+filename = os.path.join(silo_path, "2020.radiation.nc")
+
+
+def silo_daily_singleyear(var="radiation", latitude=-34.3890427, longitude=148.469499, buffer=0.1, year="2021"):
+    """Select the region of interest from the Australia wide NetCDF file"""
+    silo_path = "/g/data/xe2/cb8590/SILO"
+    filename = os.path.join(silo_path, f"{year}.{var}.nc")
+    ds = xr.open_dataset(filename)
+    ds_region = ds.sel(lat=slice(bbox[1], bbox[3]), lon=slice(bbox[0], bbox[2]))
+    return ds_region
+
+
+def silo_daily_multiyear(var="radiation", latitude=-34.3890427, longitude=148.469499, buffer=0.1, years=["2020", "2021"]):
+    dss = []
     for year in years:
-        url = silo_baseurl + layername + "/" + str(year) + "." + layername + ".nc"
-        download_file(url, layername, year, outpath)
+        ds = silo_daily_singleyear(var, latitude, longitude, buffer, year)
+        dss.append(ds)
+    ds_concat = xr.concat(dss, dim='time')
+    return ds_concat
 
-# Takes about 5 mins per file, so about 40 mins per variable, so about 3 hours for these 5 variables
-# Uses about 400MB per file, so about 3GB per variable, or 15GB for these 5 variables
+
+# +
+def silo_daily(variables=["radiation", "et_morton_actual"], lat=-34.3890427, lon=148.469499, buffer=0.1, start_year=2020, end_year=2021, outdir="", stub=""):
+    dss = []
+    years = [str(year) for year in list(range(start_year, end_year + 1))]
+    for variable in variables:
+        ds = silo_daily_multiyear(variable, lat, lon, buffer, years)
+    ds_concat = xr.merge(dss)
+    
+    filename = os.path.join(outdir, f'{stub}_silo_daily.nc')
+    ds_concat.to_netcdf(filename)
+    print("Saved:", filename)
+    return ds_concat
+
+ds = silo_daily()
+# -
+
+ds.sel(lat=slice(bbox[0], bbox[2]), lon=slice(bbox[1], bbox[3]))
+
+ds.sel(lat=slice(bbox[1], bbox[3]), lon=slice(bbox[0], bbox[2]))
