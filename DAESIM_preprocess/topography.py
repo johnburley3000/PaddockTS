@@ -31,8 +31,8 @@ def pysheds_accumulation(tiff_file):
     inflated_dem = grid.resolve_flats(flooded_dem)
 
     # Calculate the direction and accumulation of water
-    fdir = grid.flowdir(inflated_dem, dirmap=dirmap)
-    acc = grid.accumulation(fdir, dirmap=dirmap)
+    fdir = grid.flowdir(inflated_dem)
+    acc = grid.accumulation(fdir)
 
     return grid, dem, fdir, acc
 
@@ -52,7 +52,7 @@ def catchment_gullies(grid, fdir, acc, num_catchments=10):
     """Find the largest gullies"""
 
     # Extract the branches
-    branches = grid.extract_river_network(fdir, acc > np.max(acc)/(num_catchments*10), dirmap=dirmap)
+    branches = grid.extract_river_network(fdir, acc > np.max(acc)/(num_catchments*10))
 
     # Convert the branches to numpy coordinates 
     branches_np = []
@@ -114,7 +114,7 @@ def catchment_ridges(grid, fdir, acc, full_branches):
         x, y = grid.affine * (coords[1], coords[0])
 
         # Generate the catchment above that pixel
-        catch = grid.catchment(x=x, y=y, fdir=fdir, dirmap=dirmap, 
+        catch = grid.catchment(x=x, y=y, fdir=fdir, 
                             xytype='coordinate')
 
         # Override relevant pixels in all_catchments with this new catchment_id
@@ -141,6 +141,7 @@ filepath = "/g/data/xe2/cb8590/Data/PadSeg/MILG_6km_terrain_cleaned.tif"
 grid, dem, fdir, acc = pysheds_accumulation(filepath)
 
 
+# +
 def show_acc(acc):
     """Very pretty visualisation of water accumulation"""
     fig, ax = plt.subplots(figsize=(8,6))
@@ -151,28 +152,11 @@ def show_acc(acc):
                    norm=colors.LogNorm(1, acc.max()),
                    interpolation='bilinear')
     plt.colorbar(im, ax=ax, label='Upstream Cells')
-    plt.title('Flow Accumulation', size=14)
-    plt.xlabel('Longitude')
-    plt.ylabel('Latitude')
+    plt.title('Topographic Index', size=14)
     plt.tight_layout()
     plt.show()
-
-
+    
 show_acc(acc)
-
-# +
-fig = plt.figure(figsize=(8,6))
-fig.patch.set_alpha(0)
-
-plt.imshow(fdir, extent=grid.extent, cmap='viridis', zorder=2)
-boundaries = ([0] + sorted(list(dirmap)))
-plt.colorbar(boundaries= boundaries,
-             values=sorted(dirmap))
-plt.xlabel('Longitude')
-plt.ylabel('Latitude')
-plt.title('Flow direction grid', size=14)
-plt.grid(zorder=-1)
-plt.tight_layout()
 # -
 
 # %%time
@@ -182,14 +166,64 @@ ridges = catchment_ridges(grid, fdir, acc, full_branches)
 
 
 # +
-def show_contour_overlays(dem, overlays, colours, title=""):
-    """Plot an image of the contours and the overlay layer"""
-    plt.imshow(dem, alpha=0)
-    plt.contour(dem, levels=10, alpha=0.5)
-    for overlay, colour in zip(overlays, colours):
-        y, x = np.where(overlay)
-        plt.scatter(x, y, marker='.', s=0.5, c=colour)
-    plt.title(title)
+def show_ridge_gullies(dem, ridges, gullies):
+    """Very pretty visualisation of ridges and gullies"""
+    fig, ax = plt.subplots(figsize=(8, 6))
+    fig.patch.set_alpha(0)
+    
+    # Plot the DEM
+    im = ax.imshow(dem, cmap='terrain', zorder=1, interpolation='bilinear')
+    plt.colorbar(im, ax=ax, label='Elevation (m)')
+    
+    # Overlay ridges and gullies
+    ax.contour(ridges, levels=[0.5], colors='red', linewidths=1.5, zorder=2)
+    ax.contour(gullies, levels=[0.5], colors='blue', linewidths=1.5, zorder=3)
+    ax.contour(dem, colors='black', linewidths=0.5, zorder=4, alpha=0.5)
+
+    plt.title('Ridges and Gullies', size=14)
+    plt.tight_layout()
     plt.show()
 
-show_contour_overlays(dem, [gullies, ridges], ["blue", "red"], "Ridges and Gullies")
+show_ridge_gullies(dem, ridges, gullies)
+
+
+# +
+def show_aspect(fdir):
+    """Somewhat pretty visualisation of the aspect"""
+    
+    # Apparently these are the default ESRI directions
+    directions = {
+        64: "North",
+        128: "Northeast",
+        1: "East",
+        2: "Southeast",
+        4: "South",
+        8: "Southwest",
+        16: "West",
+        32: "Northwest",
+        -1: "Flat"
+    }
+    
+    # I arrived at these colours through trial and error
+    colours = ['#808080',  # Grey
+               '#EE82EE',  # Violet
+               '#00008B',  # Dark Blue
+               '#ADD8E6',  # Light Blue
+               '#006400',  # Dark Green
+               '#90EE90',  # Light Green
+               '#FFFF00',  # Yellow
+               '#FFA500',  # Orange
+              ]
+    cmap = mcolors.ListedColormap(colours)
+    bounds = sorted(list(directions.keys()))
+    norm = mcolors.BoundaryNorm(bounds, cmap.N)
+    
+    # Plotting the aspect 
+    fig, ax = plt.subplots(figsize=(8, 6))
+    im = ax.imshow(fdir, cmap=cmap, norm=norm, zorder=2)
+    cbar = plt.colorbar(im, ticks=sorted(directions.keys()))
+    cbar.ax.set_yticklabels([directions[key] for key in sorted(directions.keys())])
+    plt.title('Aspect', size=14)
+    plt.tight_layout()
+
+show_aspect(fdir)
