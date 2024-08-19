@@ -38,7 +38,8 @@ def ozwald_daily_singleyear(var="VPeff", latitude=-34.3890427, longitude=148.469
     
     # base_url = "https://thredds.nci.org.au"  # This is the new url (dapds00 is supposedly deprecated), but LAI only works with the old url
     base_url = "https://dapds00.nci.org.au"
-    url = f'{base_url}/thredds/ncss/grid/ub8/au/OzWALD/daily/meteo/{var}/OzWALD.{var}.{year}.nc?var={var}&north={north}&west={west}&east={east}&south={south}&time_start={time_start}&time_end={time_end}' 
+    prefix = ".daily" if var == "Pg" else ""
+    url = f'{base_url}/thredds/ncss/grid/ub8/au/OzWALD/daily/meteo/{var}/OzWALD{prefix}.{var}.{year}.nc?var={var}&north={north}&west={west}&east={east}&south={south}&time_start={time_start}&time_end={time_end}' 
     
     response = requests.get(url)
     filename = os.path.join(tmp_dir, f"{stub}_{var}_{year}.nc")
@@ -49,6 +50,9 @@ def ozwald_daily_singleyear(var="VPeff", latitude=-34.3890427, longitude=148.469
     ds = xr.open_dataset(filename)
     
     return ds
+
+
+ozwald_daily_singleyear(buffer=0.00001)
 
 
 def ozwald_daily_multiyear(var="VPeff", latitude=-34.3890427, longitude=148.469499, buffer=0.1, years=["2020", "2021"], stub="", tmp_dir=""):

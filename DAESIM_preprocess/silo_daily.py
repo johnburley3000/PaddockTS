@@ -39,6 +39,10 @@ silo_abbreviations = {
     }
 
 
+# +
+# # !ls /g/data/xe2/cb8590/SILO
+# -
+
 # I used this script to download data from SILO into gdata
 def download_from_SILO():
     from geodata_harvester.getdata_silo import download_file
@@ -56,19 +60,18 @@ def download_from_SILO():
     
     # Takes about 5 mins per file, so about 40 mins per variable, so about 3 hours for these 5 variables
     # Uses about 400MB per file, so about 3GB per variable, or 15GB for these 5 variables
-# !ls /g/data/xe2/cb8590/SILO
-
-
-silo_path = "/g/data/xe2/cb8590/SILO"
-filename = os.path.join(silo_path, "2020.radiation.nc")
-
-
 def silo_daily_singleyear(var="radiation", latitude=-34.3890427, longitude=148.469499, buffer=0.1, year="2021"):
     """Select the region of interest from the Australia wide NetCDF file"""
     silo_path = "/g/data/xe2/cb8590/SILO"
     filename = os.path.join(silo_path, f"{year}.{var}.nc")
     ds = xr.open_dataset(filename)
+    bbox = create_bbox(latitude, longitude, buffer)
     ds_region = ds.sel(lat=slice(bbox[1], bbox[3]), lon=slice(bbox[0], bbox[2]))
+
+    # If the region is too small, then just find a single point
+    if ds_region[var].shape[1] == 0:
+        ds_region = ds.sel(lat=latitude, lon=longitude, method="nearest")
+        
     return ds_region
 
 
@@ -81,12 +84,12 @@ def silo_daily_multiyear(var="radiation", latitude=-34.3890427, longitude=148.46
     return ds_concat
 
 
-# +
 def silo_daily(variables=["radiation", "et_morton_actual"], lat=-34.3890427, lon=148.469499, buffer=0.1, start_year=2020, end_year=2021, outdir="", stub=""):
     dss = []
     years = [str(year) for year in list(range(start_year, end_year + 1))]
     for variable in variables:
         ds = silo_daily_multiyear(variable, lat, lon, buffer, years)
+        dss.append(ds)
     ds_concat = xr.merge(dss)
     
     filename = os.path.join(outdir, f'{stub}_silo_daily.nc')
@@ -94,9 +97,8 @@ def silo_daily(variables=["radiation", "et_morton_actual"], lat=-34.3890427, lon
     print("Saved:", filename)
     return ds_concat
 
-ds = silo_daily()
-# -
 
-ds.sel(lat=slice(bbox[0], bbox[2]), lon=slice(bbox[1], bbox[3]))
-
-ds.sel(lat=slice(bbox[1], bbox[3]), lon=slice(bbox[0], bbox[2]))
+# %%time
+if __name__ == '__main__':
+    ds = silo_daily(["radiation", "et_morton_actual", "et_morton_potential", "et_short_crop", "et_tall_crop"])
+    print(ds)
