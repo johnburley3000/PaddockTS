@@ -1,17 +1,22 @@
 # +
 # Catalog is here: https://dapds00.nci.org.au/thredds/catalog/ub8/au/OzWALD/daily/meteo/catalog.html
-# -
 
-import requests
+# +
+# Standard Libraries
 import os
-import xarray as xr
-import pandas as pd
 import glob
 
+# Dependencies
+import requests
+import xarray as xr
+import pandas as pd
 
-def ozwald_daily_singleyear(var="VPeff", latitude=-34.3890427, longitude=148.469499, year="2021"):
+
+# -
+
+def ozwald_daily_singleyear(var="VPeff", latitude=-34.3890427, longitude=148.469499, buffer=0.1, year="2021", stub="test", tmp_dir=""):
     
-    buffer = 0.0000000001    # This buffer is less than the grid size of 500m (0.005 degrees), so you get a single point
+    # buffer = 0.0000000001    # Using a buffer less than the grid size of 5km (0.05 degrees), so you get a single point
     
     north = latitude + buffer 
     south = latitude - buffer 
@@ -24,57 +29,54 @@ def ozwald_daily_singleyear(var="VPeff", latitude=-34.3890427, longitude=148.469
     # base_url = "https://thredds.nci.org.au"  # This is the new url (dapds00 is supposedly deprecated), but LAI only works with the old url
     base_url = "https://dapds00.nci.org.au"
     url = f'{base_url}/thredds/ncss/grid/ub8/au/OzWALD/daily/meteo/{var}/OzWALD.{var}.{year}.nc?var={var}&north={north}&west={west}&east={east}&south={south}&time_start={time_start}&time_end={time_end}' 
-    print(url)
     
     response = requests.get(url)
-    filename = f'{var}_{year}.nc' 
+    filename = os.path.join(tmp_dir, f"{stub}_{var}_{year}.nc")
     with open(filename, 'wb') as f:
         f.write(response.content)
+    print("Downloaded", filename)
         
     ds = xr.open_dataset(filename)
-    df = ds.to_dataframe().reset_index()
-    df_indexed = df.set_index('time')
-    df_dropped = df_indexed.drop(columns=['latitude', 'longitude'])
-
-    return df_dropped
+    
+    return ds
 
 
-def ozwald_daily_multiyear(var="VPeff", latitude=-34.3890427, longitude=148.469499, years=["2020", "2021"]):
-    dfs = []
+def ozwald_daily_multiyear(var="VPeff", latitude=-34.3890427, longitude=148.469499, buffer=0.1, years=["2020", "2021"], stub="test", tmp_dir=""):
+    dss = []
     for year in years:
-        df_year = ozwald_daily_singleyear(var, latitude, longitude, year)
-        dfs.append(df_year)
-    df_concat = pd.concat(dfs)
-    return df_concat
+        ds_year = ozwald_daily_singleyear(var, latitude, longitude, buffer, year, stub, tmp_dir)
+        dss.append(ds_year)
+    ds_concat = xr.concat(dss, dim='time')
+    return ds_concat
 
 
-def ozwald_daily_multivariable(variables=["VPeff", "Uavg"], latitude=-34.3890427, longitude=148.469499, years=["2020", "2021"], cleanup=True):
-    dfs = []
+def ozwald_daily(variables=["VPeff", "Uavg"], lat=-34.3890427, lon=148.469499, buffer=0.1, start_year=2020, end_year=2021, outdir="", stub="test", tmp_dir="", cleanup=False):
+    dss = []
+    years = [str(year) for year in list(range(start_year, end_year + 1))]
     for variable in variables:
-        df_variable = ozwald_daily_multiyear(variable, latitude, longitude, years)
-        dfs.append(df_variable)
-    df_concat = pd.concat(dfs, axis=1)
+        ds_variable = ozwald_daily_multiyear(variable, lat, lon, buffer, years, stub, tmp_dir)
+        dss.append(ds_variable)
+    ds_concat = xr.merge(dss)
     
     if cleanup:
         nc_files = glob.glob(os.path.join(os.getcwd(), '*.nc'))
         for file in nc_files:
             os.remove(file)
+
+    filename = os.path.join(outdir, f'{stub}_ozwald_daily.nc')
+    ds_concat.to_netcdf(filename)
+    print("Saved:", filename)
             
-    return df_concat
+    return ds_concat
 
 
 # %%time
 if __name__ == '__main__':
-    df = ozwald_daily_multivariable()  # Took 2 seconds (0.5 seconds per variable per year)
-    abbreviations = {
-        "Ssoil":"Soil moisture",
-        "Qtot":"Runoff",
-        "LAI":"Vegetation leaf area",
-        "GPP":"Vegetation growth"
-    }
-    df.rename(columns=abbreviations, inplace=True)
-    df.rename_axis("date", inplace=True)
-    df.to_csv("ozwald_daily.csv")
-    print(df.head())
+    ds = ozwald_daily_multivariable(cleanup=True)  # Took 2 seconds (0.5 seconds per variable per year)
+    print(ds)
 
-
+    os.chdir(os.path.join(os.path.expanduser('~'), "Projects/PaddockTS"))
+    from DAESIM_preprocess.util import plot_time_series, plot_time_point
+    
+    plot_time_series(ds, "VPeff",  lat=-34.3890427, lon=148.469499)
+    plot_time_point(ds, "VPeff", "2020-03-11")

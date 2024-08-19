@@ -49,6 +49,18 @@ def visualise_tif_rioxarray(filename="terrain_tiles.tif", title="Terrain Tiles")
     plt.ylabel('Latitude')
     plt.show()
 
+def plot_time_series(ds, variable="Ssoil", lat=-34.3890427, lon=148.46949):
+    ds_point = ds.sel(latitude=lat, longitude=lon, method='nearest')
+    ds_var = ds_point[variable]
+    ds_var.plot.line()
+    plt.title(f"Latitude: {lat}, Longitude: {lon}")
+    plt.show()
+
+def plot_time_point(ds, variable="Ssoil", timepoint='2020-03-13'):
+    data = ds[variable].sel(time=timepoint, method='nearest')
+    data.plot()
+    plt.show()
+
 if __name__ == '__main__':
     print("username:", username)
     print("home_dir:", home_dir)

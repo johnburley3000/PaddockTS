@@ -86,38 +86,16 @@ def ozwald_8day(variables=["Ssoil", "GPP"], lat=-34.3890427, lon=148.469499, buf
     print("Saved:", filename)
             
     return ds_concat
-
-
-def plot_time_series(ds, variable="Ssoil", lat=-34.3890427, lon=148.46949):
-    ds_point = ds.sel(latitude=lat, longitude=lon, method='nearest')
-    ds_var = ds_point[variable]
-    ds_var.plot.line()
-    plt.title(f"Latitude: {lat}, Longitude: {lon}")
-    plt.show()
-
-
-def plot_time_point(ds, variable="Ssoil", timepoint='2020-03-13'):
-    data = ds[variable].sel(time=timepoint, method='nearest')
-    data.plot()
-    plt.show()
-
+    
 
 # %%time
 if __name__ == '__main__':
-    variables=["Ssoil", "GPP"] 
-    lat=-34.3890427 
-    lon=148.469499 
-    buffer=0.01 
-    start_year=2020 
-    end_year=2021
-    outdir=""
-    stub="test" 
-    tmp_dir=""
-    cleanup=True
-    
-    ds = ozwald_8day(variables, lat, lon, buffer, start_year, end_year, outdir, stub, tmp_dir, cleanup)
+    ds = ozwald_8day(cleanup=True)
     print(ds)
 
+    os.chdir(os.path.join(os.path.expanduser('~'), "Projects/PaddockTS"))
+    from DAESIM_preprocess.util import plot_time_series, plot_time_point
+    
     plot_time_series(ds, "Ssoil", lat, lon)
     plot_time_point(ds, "Ssoil", '2020-03-13')
 
