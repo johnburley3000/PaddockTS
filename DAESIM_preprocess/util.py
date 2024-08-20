@@ -6,6 +6,7 @@ import numpy as np
 import rasterio
 import rioxarray as rxr
 import matplotlib.pyplot as plt
+from pyproj import Transformer
 
 home_dir = os.path.expanduser('~')
 username = os.path.basename(home_dir)
@@ -21,6 +22,12 @@ def create_bbox(lat=-35.274603, lon=149.098498, buffer=0.005):
     left, top, right, bottom = lon - buffer, lat - buffer, lon + buffer, lat + buffer 
     bbox = [left, top, right, bottom] 
     return bbox
+
+def transform_bbox(bbox=[148.464499, -34.394042, 148.474499, -34.384042], inputEPSG="EPSG:4326", outputEPSG="EPSG:3857"):
+    transformer = Transformer.from_crs(inputEPSG, outputEPSG)
+    x1,y1 = transformer.transform(bbox[1], bbox[0])
+    x2,y2 = transformer.transform(bbox[3], bbox[2])
+    return (x1, y1, x2, y2)
 
 def visualise_tif_rasterio(filename="output.tif", title=""):
     with rasterio.open(filename) as src:
