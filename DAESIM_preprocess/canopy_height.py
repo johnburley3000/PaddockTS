@@ -18,7 +18,7 @@ from pyproj import Transformer
 
 # Local imports
 os.chdir(os.path.join(os.path.expanduser('~'), "Projects/PaddockTS"))
-from DAESIM_preprocess.util import create_bbox, transform_bbox
+from DAESIM_preprocess.util import create_bbox, transform_bbox, scratch_dir
 # endregion
 
 # Setup the AWS connection
@@ -29,9 +29,6 @@ s3 = boto3.client('s3')
 # [default]
 # aws_access_key_id = ACCESS_KEY
 # aws_secret_access_key = SECRET_KEY
-# region = ap-southeast-2
-# endregion
-
 # !ls .aws/credentials
 
 # Specify the region of interest
@@ -41,6 +38,7 @@ buffer = 0.1  # 0.01 degrees is about 1km in each direction, so 2km total
 # Filenames
 stub = "MILG_1km"
 outdir = '/g/data/xe2/cb8590/Global_Canopy_Height'
+tmp_dir = os.path.join(scratch_dir, "tmp")
 tiles_geojson = os.path.join(outdir, 'tiles_global.geojson')
 
 # %%time
@@ -82,6 +80,9 @@ for tile in to_download:
 # !ls /g/data/xe2/cb8590/Global_Canopy_Height
 
 # region
+# %%time
+
+# Not working
 # Load in all the relevant files and crop them to the region of interest
 bbox_3857 = transform_bbox(bbox)
 roi_3857 = box(*bbox_3857)
@@ -98,10 +99,13 @@ for tile in relevant_tiles:
         out_meta = src.meta.copy()
         images.append(out_image)
         transforms.append(out_transform)
-        metas.append(meta)
+        metas.append(out_meta)
 # endregion
 
+show(images[1])
+
 # region
+# This works for a single image
 tile = '311230211'
 tiff_file = os.path.join(outdir, f'{tile}.tif')
 
@@ -115,7 +119,7 @@ show(out_image)
 # endregion
 
 # region
-# Update the metadata to reflect the new dimensions
+# This works for a single image
 out_meta.update({
     "driver": "GTiff",
     "height": out_image.shape[1],
@@ -133,3 +137,58 @@ print(f'Cropped image saved to {cropped_tiff_file}')
 # endregion
 
 # !ls
+
+# Crop the images and save a cropped tiff file for each one
+for tile in relevant_tiles:
+    tiff_file = os.path.join(outdir, f'{tile}.tif')
+    with rasterio.open(tiff_file) as src:
+        out_image, out_transform = rasterio.mask.mask(src, [mapping(roi_polygon_3857)], crop=True)
+        out_meta = src.meta.copy()
+    cropped_tiff_file = os.path.join(tmp_dir, f'{tile}_cropped.tif')
+    out_meta.update({
+        "driver": "GTiff",
+        "height": out_image.shape[1],
+        "width": out_image.shape[2],
+        "transform": out_transform
+    })
+    with rasterio.open(cropped_tiff_file, "w", **out_meta) as dest:
+        dest.write(out_image)
+        print("Downloaded:", cropped_tiff_file)
+
+# region
+# List to store open raster datasets
+src_files_to_mosaic = []
+
+for tile in relevant_tiles:
+    tiff_file = os.path.join(tmp_dir, f'{tile}_cropped.tif')
+    src = rasterio.open(tiff_file)
+    src_files_to_mosaic.append(src)
+# endregion
+
+# Merge the datasets
+mosaic, out_trans = merge(src_files_to_mosaic)
+
+# region
+# Copy the metadata of one of the input files
+out_meta = src_files_to_mosaic[0].meta.copy()
+
+# Update the metadata to reflect the number of layers, dimensions, and transform of the mosaic
+out_meta.update({
+    "height": mosaic.shape[1],
+    "width": mosaic.shape[2],
+    "transform": out_trans
+})
+
+# Write the mosaic to a new file
+output_tiff = os.path.join(tmp_dir, 'combined_image.tif')
+with rasterio.open(output_tiff, "w", **out_meta) as dest:
+    dest.write(mosaic)
+
+# Close the open files
+for src in src_files_to_mosaic:
+    src.close()
+
+# endregion
+
+tiff_file = os.path.join(tmp_dir, "combined_image.tif")
+tiff_file
