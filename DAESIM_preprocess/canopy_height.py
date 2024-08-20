@@ -8,6 +8,7 @@ import os
 import subprocess
 
 # Dependencies
+import numpy as np
 import geopandas as gpd
 from shapely.geometry import Polygon, box, mapping
 from shapely.ops import transform
@@ -17,6 +18,9 @@ from rasterio.plot import show
 from rasterio.merge import merge
 from rasterio.transform import Affine
 from pyproj import Transformer
+import matplotlib.pyplot as plt
+from matplotlib import colors
+
 
 # Local imports
 os.chdir(os.path.join(os.path.expanduser('~'), "Projects/PaddockTS"))
@@ -142,4 +146,27 @@ with rasterio.open(tiff_file) as src:
     transform = src.transform 
 
 show(image)
+# endregion
+
+# region
+# Bin the slope into categories
+bin_edges = np.arange(0, 16, 1) 
+categories = np.digitize(image, bin_edges, right=True)
+
+# Define a color for each category
+colours = plt.cm.viridis(np.linspace(0, 1, len(bin_edges) - 2))
+cmap = colors.ListedColormap(['white'] + list(colours))
+
+# Plot the values
+fig, ax = plt.subplots(figsize=(8, 6))
+im = ax.imshow(categories, cmap=cmap)
+
+# Assign the colours
+labels = [f'{bin_edges[i]}' for i in range(len(bin_edges))]
+cbar = plt.colorbar(im, ticks=np.arange(len(bin_edges)))
+cbar.ax.set_yticklabels(labels)
+
+plt.title('Canopy Height', size=14)
+plt.tight_layout()
+plt.show()
 # endregion
