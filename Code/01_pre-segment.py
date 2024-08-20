@@ -81,7 +81,8 @@ def load_and_process_data(dc, query):
         **query
     )
     ds = calculate_indices(ds, 
-                           index=['NDVI', 'kNDVI', 'EVI', 'LAI', 'SAVI', 'MSAVI', 'NDMI', 'NDWI', 'MNDWI', 'NBR', 'NDCI', 'NDTI', 'BSI'], 
+                           #index=['NDVI', 'kNDVI', 'EVI', 'LAI', 'SAVI', 'MSAVI', 'NDMI', 'NDWI', 'MNDWI', 'NBR', 'NDCI', 'NDTI', 'BSI'],
+			   index=['NDVI', 'LAI', 'SAVI'],
                            collection='ga_s2_3')
     return ds
     
