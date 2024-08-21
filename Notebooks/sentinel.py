@@ -11,19 +11,24 @@
 import pickle
 import sys
 import os
+import calendar
 
 # Dependencies
 import numpy as np
 import xarray as xr
-import matplotlib.pyplot as plt
 import pandas as pd
-
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 
 sys.path.insert(1, '../Tools/')
 import datacube
 from dea_tools.datahandling import load_ard
 from dea_tools.plotting import rgb
+
 # -
+
+
+
 
 import resource
 def memory_usage():
@@ -33,6 +38,13 @@ print(memory_usage())
 
 dc = datacube.Datacube(app='Sentinel')
 
+
+# Filenames
+stub = "MILG_1km_all_years"
+scratch_dir = "/scratch/xe2/cb8590/"
+gdata_dir = "/g/data/xe2/cb8590"
+chris_outdir = os.path.join(gdata_dir, "Data/PadSeg/")
+filename = os.path.join(chris_outdir, f"{stub}.nc")
 
 # +
 # Specify parameters
@@ -52,7 +64,7 @@ def define_query(lat=-34.389042, lon=148.469499, buffer=0.005 , start_year=2020,
     query = {
         'y': lat_range,
         'x': lon_range,
-        'time': time_range,
+        'time': (start_year, end_year),
         'resolution': (-10, 10),
         'output_crs': 'epsg:6933',
         'group_by': 'solar_day',
@@ -77,14 +89,6 @@ def load_and_process_data(dc, query):
 ds = load_and_process_data(dc, query)
 
 
-ds
-
-stub = "MILG_1km_all_years"
-scratch_dir = "/scratch/xe2/cb8590/"
-gdata_dir = "/g/data/xe2/cb8590"
-chris_outdir = os.path.join(gdata_dir, "Data/PadSeg/")
-filename = os.path.join(chris_outdir, f"{stub}.nc")
-
 # # Sometimes need to remove these for the netcdf save to work
 ds['time'].attrs.pop('units', None)
 if 'flags_definition' in ds.attrs:
@@ -99,15 +103,16 @@ ds.to_netcdf(filename)
 
 ds = xr.open_dataset(filename)
 
+ds_full = ds.copy()
+
 # !ls /g/data/xe2/cb8590/Data/PadSeg/*.pkl
 
 
-# %%time
-filename = "/g/data/xe2/cb8590/Data/PadSeg/AO_b02_y20-22_ds2.pkl"
-with open(filename, 'rb') as handle:
-    ds = pickle.load(handle)
-    
-
+# +
+# # %%time
+# filename = "/g/data/xe2/cb8590/Data/PadSeg/AO_b02_y20-22_ds2.pkl"
+# with open(filename, 'rb') as handle:
+#     ds = pickle.load(handle)
 
 # +
 # %%time
@@ -156,47 +161,10 @@ rgb(ds,
 # Video(output, embed=True)
 
 
-# -
-
-ds
-
 # +
-# Create an empty heatmap with the dimensions: years, weeks
-dates = pd.to_datetime(ds['time'].values)
-years = np.arange(dates.year.min(), dates.year.max() + 1)
-weeks = np.arange(1, 53)
-heatmap_data = pd.DataFrame(0, index=years, columns=weeks)
+# Heatmap of available imagery dates
+# ds = ds_full
 
-# Fill the DataFrame with 1s where dates exist
-weeks_years_dates = [(date.strftime('%W'), date.year, date) for date in dates]
-weeks_years = [(1 if wyd[0] == '00' else int(wyd[0]), wyd[1]) for wyd in weeks_years_dates]
-for week_year in weeks_years:
-    heatmap_data.loc[week_year[1], week_year[0]] = 1
-
-# Plotting the heatmap
-plt.figure(figsize=(15, 10))
-plt.imshow(heatmap_data, cmap='Greens', aspect='equal', interpolation='none')
-
-# Setting labels
-plt.xlabel('Week')
-plt.ylabel('Year')
-plt.title('Heatmap of Dates')
-plt.xticks(ticks=np.arange(len(weeks)), labels=weeks)
-plt.yticks(ticks=np.arange(len(years)), labels=years)
-plt.title("Available Sentinel Imagery")
-
-plt.show()
-
-# -
-
-# Define the dimensions of your images (y, x)
-y_dim = 
-x_dim = 
-
-
-
-
-# +
 # Create an empty heatmap with the dimensions: years, weeks
 dates = pd.to_datetime(ds['time'].values)
 years = np.arange(dates.year.min(), dates.year.max() + 1)
@@ -219,30 +187,88 @@ for week_year_date in weeks_years_dates:
     else:
         heatmap_data.loc[year, week] = 2  # More than 90% good pixels
 
-heatmap_data
-
-# +
-
 # Plotting the heatmap
 plt.figure(figsize=(15, 10))
 cmap = plt.get_cmap('Greens', 3)  # Use 3 levels of green
-
-
-# Plot with custom colormap
 plt.imshow(heatmap_data, cmap=cmap, aspect='equal', interpolation='none')
 
-# Setting labels
-plt.xlabel('Week')
-plt.ylabel('Year')
-plt.title('Available Sentinel Imagery')
-plt.xticks(ticks=np.arange(len(weeks)), labels=weeks)
+# Change the xticks to use months instead of weeks
+month_start_weeks = [pd.Timestamp(f'{years[0]}-{month:02d}-01').week for month in range(1, 13)]
+month_labels = [calendar.month_name[month] for month in range(1, 13)]
+plt.xticks(ticks=month_start_weeks, labels=month_labels)
 plt.yticks(ticks=np.arange(len(years)), labels=years)
 
-# Custom labels for the color bar
+# Cloud cover categories
 labels = ['<50%', '<90%', '>=90%']
 cbar = plt.colorbar(ticks=[0.33, 1, 1.66], shrink=0.3)
 cbar.ax.set_yticklabels(labels)
 cbar.set_label('Cloud Cover')
 
-
+plt.title('Available Sentinel Imagery')
 plt.show()
+# -
+
+ds = ds_full.sel(time=slice('2015', '2017'))
+
+reds = ds
+
+# +
+# Get the unique weeks and years from the dataframe
+weeks = list(range(1,53))
+years = [2015, 2016, 2017]
+
+week_year_dict = {date:[week, year] for week, year, date in weeks_years_dates}
+
+year_minimum = min(years)
+
+# -
+
+
+
+
+
+i = 0
+time = ds.time[i].values
+timestamp = pd.Timestamp(time)
+week, year = week_year_dict[timestamp]
+week, year
+
+red = ds['nbart_red'][i]
+green = ds['nbart_green'][i]
+blue = ds['nbart_blue'][i]
+
+
+red_normalized = red / np.max(red)
+green_normalized = green / np.max(green)
+blue_normalized = blue / np.max(blue)
+rgb_image = np.stack([red_normalized, green_normalized, blue_normalized], axis=-1)
+
+plt.imshow(rgb_image)
+
+year_index = year - year_minimum
+week_index = week - 1
+year_index, week_index
+
+import matplotlib.gridspec as gridspec
+
+
+# +
+# Create a 52x3 subplot grid
+image_size = 1
+rows = 4
+cols = 4
+fig, axes = plt.subplots(nrows=rows, ncols=cols, figsize=(cols*image_size, rows*image_size))
+
+
+for row in range(rows):
+    for col in range(cols):
+        ax = axes[row, col]
+        ax.imshow(rgb_image, aspect='auto')
+        ax.axis('off') 
+
+plt.tight_layout(pad=0.2)
+plt.show()
+
+# -
+
+
