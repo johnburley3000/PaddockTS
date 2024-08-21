@@ -12,6 +12,7 @@ import pickle
 import sys
 import os
 import calendar
+import datetime
 
 # Dependencies
 import numpy as np
@@ -26,10 +27,6 @@ from dea_tools.datahandling import load_ard
 from dea_tools.plotting import rgb
 
 # -
-
-
-
-
 import resource
 def memory_usage():
     usage = resource.getrusage(resource.RUSAGE_SELF)
@@ -113,42 +110,19 @@ ds_full = ds.copy()
 # filename = "/g/data/xe2/cb8590/Data/PadSeg/AO_b02_y20-22_ds2.pkl"
 # with open(filename, 'rb') as handle:
 #     ds = pickle.load(handle)
-
-# +
-# %%time
-# John's calendar plot
-# ds_resamp = ds.resample(time="1W").interpolate("linear").interpolate_na(dim = 'time', method = 'linear')
-
-rgb(ds_resamp, 
-    bands=['nbart_red', 'nbart_green', 'nbart_blue'], 
-    robust = True, 
-    size = 4,
-    col="time", 
-    #col_wrap=36,  # 10-day
-    col_wrap=52, # weekly
-    savefig_path = path_out+stub+'_calendar_plot.png')
 # -
 
-
-# %%time
-# Calendar plot (takes about the same amount of time as a video, but more space)
 output = os.path.join(scratch_dir,f"{stub}_calendar_plot.png")
-rgb(ds, 
-    bands=['nbart_red', 'nbart_green', 'nbart_blue'], 
-    size = 1,
-    col="time", 
-    col_wrap=52,  # 7 is roughly monthly, 52 is roughly yearly (depends on how many get missed)
-    savefig_path = output)
 
-# !ls /scratch/xe2/cb8590/MILG_1km_all_years_calendar_plot.png
 
-# !du -sh /scratch/xe2/cb8590/MILG_1km_all_years_calendar_plot.png
+# !du -sh {outpath}
 
 # +
 # # %%time
 # # Video
 
-
+# Probably want to resample first even though it takes a while
+# ds_weekly = ds.resample(time="1W").interpolate("linear")
 
 # # RGB actual time series
 # output = os.path.join(scratch_dir,"calendar_plot.mp4")
@@ -210,32 +184,114 @@ plt.show()
 
 ds = ds_full.sel(time=slice('2015', '2017'))
 
-reds = ds
+# +
+
+# Create the labels for the x axis
+month_labels = []
+previous_month = None
+for week in range(1, 53):
+    
+    # Find the month
+    date = datetime.datetime.strptime(f'2024-W{week}-1', "%Y-W%U-%w").date()
+    month = date.strftime("%b")
+    
+    # Add the month if it's a new month
+    if month != previous_month:
+        month_labels.append(month)
+        previous_month = month
+    else:
+        month_labels.append("")
+        
+# Move the label to the second week of the month, because some years don't start on Monday 
+month_labels = [""] + month_labels[:-1]         
+print(month_labels)
 
 # +
-# Get the unique weeks and years from the dataframe
+# %%time
+# Create a calendar plot, spaced nicely across each year
+
+# Setup the dimensions of the calendar plot
 weeks = list(range(1,53))
-years = [2015, 2016, 2017]
-
+years = sorted(np.unique([pd.Timestamp(time).year for time in ds.time.values]))
 week_year_dict = {date:[week, year] for week, year, date in weeks_years_dates}
-
 year_minimum = min(years)
 
+# Create the subplot grid
+image_size = 1
+rows = len(years)
+cols = len(weeks)
+fig, axes = plt.subplots(nrows=rows, ncols=cols, figsize=(cols*image_size, rows*image_size))
+
+# Create the labels for the x axis
+row_labels = years
+month_labels = []
+previous_month = None
+for week in range(1, 53):
+    
+    # Find the month
+    date = datetime.datetime.strptime(f'2024-W{week}-1', "%Y-W%U-%w").date()
+    month = date.strftime("%b")
+    
+    # Add the month if it's a new month
+    if month != previous_month:
+        month_labels.append(month)
+        previous_month = month
+    else:
+        month_labels.append("")
+
+# Move the label to the second week of the month, because some years don't start on Monday 
+month_labels = [""] + month_labels[:-1]         
+        
+# Cleaning up the axes
+for row in range(rows):
+    for col in range(cols):
+        ax = axes[row, col]
+        
+        # Remove all the ticks and labels
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_xticklabels([])  
+        ax.set_yticklabels([]) 
+        
+        # Add row and column labels if on the very left or very bottom
+        label_fontsize = 9
+        if col == 0:
+            ax.set_ylabel(row_labels[row], fontsize=label_fontsize, ha='center')
+        if row == rows - 1:
+            ax.set_xlabel(month_labels[col], fontsize=label_fontsize, ha='center')
+
+
+# Plot each of the timestamps in the correct location           
+for i in range(len(ds.time)):
+    time = ds.time[i].values
+    
+    # Extract the week and year index of this timestamp
+    timestamp = pd.Timestamp(time)
+    date = str(timestamp)[:10]
+    week, year = week_year_dict[timestamp]
+    row = year - year_minimum
+    col = week - 1
+    
+    # Extract the normalized RGB image
+    red = ds['nbart_red'][i]
+    green = ds['nbart_green'][i]
+    blue = ds['nbart_blue'][i]
+    
+    red_normalized = red / np.max(red)
+    green_normalized = green / np.max(green)
+    blue_normalized = blue / np.max(blue)
+    
+    rgb_image = np.stack([red_normalized, green_normalized, blue_normalized], axis=-1)
+
+    # Plot the image
+    ax = axes[row, col]
+    ax.imshow(rgb_image, aspect='auto')
+    ax.set_title(date, fontsize=9, pad=1)
+        
+plt.tight_layout(pad=0.2)
+plt.savefig(output)
+print(f"Saved:", output)
 # -
-
-
-
-
-
-i = 0
-time = ds.time[i].values
-timestamp = pd.Timestamp(time)
-week, year = week_year_dict[timestamp]
-week, year
-
-red = ds['nbart_red'][i]
-green = ds['nbart_green'][i]
-blue = ds['nbart_blue'][i]
 
 
 red_normalized = red / np.max(red)
@@ -243,14 +299,9 @@ green_normalized = green / np.max(green)
 blue_normalized = blue / np.max(blue)
 rgb_image = np.stack([red_normalized, green_normalized, blue_normalized], axis=-1)
 
-plt.imshow(rgb_image)
-
 year_index = year - year_minimum
 week_index = week - 1
 year_index, week_index
-
-import matplotlib.gridspec as gridspec
-
 
 # +
 # Create a 52x3 subplot grid
@@ -259,16 +310,38 @@ rows = 4
 cols = 4
 fig, axes = plt.subplots(nrows=rows, ncols=cols, figsize=(cols*image_size, rows*image_size))
 
+row_labels = ["2020", "2021", "2022", "2023"]
+col_labels = ["Jan", "Feb", "March", "April"]
 
+# Remove all the ticks and tick labels
 for row in range(rows):
     for col in range(cols):
         ax = axes[row, col]
+        ax.set_xticks([])  # Remove x ticks
+        ax.set_yticks([])  # Remove y ticks
+        ax.set_xticklabels([])  # Remove x tick labels
+        ax.set_yticklabels([])  # Remove y tick labels
+        
+        if col == 0:
+            ax.set_ylabel(row_labels[row], fontsize=9, rotation=0, ha='right')
+        if row == rows - 1:
+            ax.set_xlabel(col_labels[col], fontsize=9, ha='center')
+            
+        
+for row in range(rows):
+    for col in range(cols):
+        
+        if col == 0 and row == 0:
+            continue
+        
+        ax = axes[row, col]
         ax.imshow(rgb_image, aspect='auto')
-        ax.axis('off') 
+        
+        ax.set_title("2020-02-15", fontsize=5, pad=1)
+
 
 plt.tight_layout(pad=0.2)
-plt.show()
-
+plt.savefig(output)
 # -
 
-
+# !du -sh {output}
