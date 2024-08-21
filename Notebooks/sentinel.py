@@ -35,7 +35,9 @@ def memory_usage():
     return f"Memory usage: {usage.ru_maxrss / 1024} MB"
 print(memory_usage())
 
-dc = datacube.Datacube(app='Sentinel')
+# +
+# dc = datacube.Datacube(app='Sentinel')
+# -
 
 
 # Filenames
@@ -98,14 +100,10 @@ for var in ds.variables:
         ds[var].attrs.pop('flags_definition')
 
 # %%time
-ds.to_netcdf(filename)
+# ds.to_netcdf(filename)
 
 
-# +
-# ds = xr.open_dataset(filename)
-
-# +
-# ds_full = ds.copy()
+ds = xr.open_dataset(filename)
 
 # +
 # Heatmap of available imagery dates
@@ -151,15 +149,36 @@ cbar.ax.set_yticklabels(labels)
 cbar.set_label('Clear pixels')
 
 plt.title('Available Sentinel Imagery')
+plt.tight_layout()
 
 output = os.path.join(scratch_dir,f"{stub}_cloud_heatmap.png")
 plt.savefig(output)
 print("Saved:", output)
 # -
 
-ds = ds_full.sel(time=slice('2015', '2017'))
+ds = ds.fillna(0)
 
-ds = ds_full
+# Set the image size to at least 1 (100x100 pixels per image), but at most 5 or else the filesize goes over 100MB
+image_size = ds.x.values.shape / 100  
+image_size = max(image_size, 1)
+image_size = min(image_size, 5)
+
+# +
+red = ds['nbart_red']
+green = ds['nbart_green']
+blue = ds['nbart_blue']
+
+# Using a percent clip with the same default parameters asd dea_tools.plotting.rgb
+# Note: to get more photorealistic images, use p_low=0 and p_high = 1, but some images may look very dark.
+p_low, p_high = 2, 98
+red_clip = np.clip(red, np.percentile(red, p_low), np.percentile(red, p_high))
+green_clip = np.clip(green, np.percentile(green, p_low), np.percentile(green, p_high))
+blue_clip = np.clip(blue, np.percentile(blue, p_low), np.percentile(blue, p_high))
+
+red_normalized = (red_clip - np.min(red_clip)) / (np.max(red_clip) - np.min(red_clip))
+green_normalized = (green_clip - np.min(green_clip)) / (np.max(green_clip) - np.min(green_clip))
+blue_normalized = (blue_clip - np.min(blue_clip)) / (np.max(blue_clip) - np.min(blue_clip))
+
 
 # +
 # %%time
@@ -172,7 +191,7 @@ week_year_dict = {date:[week, year] for week, year, date in weeks_years_dates}
 year_minimum = min(years)
 
 # Create the subplot grid
-image_size = 0.5
+image_size = 6
 rows = len(years)
 cols = len(weeks)
 fig, axes = plt.subplots(nrows=rows, ncols=cols, figsize=(cols*image_size, rows*image_size))
@@ -198,6 +217,7 @@ for week in range(1, 53):
 month_labels = [""] + month_labels[:-1]         
         
 # Cleaning up the axes
+label_fontsize = 9 * size
 for row in range(rows):
     for col in range(cols):
         ax = axes[row, col]
@@ -209,7 +229,6 @@ for row in range(rows):
         ax.set_yticklabels([]) 
         
         # Add row and column labels if on the very left or very bottom
-        label_fontsize = 9
         if col == 0:
             ax.set_ylabel(row_labels[row], fontsize=label_fontsize, ha='center')
         if row == rows - 1:
@@ -228,15 +247,11 @@ for i in range(len(ds.time)):
     col = week - 1
     
     # Extract the normalized RGB image
-    red = ds['nbart_red'][i]
-    green = ds['nbart_green'][i]
-    blue = ds['nbart_blue'][i]
+    r = red_normalized[i]
+    g = green_normalized[i]
+    b = blue_normalized[i]
     
-    red_normalized = red / np.max(red)
-    green_normalized = green / np.max(green)
-    blue_normalized = blue / np.max(blue)
-    
-    rgb_image = np.stack([red_normalized, green_normalized, blue_normalized], axis=-1)
+    rgb_image = np.stack([r, g, b], axis=-1)
 
     # Plot the image
     ax = axes[row, col]
@@ -258,14 +273,17 @@ print(f"Saved:", output)
 # Video
 
 # Resampling takes a while and adds data that isn't there, but makes the video much more pleasant to watch
-ds_weekly = ds.resample(time="1W").interpolate("linear")
+ds_weekly = ds.resample(time="1W").interpolate("linear").interpolate_na(dim = 'time', method = 'linear')
 
 
 output = os.path.join(scratch_dir,f"{stub}_video.mp4")
-num_frames = len(ds.time) # get total length from ds_weekly
+num_frames = len(ds_weekly.time) # get total length from ds_weekly
 xr_animation(ds_weekly, 
              bands=['nbart_red', 'nbart_green', 'nbart_blue'], 
              output_path = output, 
              limit=num_frames)
 plt.close()
 Video(output, embed=True)
+# -
+
+
