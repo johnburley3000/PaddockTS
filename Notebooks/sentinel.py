@@ -6,10 +6,6 @@
 # Storage: gdata/+gdata/xe2+gdata/v10+gdata
 # Module Directories: /g/data/v10/public/modules/modulefiles
 # Modules: dea/20231204
-# -
-
-
-
 # +
 # Standard libraries
 import pickle
@@ -101,16 +97,17 @@ for var in ds.variables:
 ds.to_netcdf(filename)
 
 
+ds = xr.open_dataset(filename)
+
 # !ls /g/data/xe2/cb8590/Data/PadSeg/*.pkl
 
 
-# +
 # %%time
 filename = "/g/data/xe2/cb8590/Data/PadSeg/AO_b02_y20-22_ds2.pkl"
 with open(filename, 'rb') as handle:
     ds = pickle.load(handle)
     
-    
+
 
 # +
 # %%time
@@ -125,9 +122,9 @@ rgb(ds_resamp,
     #col_wrap=36,  # 10-day
     col_wrap=52, # weekly
     savefig_path = path_out+stub+'_calendar_plot.png')
+# -
 
 
-# +
 # %%time
 # Calendar plot (takes about the same amount of time as a video, but more space)
 output = os.path.join(scratch_dir,f"{stub}_calendar_plot.png")
@@ -137,9 +134,6 @@ rgb(ds,
     col="time", 
     col_wrap=52,  # 7 is roughly monthly, 52 is roughly yearly (depends on how many get missed)
     savefig_path = output)
-
-
-# -
 
 # !ls /scratch/xe2/cb8590/MILG_1km_all_years_calendar_plot.png
 
@@ -164,13 +158,7 @@ rgb(ds,
 
 # -
 
-heatmap_data.shape
-
-heatmap_data
-
-weeks
-
-
+ds
 
 # +
 # Create an empty heatmap with the dimensions: years, weeks
@@ -199,3 +187,62 @@ plt.title("Available Sentinel Imagery")
 
 plt.show()
 
+# -
+
+# Define the dimensions of your images (y, x)
+y_dim = 
+x_dim = 
+
+
+
+
+# +
+# Create an empty heatmap with the dimensions: years, weeks
+dates = pd.to_datetime(ds['time'].values)
+years = np.arange(dates.year.min(), dates.year.max() + 1)
+weeks = np.arange(1, 53)
+heatmap_data = pd.DataFrame(0, index=years, columns=weeks)
+
+# Calculate the week of the year for each date (using date.week has some funny behaviour leading to 53 weeks which I don't like)
+weeks_years_dates = [(date.strftime('%W'), date.year, date) for date in dates]
+weeks_years_dates = [(1 if wyd[0] == '00' else int(wyd[0]), wyd[1], wyd[2]) for wyd in weeks_years_dates]
+
+# Fill the DataFrame with 0s (no image), 1 (cloudy image), 2 (good image)
+ten_percent = ds['x'].size * ds['y'].size * 0.1
+for week_year_date in weeks_years_dates:
+    week, year, date = week_year_date
+    data_array = ds.sel(time=date)
+    nan_count = data_array['nbart_red'].isnull().sum()
+    
+    if nan_count > ten_percent:
+        heatmap_data.loc[year, week] = 1  # Less then 90% good pixels
+    else:
+        heatmap_data.loc[year, week] = 2  # More than 90% good pixels
+
+heatmap_data
+
+# +
+
+# Plotting the heatmap
+plt.figure(figsize=(15, 10))
+cmap = plt.get_cmap('Greens', 3)  # Use 3 levels of green
+
+
+# Plot with custom colormap
+plt.imshow(heatmap_data, cmap=cmap, aspect='equal', interpolation='none')
+
+# Setting labels
+plt.xlabel('Week')
+plt.ylabel('Year')
+plt.title('Available Sentinel Imagery')
+plt.xticks(ticks=np.arange(len(weeks)), labels=weeks)
+plt.yticks(ticks=np.arange(len(years)), labels=years)
+
+# Custom labels for the color bar
+labels = ['<50%', '<90%', '>=90%']
+cbar = plt.colorbar(ticks=[0.33, 1, 1.66], shrink=0.3)
+cbar.ax.set_yticklabels(labels)
+cbar.set_label('Cloud Cover')
+
+
+plt.show()
