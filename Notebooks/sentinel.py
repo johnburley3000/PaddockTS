@@ -13,6 +13,7 @@ import sys
 import os
 import calendar
 import datetime
+from IPython.core.display import Video
 
 # Dependencies
 import numpy as np
@@ -24,7 +25,8 @@ import matplotlib.dates as mdates
 sys.path.insert(1, '../Tools/')
 import datacube
 from dea_tools.datahandling import load_ard
-from dea_tools.plotting import rgb
+from dea_tools.plotting import xr_animation
+from dea_tools.plotting import xr_animation
 
 # -
 import resource
@@ -37,7 +39,7 @@ dc = datacube.Datacube(app='Sentinel')
 
 
 # Filenames
-stub = "MILG_1km_all_years"
+stub = "MILG_1km_all_years_90p"
 scratch_dir = "/scratch/xe2/cb8590/"
 gdata_dir = "/g/data/xe2/cb8590"
 chris_outdir = os.path.join(gdata_dir, "Data/PadSeg/")
@@ -47,8 +49,8 @@ filename = os.path.join(chris_outdir, f"{stub}.nc")
 # Specify parameters
 lat = -34.389042
 lon = 148.469499
-buffer = 0.005    # 0.01 is 1km in each direction to 2kmx2km total 
-stub = "MILG_1km"
+buffer = 0.033    # 0.01 is 1km in each direction to 2kmx2km total 
+stub = "MILG_6km"
 
 start_year = 2010  # This automatically gets the earlist timepoint (late 2015)
 end_year = 2030    # This automatically gets the most recent timepoint
@@ -66,11 +68,12 @@ def define_query(lat=-34.389042, lon=148.469499, buffer=0.005 , start_year=2020,
         'output_crs': 'epsg:6933',
         'group_by': 'solar_day',
         'measurements': ['nbart_red', 'nbart_green', 'nbart_blue', 'nbart_nir_1', 'nbart_swir_2','nbart_swir_3'],
-        'min_gooddata':0.5
+        'min_gooddata':0.9
     }
     return query
 
 query = define_query(lat, lon, buffer, start_year, end_year)
+
 
 # -
 
@@ -98,42 +101,11 @@ for var in ds.variables:
 ds.to_netcdf(filename)
 
 
-ds = xr.open_dataset(filename)
-
-ds_full = ds.copy()
-
-# !ls /g/data/xe2/cb8590/Data/PadSeg/*.pkl
-
+# +
+# ds = xr.open_dataset(filename)
 
 # +
-# # %%time
-# filename = "/g/data/xe2/cb8590/Data/PadSeg/AO_b02_y20-22_ds2.pkl"
-# with open(filename, 'rb') as handle:
-#     ds = pickle.load(handle)
-# -
-
-output = os.path.join(scratch_dir,f"{stub}_calendar_plot.png")
-
-
-# !du -sh {outpath}
-
-# +
-# # %%time
-# # Video
-
-# Probably want to resample first even though it takes a while
-# ds_weekly = ds.resample(time="1W").interpolate("linear")
-
-# # RGB actual time series
-# output = os.path.join(scratch_dir,"calendar_plot.mp4")
-# num_frames = len(ds.time) # get total length from ds_weekly
-# xr_animation(ds, 
-#              bands=['nbart_red', 'nbart_green', 'nbart_blue'], 
-#              output_path = output, 
-#              limit=num_frames)
-# plt.close()
-# Video(output, embed=True)
-
+# ds_full = ds.copy()
 
 # +
 # Heatmap of available imagery dates
@@ -150,17 +122,17 @@ weeks_years_dates = [(date.strftime('%W'), date.year, date) for date in dates]
 weeks_years_dates = [(1 if wyd[0] == '00' else int(wyd[0]), wyd[1], wyd[2]) for wyd in weeks_years_dates]
 
 # Fill the DataFrame with 0s (no image), 1 (cloudy image), 2 (good image)
-ten_percent = ds['x'].size * ds['y'].size * 0.1
+threshold = ds['x'].size * ds['y'].size * 0.01
 for week_year_date in weeks_years_dates:
     week, year, date = week_year_date
     data_array = ds.sel(time=date)
     nan_count = data_array['nbart_red'].isnull().sum()
     
-    if nan_count > ten_percent:
-        heatmap_data.loc[year, week] = 1  # Less then 90% good pixels
+    if nan_count > threshold:
+        heatmap_data.loc[year, week] = 1  
     else:
-        heatmap_data.loc[year, week] = 2  # More than 90% good pixels
-
+        heatmap_data.loc[year, week] = 2 
+        
 # Plotting the heatmap
 plt.figure(figsize=(15, 10))
 cmap = plt.get_cmap('Greens', 3)  # Use 3 levels of green
@@ -173,38 +145,21 @@ plt.xticks(ticks=month_start_weeks, labels=month_labels)
 plt.yticks(ticks=np.arange(len(years)), labels=years)
 
 # Cloud cover categories
-labels = ['<50%', '<90%', '>=90%']
+labels = ['< 90%', '90-99%', '> 99%']
 cbar = plt.colorbar(ticks=[0.33, 1, 1.66], shrink=0.3)
 cbar.ax.set_yticklabels(labels)
-cbar.set_label('Cloud Cover')
+cbar.set_label('Clear pixels')
 
 plt.title('Available Sentinel Imagery')
-plt.show()
+
+output = os.path.join(scratch_dir,f"{stub}_cloud_heatmap.png")
+plt.savefig(output)
+print("Saved:", output)
 # -
 
 ds = ds_full.sel(time=slice('2015', '2017'))
 
-# +
-
-# Create the labels for the x axis
-month_labels = []
-previous_month = None
-for week in range(1, 53):
-    
-    # Find the month
-    date = datetime.datetime.strptime(f'2024-W{week}-1', "%Y-W%U-%w").date()
-    month = date.strftime("%b")
-    
-    # Add the month if it's a new month
-    if month != previous_month:
-        month_labels.append(month)
-        previous_month = month
-    else:
-        month_labels.append("")
-        
-# Move the label to the second week of the month, because some years don't start on Monday 
-month_labels = [""] + month_labels[:-1]         
-print(month_labels)
+ds = ds_full
 
 # +
 # %%time
@@ -217,7 +172,7 @@ week_year_dict = {date:[week, year] for week, year, date in weeks_years_dates}
 year_minimum = min(years)
 
 # Create the subplot grid
-image_size = 1
+image_size = 0.5
 rows = len(years)
 cols = len(weeks)
 fig, axes = plt.subplots(nrows=rows, ncols=cols, figsize=(cols*image_size, rows*image_size))
@@ -286,62 +241,31 @@ for i in range(len(ds.time)):
     # Plot the image
     ax = axes[row, col]
     ax.imshow(rgb_image, aspect='auto')
-    ax.set_title(date, fontsize=9, pad=1)
+    ax.set_title(date, fontsize=8, pad=1)
         
 plt.tight_layout(pad=0.2)
+
+output = os.path.join(scratch_dir,f"{stub}_calendar_plot.png")
 plt.savefig(output)
 print(f"Saved:", output)
 # -
 
 
-red_normalized = red / np.max(red)
-green_normalized = green / np.max(green)
-blue_normalized = blue / np.max(blue)
-rgb_image = np.stack([red_normalized, green_normalized, blue_normalized], axis=-1)
-
-year_index = year - year_minimum
-week_index = week - 1
-year_index, week_index
+# !du -sh {output}
 
 # +
-# Create a 52x3 subplot grid
-image_size = 1
-rows = 4
-cols = 4
-fig, axes = plt.subplots(nrows=rows, ncols=cols, figsize=(cols*image_size, rows*image_size))
+# # %%time
+# Video
 
-row_labels = ["2020", "2021", "2022", "2023"]
-col_labels = ["Jan", "Feb", "March", "April"]
-
-# Remove all the ticks and tick labels
-for row in range(rows):
-    for col in range(cols):
-        ax = axes[row, col]
-        ax.set_xticks([])  # Remove x ticks
-        ax.set_yticks([])  # Remove y ticks
-        ax.set_xticklabels([])  # Remove x tick labels
-        ax.set_yticklabels([])  # Remove y tick labels
-        
-        if col == 0:
-            ax.set_ylabel(row_labels[row], fontsize=9, rotation=0, ha='right')
-        if row == rows - 1:
-            ax.set_xlabel(col_labels[col], fontsize=9, ha='center')
-            
-        
-for row in range(rows):
-    for col in range(cols):
-        
-        if col == 0 and row == 0:
-            continue
-        
-        ax = axes[row, col]
-        ax.imshow(rgb_image, aspect='auto')
-        
-        ax.set_title("2020-02-15", fontsize=5, pad=1)
+# Resampling takes a while and adds data that isn't there, but makes the video much more pleasant to watch
+ds_weekly = ds.resample(time="1W").interpolate("linear")
 
 
-plt.tight_layout(pad=0.2)
-plt.savefig(output)
-# -
-
-# !du -sh {output}
+output = os.path.join(scratch_dir,f"{stub}_video.mp4")
+num_frames = len(ds.time) # get total length from ds_weekly
+xr_animation(ds_weekly, 
+             bands=['nbart_red', 'nbart_green', 'nbart_blue'], 
+             output_path = output, 
+             limit=num_frames)
+plt.close()
+Video(output, embed=True)
