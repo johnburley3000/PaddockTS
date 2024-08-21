@@ -62,6 +62,7 @@ def define_query(lat, lon, buffer, time_range):
     lat_range = (lat-buffer, lat+buffer)
     lon_range = (lon-buffer, lon+buffer)
     query = {
+        'centre': (lat, lon),
         'y': lat_range,
         'x': lon_range,
         'time': time_range,
@@ -69,10 +70,11 @@ def define_query(lat, lon, buffer, time_range):
         'output_crs': 'epsg:6933',
         'group_by': 'solar_day'
     }
+    # note that centre is not recognized as query option in load_arc, but we want to output it as a record.
     return query
 
 def load_and_process_data(dc, query):
-	
+    query = {k: v for k, v in query.items() if k != 'centre'} # this takes centre out of the query	
     ds = load_ard(
         dc=dc,
         products=['ga_s2am_ard_3', 'ga_s2bm_ard_3'],
