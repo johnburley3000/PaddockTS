@@ -22,6 +22,8 @@ def create_bbox(lat=-35.274603, lon=149.098498, buffer=0.005):
     bbox = [left, top, right, bottom] 
     return bbox
 
+
+# This version is redundant now
 def visualise_tif_rasterio(filename="output.tif", title=""):
     with rasterio.open(filename) as src:
         data = src.read(1)  

@@ -33,31 +33,35 @@ os.chdir(os.path.join(os.path.expanduser('~'), "Projects/PaddockTS"))
 from DAESIM_preprocess.util import gdata_dir, scratch_dir
 # +
 def define_query(lat=-34.389042, lon=148.469499, buffer=0.005 , start_year=2020, end_year=2021):
+    """Just requesting the bands needed for RGB and fractional cover"""
     lat_range = (lat-buffer, lat+buffer)
     lon_range = (lon-buffer, lon+buffer)
+    time_range = (f'{start_year}-01-01', f'{end_year}-12-31')
     query = {
         'y': lat_range,
         'x': lon_range,
-        'time': (start_year, end_year),
+        'time': time_range,
         'resolution': (-10, 10),
         'measurements': ['nbart_red', 'nbart_green', 'nbart_blue', 'nbart_nir_1', 'nbart_swir_2','nbart_swir_3'],
-        'min_gooddata':0.9
+
     }
     return query
 
-query = define_query(lat, lon, buffer, start_year, end_year)
+query = define_query()
 
 
 # +
 # %%time
 def load_and_process_data(query, outdir="", stub=""):
+    """Just download the data from sentinel"""
     dc = datacube.Datacube(app='Sentinel')
     ds = load_ard(
-        dc=dc,
+        dc,
         products=['ga_s2am_ard_3', 'ga_s2bm_ard_3'],
         cloud_mask='s2cloudless',
-        output_crs: 'epsg:6933',
-        group_by: 'solar_day',
+        group_by= 'solar_day',
+        output_crs= 'epsg:6933',
+        min_gooddata=0.9,
         **query
     )
     
@@ -134,9 +138,9 @@ available_imagery(ds)
 
 # +
 # %%time
-def calendar_plot(ds, image_size = 1, bands=['nbart_red', 'nbart_green', 'nbart_blue'], outdir="", stub="")
+def calendar_plot(ds, image_size = 1, bands=['nbart_red', 'nbart_green', 'nbart_blue'], outdir="", stub=""):
     """Create a calendar plot spaced nicely across each year"""
-    # Should set the image size to at least 1 (100x100 pixels per image), but at most 5 or else the filesize goes over 100MB
+    # Should set the image size to at least 1 (100x100 pixels per image), but above 5 the filesize can be over 100MB
     
     # NaN values mess up the normalization
     ds = ds.fillna(0)
@@ -160,6 +164,9 @@ def calendar_plot(ds, image_size = 1, bands=['nbart_red', 'nbart_green', 'nbart_
     # Setup the dimensions of the calendar plot
     weeks = list(range(1,53))
     years = sorted(np.unique([pd.Timestamp(time).year for time in ds.time.values]))
+    dates = pd.to_datetime(ds['time'].values)
+    weeks_years_dates = [(date.strftime('%W'), date.year, date) for date in dates]
+    weeks_years_dates = [(1 if wyd[0] == '00' else int(wyd[0]), wyd[1], wyd[2]) for wyd in weeks_years_dates]
     week_year_dict = {date:[week, year] for week, year, date in weeks_years_dates}
     year_minimum = min(years)
     
@@ -236,18 +243,16 @@ def calendar_plot(ds, image_size = 1, bands=['nbart_red', 'nbart_green', 'nbart_
     plt.savefig(filename)
     print(f"Saved:", filename)   
 
-available_imagery()
+calendar_plot(ds)
 
 
-# -
-
-
+# +
 # %%time
-def time_lapse(ds, bands=['nbart_red', 'nbart_green', 'nbart_blue'], interpolate=True)
+def time_lapse(ds, bands=['nbart_red', 'nbart_green', 'nbart_blue'], interpolate=True, outdir="", stub=""):
     """Create a video of the time-series"""
     # Video has a smaller filesize than a calendar plot, but a calendar plot lets you see all the data at once"""
     
-    # I think it's valuable to having a video without resampling to see the raw data, and with resampling for a smooth experience
+    # I think it's valuable having a video without resampling to see the raw data, and with resampling for a smooth experience
     if interpolate:
         ds_weekly = ds.resample(time="1W").interpolate("linear").interpolate_na(dim = 'time', method = 'linear')
     else:
@@ -264,26 +269,31 @@ def time_lapse(ds, bands=['nbart_red', 'nbart_green', 'nbart_blue'], interpolate
 
     # Can use this line to see the video embedded in a jupyter notebook
     # Video(output, embed=True)
-
-# +
-# # %%time
-
-
+    
+time_lapse(ds)
 # -
+
+# %%time
 if __name__ == '__main__':
+    # Specify parameters
+    stub = "MILG_1km"
+    lat = -34.389042
+    lon = 148.469499
+    buffer = 0.005    # 0.01 is 1km in each direction to 2kmx2km total     
+    start_year = 2010  # This automatically gets the earlist timepoint (late 2015)
+    end_year = 2030    # This automatically gets the most recent timepoint
+
     # Filenames
     chris_outdir = os.path.join(gdata_dir, "Data/PadSeg/")
     filename = os.path.join(chris_outdir, f"{stub}.nc")
         
-    # Specify parameters
-    lat = -34.389042
-    lon = 148.469499
-    buffer = 0.005    # 0.01 is 1km in each direction to 2kmx2km total 
-    stub = "MILG_1km"
-    
-    start_year = 2010  # This automatically gets the earlist timepoint (late 2015)
-    end_year = 2030    # This automatically gets the most recent timepoint
-
+        
     query = define_query(lat, lon, buffer, start_year, end_year)
     ds = load_and_process_data(query)
+    
+    available_imagery(ds)
+    calendar_plot(ds)
+    time_lapse(ds)
+
+
 
