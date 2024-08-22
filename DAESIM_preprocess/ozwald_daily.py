@@ -52,9 +52,6 @@ def ozwald_daily_singleyear(var="VPeff", latitude=-34.3890427, longitude=148.469
     return ds
 
 
-ozwald_daily_singleyear(buffer=0.00001)
-
-
 def ozwald_daily_multiyear(var="VPeff", latitude=-34.3890427, longitude=148.469499, buffer=0.1, years=["2020", "2021"], stub="", tmp_dir=""):
     dss = []
     for year in years:
