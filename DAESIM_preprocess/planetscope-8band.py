@@ -138,127 +138,51 @@ def load_directories(base_dir, stub, order_ids, limit=None):
 
 ds = load_directories(base_dir, stub, order_ids, limit=3)
 rgb(ds, col='time')
-# -
 
-data_array = ds.sel(time=date)
-nan_count = data_array['nbart_red'].isnull().sum()
-percent_clear = 1 - nan_count/total_pixels
-percent_clear.values.round(2)
 
 # +
-total_pixels = ds['x'].size * ds['y'].size
-weeks_years_dates_percents = []
-for week, year, date in weeks_years_dates:
-    data_array = ds.sel(time=date)
-    nan_count = data_array['nbart_red'].isnull().sum()
-    percent_clear = 1 - nan_count/total_pixels
-    percent_rounded = percent_clear.values.round(2)
-    weeks_years_dates_percents.append((week, year, date, percent_rounded))
-    
-pd.DataFrame(weeks_years_dates_percents).head()
-# -
-
-best_pixels = dict()
-best_pixels[(week, year)] = (date, 0.98)
-best_pixels
-
-# Find the timestamp with the clearest imagery for each week
-best_pixels = dict() # Mapping of {(week, year): {date, percent_clear_pixels}}
-for week, year, date, percent in weeks_years_dates_percents:
-    key = (week, year)
-    if key not in best_pixels:
-        best_pixels[key] = (date, percent)
-        continue
-    if percent > best_pixels[key][1]:
-        best_pixels[key] = (date, percent)
-best_pixels   
-
-# +
-outdir=""
-stub=""
-
-"""Create a heatmap showing the available imagery and cloud cover percentage"""    
-# Create an empty heatmap with the dimensions: years, weeks
-dates = pd.to_datetime(ds['time'].values)
-years = np.arange(dates.year.min(), dates.year.max() + 1)
-weeks = np.arange(1, 53)
-heatmap_data = pd.DataFrame(0, index=years, columns=weeks)
-
-# Calculate the week of the year for each date (using date.week has some funny behaviour leading to 53 weeks which I don't like)
-weeks_years_dates = [(date.strftime('%W'), date.year, date) for date in dates]
-weeks_years_dates = [(1 if wyd[0] == '00' else int(wyd[0]), wyd[1], wyd[2]) for wyd in weeks_years_dates]
-
-# Fill the DataFrame with 0s (no image), 1 (cloudy image), 2 (good image)
-threshold = ds['x'].size * ds['y'].size * 0.01
-for week, year in best_pixels:
-    date, percent_clear = best_pixels[(week, year)]
-    data_array = ds.sel(time=date)
-
-    # Assumes pixels covered by cloud are represented by NaN
-    if percent_clear > 0.5:
-        heatmap_data.loc[year, week] = 1  
-    if percent_clear > 0.95:
-        heatmap_data.loc[year, week] = 2 
-
-# Plotting the heatmap
-plt.figure(figsize=(15, 10))
-cmap = plt.get_cmap('Greens', 3)  # Use 3 levels of green
-plt.imshow(heatmap_data, cmap=cmap, aspect='equal', interpolation='none')
-
-# Change the xticks to use months instead of weeks
-month_start_weeks = [pd.Timestamp(f'{years[0]}-{month:02d}-01').week for month in range(1, 13)]
-month_labels = [calendar.month_name[month] for month in range(1, 13)]
-plt.xticks(ticks=month_start_weeks, labels=month_labels)
-plt.yticks(ticks=np.arange(len(years)), labels=years)
-
-# Cloud cover categories
-labels = ['< 50%', '50-95%', '> 95%']
-cbar = plt.colorbar(ticks=[0.33, 1, 1.66], shrink=0.3)
-cbar.ax.set_yticklabels(labels)
-cbar.set_label('Clear pixels')
-
-plt.title('Planetscope Available Imagery')
-plt.tight_layout()
-
-# Save the image
-filename = os.path.join(outdir, f"{stub}_available_imagery_planet.png")
-plt.savefig(filename)
-print("Saved:", filename)
-
-# -
-
-available_imagery(ds)
-
-
-def available_imagery_365days:
-    # I didn't think the calendar looked that informative when sectioned into 365 days. The weekly version is more useful. Then I think I just want to see the best image per week in the following calendar plot, similar to sentinel.
-    
-    outdir=""
-    stub=""
-
+def available_imagery_planet(ds, outdir="", stub=""):
     """Create a heatmap showing the available imagery and cloud cover percentage"""    
     # Create an empty heatmap with the dimensions: years, weeks
     dates = pd.to_datetime(ds['time'].values)
     years = np.arange(dates.year.min(), dates.year.max() + 1)
-    days = np.arange(1, 365)
-    heatmap_data = pd.DataFrame(0, index=years, columns=days)
+    weeks = np.arange(1, 53)
+    heatmap_data = pd.DataFrame(0, index=years, columns=weeks)
 
     # Calculate the week of the year for each date (using date.week has some funny behaviour leading to 53 weeks which I don't like)
-    days_years_dates = [(date.strftime('%D'), date.year, date) for date in dates]
-    days_years_dates = [(1 if dyd[0] == '00' else int(dyd[0]), dyd[1], dyd[2]) for dyd in days_years_dates]
+    weeks_years_dates = [(date.strftime('%W'), date.year, date) for date in dates]
+    weeks_years_dates = [(1 if wyd[0] == '00' else int(wyd[0]), wyd[1], wyd[2]) for wyd in weeks_years_dates]
+
+    # Find the percent of clear pixels for each timestamp
+    total_pixels = ds['x'].size * ds['y'].size
+    weeks_years_dates_percents = []
+    for week, year, date in weeks_years_dates:
+        data_array = ds.sel(time=date)
+        nan_count = data_array['nbart_red'].isnull().sum()
+        percent_clear = 1 - nan_count/total_pixels
+        percent_rounded = percent_clear.values.round(2)
+        weeks_years_dates_percents.append((week, year, date, percent_rounded))
+
+    # Find the timestamp with the clearest imagery for each week
+    best_pixels = dict() # Mapping of {(week, year): {date, percent_clear_pixels}}
+    for week, year, date, percent in weeks_years_dates_percents:
+        key = (week, year)
+        if key not in best_pixels:
+            best_pixels[key] = (date, percent)
+            continue
+        if percent > best_pixels[key][1]:
+            best_pixels[key] = (date, percent)
 
     # Fill the DataFrame with 0s (no image), 1 (cloudy image), 2 (good image)
-    threshold = ds['x'].size * ds['y'].size * 0.01
-    for days_years_date in days_years_dates:
-        day, year, date = days_years_date
+    for week, year in best_pixels:
+        date, percent_clear = best_pixels[(week, year)]
         data_array = ds.sel(time=date)
 
         # Assumes pixels covered by cloud are represented by NaN
-        nan_count = data_array['nbart_red'].isnull().sum()
-        if nan_count > threshold:
-            heatmap_data.loc[year, day] = 1  
-        else:
-            heatmap_data.loc[year, day] = 2 
+        if percent_clear > 0.5:
+            heatmap_data.loc[year, week] = 1  
+        if percent_clear > 0.95:
+            heatmap_data.loc[year, week] = 2 
 
     # Plotting the heatmap
     plt.figure(figsize=(15, 10))
@@ -272,24 +196,204 @@ def available_imagery_365days:
     plt.yticks(ticks=np.arange(len(years)), labels=years)
 
     # Cloud cover categories
-    labels = ['< 90%', '90-99%', '> 99%']
+    labels = ['< 50%', '50-95%', '> 95%']
     cbar = plt.colorbar(ticks=[0.33, 1, 1.66], shrink=0.3)
     cbar.ax.set_yticklabels(labels)
     cbar.set_label('Clear pixels')
 
-    plt.title('Available Imagery')
+    plt.title('Planetscope Available Imagery')
     plt.tight_layout()
 
     # Save the image
-    filename = os.path.join(outdir, f"{stub}_available_imagery.png")
+    filename = os.path.join(outdir, f"{stub}_available_imagery_planet.png")
     plt.savefig(filename)
     print("Saved:", filename)
 
+available_imagery_planet(ds)
+# -
 
-calendar_plot(ds)
+ds0 = ds.isel(time=0)
 
 # %%time
-time_lapse(ds, interpolate=False)
+# Flip the image for xr_animation and plt.imshow to work correctly 
+# Note this means that dea_tools.plotting.rgb will now be flipped, I think because it uses the coordinate system
+ds_flipped = ds_full.isel(y=slice(None, None, -1))
+ds = ds_flipped
+
+# +
+# %%time
+p_low, p_high = 2, 98
+
+red = ds[bands[0]]
+green = ds[bands[1]]
+blue = ds[bands[2]]
+
+red_clip = np.clip(red, np.percentile(red, p_low), np.percentile(red, p_high))
+green_clip = np.clip(green, np.percentile(green, p_low), np.percentile(green, p_high))
+blue_clip = np.clip(blue, np.percentile(blue, p_low), np.percentile(blue, p_high))
+
+red_normalized = (red_clip - np.min(red_clip)) / (np.max(red_clip) - np.min(red_clip))
+green_normalized = (green_clip - np.min(green_clip)) / (np.max(green_clip) - np.min(green_clip))
+blue_normalized = (blue_clip - np.min(blue_clip)) / (np.max(blue_clip) - np.min(blue_clip))
+
+# -
+
+rgb = np.stack([red_normalized[0], green_normalized[0], blue_normalized[0]], axis=-1)
+plt.imshow(rgb)
+
+# +
+# %%time
+# Calendar plot for planetscope
+ds, 
+image_size = 1
+bands=['nbart_red', 'nbart_green', 'nbart_blue']
+outdir=""
+stub=""
+
+ds_full = ds.copy()
+
+
+# Copying code from the available imagery heatmap to find the best_pixels
+dates = pd.to_datetime(ds['time'].values)
+years = np.arange(dates.year.min(), dates.year.max() + 1)
+weeks = np.arange(1, 53)
+heatmap_data = pd.DataFrame(0, index=years, columns=weeks)
+
+# Calculate the week of the year for each date (using date.week has some funny behaviour leading to 53 weeks which I don't like)
+weeks_years_dates = [(date.strftime('%W'), date.year, date) for date in dates]
+weeks_years_dates = [(1 if wyd[0] == '00' else int(wyd[0]), wyd[1], wyd[2]) for wyd in weeks_years_dates]
+
+# Find the percent of clear pixels for each timestamp
+total_pixels = ds['x'].size * ds['y'].size
+weeks_years_dates_percents = []
+for week, year, date in weeks_years_dates:
+    data_array = ds.sel(time=date)
+    nan_count = data_array['nbart_red'].isnull().sum()
+    percent_clear = 1 - nan_count/total_pixels
+    percent_rounded = percent_clear.values.round(2)
+    weeks_years_dates_percents.append((week, year, date, percent_rounded))
+
+# Find the timestamp with the clearest imagery for each week
+best_pixels = dict() # Mapping of {(week, year): {date, percent_clear_pixels}}
+for week, year, date, percent in weeks_years_dates_percents:
+    key = (week, year)
+    if key not in best_pixels:
+        best_pixels[key] = (date, percent)
+        continue
+    if percent > best_pixels[key][1]:
+        best_pixels[key] = (date, percent)
+
+# Reduce to just the best timestamp per week
+ds_best = ds.sel(time=best_timestamps)
+
+# NaN values mess up the normalization
+ds = ds_best.fillna(0)
+
+# Percent clip normlization with the same default parameters as dea_tools.plotting.rgb, to make the images look brighter
+p_low, p_high = 2, 98
+
+red = ds[bands[0]]
+green = ds[bands[1]]
+blue = ds[bands[2]]
+
+red_clip = np.clip(red, np.percentile(red, p_low), np.percentile(red, p_high))
+green_clip = np.clip(green, np.percentile(green, p_low), np.percentile(green, p_high))
+blue_clip = np.clip(blue, np.percentile(blue, p_low), np.percentile(blue, p_high))
+
+red_normalized = (red_clip - np.min(red_clip)) / (np.max(red_clip) - np.min(red_clip))
+green_normalized = (green_clip - np.min(green_clip)) / (np.max(green_clip) - np.min(green_clip))
+blue_normalized = (blue_clip - np.min(blue_clip)) / (np.max(blue_clip) - np.min(blue_clip))
+
+# Setup the dimensions of the calendar plot
+weeks = list(range(1,53))
+years = sorted(np.unique([pd.Timestamp(time).year for time in ds.time.values]))
+dates = pd.to_datetime(ds['time'].values)
+weeks_years_dates = [(date.strftime('%W'), date.year, date) for date in dates]
+weeks_years_dates = [(1 if wyd[0] == '00' else int(wyd[0]), wyd[1], wyd[2]) for wyd in weeks_years_dates]
+week_year_dict = {date:[week, year] for week, year, date in weeks_years_dates}
+year_minimum = min(years)
+
+# Create the subplot grid
+image_size = 1   
+rows = len(years)
+cols = len(weeks)
+fig, axes = plt.subplots(nrows=rows, ncols=cols, figsize=(cols*image_size, rows*image_size))
+
+# Create the labels for the x axis
+row_labels = years
+month_labels = []
+previous_month = None
+for week in range(1, 53):
+
+    # Find the month
+    date = datetime.strptime(f'2024-W{week}-1', "%Y-W%U-%w").date()
+    month = date.strftime("%b")
+
+    # Add the month if it's a new month
+    if month != previous_month:
+        month_labels.append(month)
+        previous_month = month
+    else:
+        month_labels.append("")
+
+# Move the label to the second week of the month, because some years don't start on Monday 
+month_labels = [""] + month_labels[:-1]         
+
+# Cleaning up the axes
+label_fontsize = 9 * image_size
+for row in range(rows):
+    for col in range(cols):
+        ax = axes[row, col]
+
+        # Remove all the ticks and labels
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_xticklabels([])  
+        ax.set_yticklabels([]) 
+
+        # Add row and column labels if on the very left or very bottom
+        if col == 0:
+            ax.set_ylabel(row_labels[row], fontsize=label_fontsize, ha='center')
+        if row == rows - 1:
+            ax.set_xlabel(month_labels[col], fontsize=label_fontsize, ha='center')
+
+# Plot each of the timestamps in the correct location           
+for i in range(len(ds.time)):
+    time = ds.time[i].values
+
+    # Extract the week and year index of this timestamp
+    timestamp = pd.Timestamp(time)
+    date = str(timestamp)[:10]
+    week, year = week_year_dict[timestamp]
+    row = year - year_minimum
+    col = week - 1
+
+    # Extract the normalized RGB image
+    r = red_normalized[i]
+    g = green_normalized[i]
+    b = blue_normalized[i]
+
+    rgb_image = np.stack([r, g, b], axis=-1)
+
+    # Plot the image
+    ax = axes[row, col]
+    ax.imshow(rgb_image, aspect='auto')
+    ax.set_title(date, fontsize=8, pad=1)
+
+plt.tight_layout(pad=0.2)
+
+filename = os.path.join(outdir,f"{stub}_calendar_plot.png")
+plt.savefig(filename)
+print(f"Saved:", filename)   
+# -
+
+# %%time
+# Apparently the planetscope video needs to be flipped vertically to work properly (even though sentinel doesn't, weird)
+time_lapse(ds, interpolate=False, stub="Planet")
+
+# !pwd
+
+# !ls
 
 if __name__ == '__main__':
 

@@ -126,7 +126,7 @@ def available_imagery(ds, outdir="", stub=""):
     plt.tight_layout()
     
     # Save the image
-    filename = os.path.join(outdir, f"{stub}_available_imagery.png")
+    filename = os.path.join(outdir, f"{stub}_available_imagery_sentinel.png")
     plt.savefig(filename)
     print("Saved:", filename)
 
@@ -165,7 +165,6 @@ def calendar_plot(ds, image_size = 1, bands=['nbart_red', 'nbart_green', 'nbart_
     year_minimum = min(years)
     
     # Create the subplot grid
-    image_size = 6   
     rows = len(years)
     cols = len(weeks)
     fig, axes = plt.subplots(nrows=rows, ncols=cols, figsize=(cols*image_size, rows*image_size))
