@@ -28,7 +28,7 @@ from dea_tools.plotting import rgb
 # Local imports
 os.chdir(os.path.join(os.path.expanduser('~'), "Projects/PaddockTS"))
 from DAESIM_preprocess.util import gdata_dir, scratch_dir, memory_usage
-from DAESIM_preprocess.sentinel import available_imagery, calendar_plot, time_lapse
+from DAESIM_preprocess.sentinel import time_lapse
 
 # -
 
@@ -36,13 +36,12 @@ from DAESIM_preprocess.sentinel import available_imagery, calendar_plot, time_la
 print(memory_usage())
 
 # +
-orderid = ""
-outpath = ""
-stub = "MILG"
 base_dir = "/g/data/xe2/datasets/Planet/Farms"
+stub = "MILG"
+outdir = os.path.join(gdata_dir, "Data/PadSeg")
 
 order_ids = "7f4b89d0-f25b-4743-9e4f-37a45eb66764", "844e2072-2266-40ac-be00-ba5bba69078c" # 8bands
-# order_ids = "5534c295-c405-4e10-8d51-92c7c7c02427", "570f6f33-9471-4dcb-a553-2c97928c53aa" # 3bands
+
 
 # +
 def find_timestamps(base_dir, stub, order_id):
@@ -58,7 +57,7 @@ def find_timestamps(base_dir, stub, order_id):
     return timestamps
 
 timestamps = find_timestamps(base_dir, stub, order_ids[0])
-timestamps[:5]
+timestamps[:1]
 
 
 # +
@@ -119,12 +118,8 @@ def load_directory(base_dir, stub, order_id, limit=None):
     combined_ds = xr.concat(dss, dim='time')
     return combined_ds
 
-ds = load_directory(base_dir, stub, order_ids[0], limit=None)
-print(ds)
-# -
-print(memory_usage())
-
-
+# ds = load_directory(base_dir, stub, order_ids[0], limit=None)
+# print(ds)
 # +
 # %%time
 def load_directories(base_dir, stub, order_ids, limit=None):
@@ -136,11 +131,20 @@ def load_directories(base_dir, stub, order_ids, limit=None):
     combined_ds = xr.concat(dss, dim='time')
     return combined_ds
 
-ds = load_directories(base_dir, stub, order_ids, limit=3)
-rgb(ds, col='time')
+ds = load_directories(base_dir, stub, order_ids, limit=None)
+# -
+
+print(memory_usage())
+
+outdir
+
+# %%time
+filename = os.path.join(outdir, f"{stub}_planet.ds")
+ds.to_netcdf(filename)
 
 
 # +
+# %%time
 def available_imagery_planet(ds, outdir="", stub=""):
     """Create a heatmap showing the available imagery and cloud cover percentage"""    
     # Create an empty heatmap with the dimensions: years, weeks
@@ -209,193 +213,162 @@ def available_imagery_planet(ds, outdir="", stub=""):
     plt.savefig(filename)
     print("Saved:", filename)
 
-available_imagery_planet(ds)
+available_imagery_planet(ds, outdir, stub)
 
-# +
-
-# Flip the image for xr_animation and plt.imshow to work correctly 
-# Note this means that dea_tools.plotting.rgb will now be flipped, I think because it uses the coordinate system
-ds_flipped = ds_full.isel(y=slice(None, None, -1))
-ds = ds_flipped
-
-# Percentile clip using default parameters
-p_low, p_high = 2, 98
-
-red = ds[bands[0]]
-green = ds[bands[1]]
-blue = ds[bands[2]]
-
-red_clip = np.clip(red, np.percentile(red, p_low), np.percentile(red, p_high))
-green_clip = np.clip(green, np.percentile(green, p_low), np.percentile(green, p_high))
-blue_clip = np.clip(blue, np.percentile(blue, p_low), np.percentile(blue, p_high))
-
-red_normalized = (red_clip - np.min(red_clip)) / (np.max(red_clip) - np.min(red_clip))
-green_normalized = (green_clip - np.min(green_clip)) / (np.max(green_clip) - np.min(green_clip))
-blue_normalized = (blue_clip - np.min(blue_clip)) / (np.max(blue_clip) - np.min(blue_clip))
-
-# -
-
-rgb = np.stack([red_normalized[0], green_normalized[0], blue_normalized[0]], axis=-1)
-plt.imshow(rgb)
 
 # +
 # %%time
-# Calendar plot for planetscope
-ds = ds_full
-image_size = 1
-bands=['nbart_red', 'nbart_green', 'nbart_blue']
-outdir=""
-stub=""
+def calendar_plot_planet(ds, image_size=1, outdir="", stub=""):
+    """Create a calendar plot showing the image with the most clear pixels for each week"""
+    
+    bands=['nbart_red', 'nbart_green', 'nbart_blue']
 
-# Copying code from the available imagery heatmap to find the best_pixels
-dates = pd.to_datetime(ds['time'].values)
-years = np.arange(dates.year.min(), dates.year.max() + 1)
-weeks = np.arange(1, 53)
-heatmap_data = pd.DataFrame(0, index=years, columns=weeks)
+    # Copying code from the available imagery heatmap to find the best_pixels
+    dates = pd.to_datetime(ds['time'].values)
+    years = np.arange(dates.year.min(), dates.year.max() + 1)
+    weeks = np.arange(1, 53)
+    heatmap_data = pd.DataFrame(0, index=years, columns=weeks)
 
-# Calculate the week of the year for each date (using date.week has some funny behaviour leading to 53 weeks which I don't like)
-weeks_years_dates = [(date.strftime('%W'), date.year, date) for date in dates]
-weeks_years_dates = [(1 if wyd[0] == '00' else int(wyd[0]), wyd[1], wyd[2]) for wyd in weeks_years_dates]
+    # Calculate the week of the year for each date (using date.week has some funny behaviour leading to 53 weeks which I don't like)
+    weeks_years_dates = [(date.strftime('%W'), date.year, date) for date in dates]
+    weeks_years_dates = [(1 if wyd[0] == '00' else int(wyd[0]), wyd[1], wyd[2]) for wyd in weeks_years_dates]
 
-# Find the percent of clear pixels for each timestamp
-total_pixels = ds['x'].size * ds['y'].size
-weeks_years_dates_percents = []
-for week, year, date in weeks_years_dates:
-    data_array = ds.sel(time=date)
-    nan_count = data_array['nbart_red'].isnull().sum()
-    percent_clear = 1 - nan_count/total_pixels
-    percent_rounded = percent_clear.values.round(2)
-    weeks_years_dates_percents.append((week, year, date, percent_rounded))
+    # Find the percent of clear pixels for each timestamp
+    total_pixels = ds['x'].size * ds['y'].size
+    weeks_years_dates_percents = []
+    for week, year, date in weeks_years_dates:
+        data_array = ds.sel(time=date)
+        nan_count = data_array['nbart_red'].isnull().sum()
+        percent_clear = 1 - nan_count/total_pixels
+        percent_rounded = percent_clear.values.round(2)
+        weeks_years_dates_percents.append((week, year, date, percent_rounded))
 
-# Find the timestamp with the clearest imagery for each week
-best_pixels = dict() # Mapping of {(week, year): {date, percent_clear_pixels}}
-for week, year, date, percent in weeks_years_dates_percents:
-    key = (week, year)
-    if key not in best_pixels:
-        best_pixels[key] = (date, percent)
-        continue
-    if percent > best_pixels[key][1]:
-        best_pixels[key] = (date, percent)
+    # Find the timestamp with the clearest imagery for each week
+    best_pixels = dict() # Mapping of {(week, year): {date, percent_clear_pixels}}
+    for week, year, date, percent in weeks_years_dates_percents:
+        key = (week, year)
+        if key not in best_pixels:
+            best_pixels[key] = (date, percent)
+            continue
+        if percent > best_pixels[key][1]:
+            best_pixels[key] = (date, percent)
 
-# Reduce to just the best timestamp per week
-ds_best = ds.sel(time=best_timestamps)
+    # Reduce to just the best timestamp per week
+    best_timestamps = [best_pixels[key][0] for key in best_pixels]
+    ds_best = ds.sel(time=best_timestamps)
 
-# NaN values mess up the normalization
-ds = ds_best.fillna(0)
+    # NaN values mess up the normalization
+    ds = ds_best.fillna(0)
 
-# Flip the image for xr_animation and plt.imshow to work correctly 
-# Note this means that dea_tools.plotting.rgb will now be flipped, I think because it uses the coordinate system
-ds = ds.isel(y=slice(None, None, -1))
+    # Flip the image for xr_animation and plt.imshow to work correctly 
+    # Note this means that dea_tools.plotting.rgb will now be flipped, I think because it uses the coordinate system
+    ds = ds.isel(y=slice(None, None, -1))
 
-# Percent clip normlization with the same default parameters as dea_tools.plotting.rgb, to make the images look brighter
-p_low, p_high = 2, 98
+    # Percent clip normlization with the same default parameters as dea_tools.plotting.rgb, to make the images look brighter
+    p_low, p_high = 2, 98
 
-red = ds[bands[0]]
-green = ds[bands[1]]
-blue = ds[bands[2]]
+    red = ds[bands[0]]
+    green = ds[bands[1]]
+    blue = ds[bands[2]]
 
-red_clip = np.clip(red, np.percentile(red, p_low), np.percentile(red, p_high))
-green_clip = np.clip(green, np.percentile(green, p_low), np.percentile(green, p_high))
-blue_clip = np.clip(blue, np.percentile(blue, p_low), np.percentile(blue, p_high))
+    red_clip = np.clip(red, np.percentile(red, p_low), np.percentile(red, p_high))
+    green_clip = np.clip(green, np.percentile(green, p_low), np.percentile(green, p_high))
+    blue_clip = np.clip(blue, np.percentile(blue, p_low), np.percentile(blue, p_high))
 
-red_normalized = (red_clip - np.min(red_clip)) / (np.max(red_clip) - np.min(red_clip))
-green_normalized = (green_clip - np.min(green_clip)) / (np.max(green_clip) - np.min(green_clip))
-blue_normalized = (blue_clip - np.min(blue_clip)) / (np.max(blue_clip) - np.min(blue_clip))
+    red_normalized = (red_clip - np.min(red_clip)) / (np.max(red_clip) - np.min(red_clip))
+    green_normalized = (green_clip - np.min(green_clip)) / (np.max(green_clip) - np.min(green_clip))
+    blue_normalized = (blue_clip - np.min(blue_clip)) / (np.max(blue_clip) - np.min(blue_clip))
 
-# Setup the dimensions of the calendar plot
-weeks = list(range(1,53))
-years = sorted(np.unique([pd.Timestamp(time).year for time in ds.time.values]))
-dates = pd.to_datetime(ds['time'].values)
-weeks_years_dates = [(date.strftime('%W'), date.year, date) for date in dates]
-weeks_years_dates = [(1 if wyd[0] == '00' else int(wyd[0]), wyd[1], wyd[2]) for wyd in weeks_years_dates]
-week_year_dict = {date:[week, year] for week, year, date in weeks_years_dates}
-year_minimum = min(years)
+    # Setup the dimensions of the calendar plot
+    weeks = list(range(1,53))
+    years = sorted(np.unique([pd.Timestamp(time).year for time in ds.time.values]))
+    dates = pd.to_datetime(ds['time'].values)
+    weeks_years_dates = [(date.strftime('%W'), date.year, date) for date in dates]
+    weeks_years_dates = [(1 if wyd[0] == '00' else int(wyd[0]), wyd[1], wyd[2]) for wyd in weeks_years_dates]
+    week_year_dict = {date:[week, year] for week, year, date in weeks_years_dates}
+    year_minimum = min(years)
 
-# Create the subplot grid
-image_size = 1   
-rows = len(years)
-cols = len(weeks)
-fig, axes = plt.subplots(nrows=rows, ncols=cols, figsize=(cols*image_size, rows*image_size))
+    # Create the subplot grid
+    rows = len(years)
+    cols = len(weeks)
+    fig, axes = plt.subplots(nrows=rows, ncols=cols, figsize=(cols*image_size, rows*image_size))
 
-# Create the labels for the x axis
-row_labels = years
-month_labels = []
-previous_month = None
-for week in range(1, 53):
+    # Create the labels for the x axis
+    row_labels = years
+    month_labels = []
+    previous_month = None
+    for week in range(1, 53):
 
-    # Find the month
-    date = datetime.strptime(f'2024-W{week}-1', "%Y-W%U-%w").date()
-    month = date.strftime("%b")
+        # Find the month
+        date = datetime.strptime(f'2024-W{week}-1', "%Y-W%U-%w").date()
+        month = date.strftime("%b")
 
-    # Add the month if it's a new month
-    if month != previous_month:
-        month_labels.append(month)
-        previous_month = month
-    else:
-        month_labels.append("")
+        # Add the month if it's a new month
+        if month != previous_month:
+            month_labels.append(month)
+            previous_month = month
+        else:
+            month_labels.append("")
 
-# Move the label to the second week of the month, because some years don't start on Monday 
-month_labels = [""] + month_labels[:-1]         
+    # Move the label to the second week of the month, because some years don't start on Monday 
+    month_labels = [""] + month_labels[:-1]         
 
-# Cleaning up the axes
-label_fontsize = 9 * image_size
-for row in range(rows):
-    for col in range(cols):
+    # Cleaning up the axes
+    label_fontsize = 9 * image_size
+    for row in range(rows):
+        for col in range(cols):
+            ax = axes[row, col]
+
+            # Remove all the ticks and labels
+            ax.set_xticks([])
+            ax.set_yticks([])
+            ax.set_xticklabels([])  
+            ax.set_yticklabels([]) 
+
+            # Add row and column labels if on the very left or very bottom
+            if col == 0:
+                ax.set_ylabel(row_labels[row], fontsize=label_fontsize, ha='center')
+            if row == rows - 1:
+                ax.set_xlabel(month_labels[col], fontsize=label_fontsize, ha='center')
+
+    # Plot each of the timestamps in the correct location           
+    for i in range(len(ds.time)):
+        time = ds.time[i].values
+
+        # Extract the week and year index of this timestamp
+        timestamp = pd.Timestamp(time)
+        date = str(timestamp)[:10]
+        week, year = week_year_dict[timestamp]
+        row = year - year_minimum
+        col = week - 1
+
+        # Extract the normalized RGB image
+        r = red_normalized[i]
+        g = green_normalized[i]
+        b = blue_normalized[i]
+
+        rgb_image = np.stack([r, g, b], axis=-1)
+
+        # Plot the image
         ax = axes[row, col]
+        ax.imshow(rgb_image, aspect='auto')
+        ax.set_title(date, fontsize=8, pad=1)
 
-        # Remove all the ticks and labels
-        ax.set_xticks([])
-        ax.set_yticks([])
-        ax.set_xticklabels([])  
-        ax.set_yticklabels([]) 
+    plt.tight_layout(pad=0.2)
 
-        # Add row and column labels if on the very left or very bottom
-        if col == 0:
-            ax.set_ylabel(row_labels[row], fontsize=label_fontsize, ha='center')
-        if row == rows - 1:
-            ax.set_xlabel(month_labels[col], fontsize=label_fontsize, ha='center')
-
-# Plot each of the timestamps in the correct location           
-for i in range(len(ds.time)):
-    time = ds.time[i].values
-
-    # Extract the week and year index of this timestamp
-    timestamp = pd.Timestamp(time)
-    date = str(timestamp)[:10]
-    week, year = week_year_dict[timestamp]
-    row = year - year_minimum
-    col = week - 1
-
-    # Extract the normalized RGB image
-    r = red_normalized[i]
-    g = green_normalized[i]
-    b = blue_normalized[i]
-
-    rgb_image = np.stack([r, g, b], axis=-1)
-
-    # Plot the image
-    ax = axes[row, col]
-    ax.imshow(rgb_image, aspect='auto')
-    ax.set_title(date, fontsize=8, pad=1)
-
-plt.tight_layout(pad=0.2)
-
-filename = os.path.join(outdir,f"{stub}_calendar_plot.png")
-plt.savefig(filename)
-print(f"Saved:", filename)   
-
-# +
-# %%time
-# Apparently the planetscope video needs to be flipped vertically to work properly (even though sentinel doesn't, weird)
-
-ds_flipped = ds.isel(y=slice(None, None, -1))
-time_lapse(ds_flipped, interpolate=False, stub="Planet")
+    filename = os.path.join(outdir,f"{stub}_calendar_plot_planet_{image_size}.png")
+    plt.savefig(filename)
+    print(f"Saved:", filename)   
+    
+# calendar_plot_planet(ds, 1, outdir, stub)
+calendar_plot_planet(ds, 5, outdir, stub)
 # -
 
-# !pwd
-
-# !ls
+# %%time
+# Flip the image for xr_animation and plt.imshow to work correctly (Note: Don't flip for rgb or merging, because the coordinates handle this)
+time_lapse(ds.isel(y=slice(None, None, -1)), interpolate=True, outdir=outdir, stub=f"{stub}_planet")
 
 if __name__ == '__main__':
+    print("hi")
 
-    print("Hi")
+

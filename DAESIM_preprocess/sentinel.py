@@ -80,7 +80,7 @@ def load_and_process_data(query, outdir="", stub=""):
 
 
 # %%time
-def available_imagery(ds, outdir="", stub=""):
+def available_imagery_sentinel(ds, outdir="", stub=""):
     """Create a heatmap showing the available imagery and cloud cover percentage"""    
     # Create an empty heatmap with the dimensions: years, weeks
     dates = pd.to_datetime(ds['time'].values)
@@ -93,7 +93,7 @@ def available_imagery(ds, outdir="", stub=""):
     weeks_years_dates = [(1 if wyd[0] == '00' else int(wyd[0]), wyd[1], wyd[2]) for wyd in weeks_years_dates]
     
     # Fill the DataFrame with 0s (no image), 1 (cloudy image), 2 (good image)
-    threshold = ds['x'].size * ds['y'].size * 0.01
+    threshold = ds['x'].size * ds['y'].size * 0.05
     for week_year_date in weeks_years_dates:
         week, year, date = week_year_date
         data_array = ds.sel(time=date)
@@ -117,12 +117,12 @@ def available_imagery(ds, outdir="", stub=""):
     plt.yticks(ticks=np.arange(len(years)), labels=years)
     
     # Cloud cover categories
-    labels = ['< 90%', '90-99%', '> 99%']
+    labels = ['< 90%', '90-95%', '> 95%']
     cbar = plt.colorbar(ticks=[0.33, 1, 1.66], shrink=0.3)
     cbar.ax.set_yticklabels(labels)
     cbar.set_label('Clear pixels')
     
-    plt.title('Available Imagery')
+    plt.title('Sentinel Available Imagery')
     plt.tight_layout()
     
     # Save the image
@@ -132,7 +132,7 @@ def available_imagery(ds, outdir="", stub=""):
 
 
 # %%time
-def calendar_plot(ds, image_size = 1, bands=['nbart_red', 'nbart_green', 'nbart_blue'], outdir="", stub=""):
+def calendar_plot_sentinel(ds, image_size = 1, bands=['nbart_red', 'nbart_green', 'nbart_blue'], outdir="", stub=""):
     """Create a calendar plot spaced nicely across each year"""
     # Should set the image size to at least 1 (100x100 pixels per image), but above 5 the filesize can be over 100MB
     
@@ -279,8 +279,8 @@ if __name__ == '__main__':
     query = define_query(lat, lon, buffer, start_year, end_year)
     ds = load_and_process_data(query)
     
-    available_imagery(ds)
-    calendar_plot(ds)
+    available_imagery_sentinel(ds)
+    calendar_plot_sentinel(ds)
     time_lapse(ds)
 
     stub = "MILG_1km"
