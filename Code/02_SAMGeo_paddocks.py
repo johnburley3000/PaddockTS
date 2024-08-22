@@ -12,14 +12,13 @@ The script is designed to be executed from the command line, where the user can 
 
 Requirements:
 - The script utilizes the 'samgeo' library for image segmentation, 'rasterio' for handling raster data, and 'geopandas' for geospatial data manipulation.
-- Execution of this script requires a Python environment containing all necessary packages.
+- Load the venv called geospatenv
 
 Outputs:
 - A GeoPackage containing the filtered polygons representing the paddocks, saved in the specified output directory.
 
 Next:
-- Code could probably be made shorter. 
-- Use GPU for much faster processing.
+- I'm not sure that it's properly using the GPU.. Check this (could be to do with PBS script)
 """
 
 import argparse
