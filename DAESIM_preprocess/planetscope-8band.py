@@ -210,18 +210,15 @@ def available_imagery_planet(ds, outdir="", stub=""):
     print("Saved:", filename)
 
 available_imagery_planet(ds)
-# -
 
-ds0 = ds.isel(time=0)
+# +
 
-# %%time
 # Flip the image for xr_animation and plt.imshow to work correctly 
 # Note this means that dea_tools.plotting.rgb will now be flipped, I think because it uses the coordinate system
 ds_flipped = ds_full.isel(y=slice(None, None, -1))
 ds = ds_flipped
 
-# +
-# %%time
+# Percentile clip using default parameters
 p_low, p_high = 2, 98
 
 red = ds[bands[0]]
@@ -244,14 +241,11 @@ plt.imshow(rgb)
 # +
 # %%time
 # Calendar plot for planetscope
-ds, 
+ds = ds_full
 image_size = 1
 bands=['nbart_red', 'nbart_green', 'nbart_blue']
 outdir=""
 stub=""
-
-ds_full = ds.copy()
-
 
 # Copying code from the available imagery heatmap to find the best_pixels
 dates = pd.to_datetime(ds['time'].values)
@@ -288,6 +282,10 @@ ds_best = ds.sel(time=best_timestamps)
 
 # NaN values mess up the normalization
 ds = ds_best.fillna(0)
+
+# Flip the image for xr_animation and plt.imshow to work correctly 
+# Note this means that dea_tools.plotting.rgb will now be flipped, I think because it uses the coordinate system
+ds = ds.isel(y=slice(None, None, -1))
 
 # Percent clip normlization with the same default parameters as dea_tools.plotting.rgb, to make the images look brighter
 p_low, p_high = 2, 98
@@ -385,11 +383,14 @@ plt.tight_layout(pad=0.2)
 filename = os.path.join(outdir,f"{stub}_calendar_plot.png")
 plt.savefig(filename)
 print(f"Saved:", filename)   
-# -
 
+# +
 # %%time
 # Apparently the planetscope video needs to be flipped vertically to work properly (even though sentinel doesn't, weird)
-time_lapse(ds, interpolate=False, stub="Planet")
+
+ds_flipped = ds.isel(y=slice(None, None, -1))
+time_lapse(ds_flipped, interpolate=False, stub="Planet")
+# -
 
 # !pwd
 
