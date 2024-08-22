@@ -12,18 +12,11 @@ import rasterio
 import matplotlib.pyplot as plt
 from scipy.interpolate import griddata
 from scipy.ndimage import zoom
-from pyproj import Proj, Transformer
 import rioxarray as rxr
 
 # Local imports
 os.chdir(os.path.join(os.path.expanduser('~'), "Projects/PaddockTS"))
-from DAESIM_preprocess.util import gdata_dir, scratch_dir, create_bbox
-
-def transform_bbox(bbox=[148.464499, -34.394042, 148.474499, -34.384042], inputEPSG="EPSG:4326", outputEPSG="EPSG:3857"):
-    transformer = Transformer.from_crs(inputEPSG, outputEPSG)
-    x1,y1 = transformer.transform(bbox[1], bbox[0])
-    x2,y2 = transformer.transform(bbox[3], bbox[2])
-    return (x1, y1, x2, y2)
+from DAESIM_preprocess.util import gdata_dir, scratch_dir, create_bbox, transform_bbox
 
 def run_gdalwarp(bbox=[148.464499, -34.394042, 148.474499, -34.3840426], filename="output.tif"):
     """Use gdalwarp to download a tif from terrain tiles"""
