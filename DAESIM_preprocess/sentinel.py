@@ -1,5 +1,6 @@
 # +
 # Sentinel loading examples are here: https://knowledge.dea.ga.gov.au/notebooks/DEA_products/DEA_Sentinel2_Surface_Reflectance/
+# Sentinel band info is here: https://custom-scripts.sentinel-hub.com/custom-scripts/sentinel-2/bands/
 
 # +
 # Project: xe2
@@ -249,7 +250,7 @@ def time_lapse(ds, bands=['nbart_red', 'nbart_green', 'nbart_blue'], interpolate
         ds_weekly = ds
     
     # DEA_Tools.xr_animation is excellent
-    output = os.path.join(scratch_dir,f"{stub}_video.mp4")
+    output = os.path.join(outdir,f"{stub}_video.mp4")
     num_frames = len(ds_weekly.time)
     xr_animation(ds_weekly, 
                  bands=['nbart_red', 'nbart_green', 'nbart_blue'], 
@@ -293,12 +294,4 @@ if __name__ == '__main__':
     # Filenames
     chris_outdir = os.path.join(gdata_dir, "Data/PadSeg/")
     filename = os.path.join(chris_outdir, f"{stub}.nc")
-
-filename
-
-ds_netcdf = xr.open_dataset('/g/data/xe2/cb8590/Data/PadSeg/MILG_1km_all_years.nc')
-ds_netcdf
-
-
-# !ls /g/data/xe2/cb8590/Data/PadSeg/*.nc
 

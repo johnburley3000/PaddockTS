@@ -1,5 +1,6 @@
 # Standatd libraries
 import os
+import resource
 
 # Dependencies
 import numpy as np
@@ -12,6 +13,10 @@ username = os.path.basename(home_dir)
 gdata_dir = os.path.join("/g/data/xe2", username)
 scratch_dir = os.path.join('/scratch/xe2', username)
 paddockTS_dir = os.path.join(home_dir, "Projects/PaddockTS")
+
+def memory_usage():
+    usage = resource.getrusage(resource.RUSAGE_SELF)
+    return f"Memory usage: {usage.ru_maxrss / 1024} MB"
 
 def create_bbox(lat=-35.274603, lon=149.098498, buffer=0.005):
     """Generates a bbox in the order [West, North, East, South] that's required for most APIs"""

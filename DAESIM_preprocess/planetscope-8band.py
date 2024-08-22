@@ -25,10 +25,13 @@ from dea_tools.plotting import rgb
 
 # Local imports
 os.chdir(os.path.join(os.path.expanduser('~'), "Projects/PaddockTS"))
-from DAESIM_preprocess.util import gdata_dir, scratch_dir
+from DAESIM_preprocess.util import gdata_dir, scratch_dir, memory_usage
 from DAESIM_preprocess.sentinel import available_imagery, calendar_plot, time_lapse
 
+# -
 
+
+print(memory_usage())
 
 # +
 orderid = ""
@@ -57,7 +60,7 @@ timestamps[:5]
 
 
 # +
-def load_image(base_dir, stub, order_id, timestamp):
+def load_image(base_dir, stub, order_id, timestamp, rgb_only=True):
     """Load a single planetscope image into an xarray"""
     
     # Open the tiff file
@@ -76,6 +79,9 @@ def load_image(base_dir, stub, order_id, timestamp):
     ds = da_bands.to_dataset(dim='band')
     planetscope_bands = {1: "nbart_coastal_aerosol", 2: 'nbart_blue', 3: 'planet_green_1', 4: 'nbart_green', 5: 'planetscope_yellow', 6: 'nbart_red', 7: 'nbart_red_edge_1', 8: 'nbart_nir_2'}
     ds_named = ds.rename(planetscope_bands)
+    
+    if rgb_only:
+        ds_named = ds_named[['nbart_red', 'nbart_green', 'nbart_blue']]
 
     return ds_named
 
@@ -97,7 +103,8 @@ def load_directory(base_dir, stub, order_id, limit=None):
     dss = []
     for timestamp in timestamps:
         
-        # Some of the downloads failed for MILG 2023. This skips those failed ones.
+        # Skip timepoints that failed to download
+        bands_tiff_prefix = "_3B_AnalyticMS_SR_8b_clip"
         filename = os.path.join(base_dir, stub, order_id, "PSScene", f"{timestamp}{bands_tiff_prefix}.tif")
         if not os.path.exists(filename):
             continue
@@ -110,9 +117,12 @@ def load_directory(base_dir, stub, order_id, limit=None):
     combined_ds = xr.concat(dss, dim='time')
     return combined_ds
 
-ds = load_directory(base_dir, stub, order_ids[1], limit=3)
+ds = load_directory(base_dir, stub, order_ids[0], limit=None)
 print(ds)
-rgb(ds, col="time")
+# -
+print(memory_usage())
+
+
 # +
 # %%time
 def load_directories(base_dir, stub, order_ids, limit=None):
