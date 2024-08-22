@@ -31,7 +31,9 @@ from dea_tools.plotting import xr_animation
 # Local imports
 os.chdir(os.path.join(os.path.expanduser('~'), "Projects/PaddockTS"))
 from DAESIM_preprocess.util import gdata_dir, scratch_dir
-# +
+
+
+# -
 def define_query(lat=-34.389042, lon=148.469499, buffer=0.005 , start_year=2020, end_year=2021):
     """Just requesting the bands needed for RGB and fractional cover"""
     lat_range = (lat-buffer, lat+buffer)
@@ -47,10 +49,7 @@ def define_query(lat=-34.389042, lon=148.469499, buffer=0.005 , start_year=2020,
     }
     return query
 
-query = define_query()
 
-
-# +
 # %%time
 def load_and_process_data(query, outdir="", stub=""):
     """Just download the data from sentinel"""
@@ -77,11 +76,8 @@ def load_and_process_data(query, outdir="", stub=""):
     ds.to_netcdf(filename)
     print(f"Saved:{filename}")
     return ds
-    
-ds = load_and_process_data(query)
 
 
-# +
 # %%time
 def available_imagery(ds, outdir="", stub=""):
     """Create a heatmap showing the available imagery and cloud cover percentage"""    
@@ -133,10 +129,7 @@ def available_imagery(ds, outdir="", stub=""):
     plt.savefig(filename)
     print("Saved:", filename)
 
-available_imagery(ds)
 
-
-# +
 # %%time
 def calendar_plot(ds, image_size = 1, bands=['nbart_red', 'nbart_green', 'nbart_blue'], outdir="", stub=""):
     """Create a calendar plot spaced nicely across each year"""
@@ -243,10 +236,7 @@ def calendar_plot(ds, image_size = 1, bands=['nbart_red', 'nbart_green', 'nbart_
     plt.savefig(filename)
     print(f"Saved:", filename)   
 
-calendar_plot(ds)
 
-
-# +
 # %%time
 def time_lapse(ds, bands=['nbart_red', 'nbart_green', 'nbart_blue'], interpolate=True, outdir="", stub=""):
     """Create a video of the time-series"""
@@ -269,9 +259,7 @@ def time_lapse(ds, bands=['nbart_red', 'nbart_green', 'nbart_blue'], interpolate
 
     # Can use this line to see the video embedded in a jupyter notebook
     # Video(output, embed=True)
-    
-time_lapse(ds)
-# -
+
 
 # %%time
 if __name__ == '__main__':
