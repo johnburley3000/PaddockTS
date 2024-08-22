@@ -283,5 +283,22 @@ if __name__ == '__main__':
     calendar_plot(ds)
     time_lapse(ds)
 
+    stub = "MILG_1km"
+    lat = -34.389042
+    lon = 148.469499
+    buffer = 0.005    # 0.01 is 1km in each direction to 2kmx2km total     
+    start_year = 2010  # This automatically gets the earlist timepoint (late 2015)
+    end_year = 2030    # This automatically gets the most recent timepoint
 
+    # Filenames
+    chris_outdir = os.path.join(gdata_dir, "Data/PadSeg/")
+    filename = os.path.join(chris_outdir, f"{stub}.nc")
+
+filename
+
+ds_netcdf = xr.open_dataset('/g/data/xe2/cb8590/Data/PadSeg/MILG_1km_all_years.nc')
+ds_netcdf
+
+
+# !ls /g/data/xe2/cb8590/Data/PadSeg/*.nc
 
