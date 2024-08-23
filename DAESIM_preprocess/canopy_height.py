@@ -63,16 +63,16 @@ def download_new_tiles(tiles, canopy_height_dir='/g/data/xe2/cb8590/Global_Canop
     s3 = boto3.client('s3')
     
     # Download tiles if we don't have them in gdata already
+    print(f"Downloading {tiles}")
     for tile in to_download:
         bucket_name = 'dataforgood-fb-data'
         file_key = f'forests/v1/alsgedi_global_v6_float/chm/{tile}.tif'
         local_file_path = os.path.join(canopy_height_dir, f'{tile}.tif')
         s3.download_file(bucket_name, file_key, local_file_path)
         print("Downloaded:", local_file_path)
-        
 
 
-def merge_tiles(lat=-34.3890427, lon=148.469499, buffer=0.005, outdir="/g/data/xe2/cb8590/", tmp_dir='/scratch/xe2/cb8590/tmp', canopy_height_dir='/g/data/xe2/cb8590/Global_Canopy_Height'):
+def merge_tiles(lat=-34.3890427, lon=148.469499, buffer=0.005, stub = "", outdir="/g/data/xe2/cb8590/", tmp_dir='/scratch/xe2/cb8590/tmp', canopy_height_dir='/g/data/xe2/cb8590/Global_Canopy_Height'):
     """Create a tiff file with just the region of interest. This may use just one tile, or merge multiple tiles"""
     
     # Convert the bounding box to EPSG:3857 (tiles.geojson uses EPSG:4326, but the tiff files use EPSG:3857')
@@ -118,7 +118,7 @@ def merge_tiles(lat=-34.3890427, lon=148.469499, buffer=0.005, outdir="/g/data/x
         "width": mosaic.shape[2],
         "transform": new_transform
     })
-    output_tiff_filename = os.path.join(outdir, 'combined_image.tif')
+    output_tiff_filename = os.path.join(outdir, f'{stub}_canopy_height.tif')
     with rasterio.open(output_tiff_filename, "w", **out_meta) as dest:
         dest.write(mosaic)
     for src in src_files_to_mosaic:
@@ -159,10 +159,10 @@ def visualise_canopy_height(filename):
 if __name__ == '__main__':
     # Specify the region of interest
     lat, lon = -34.3890427, 148.469499
-    buffer = 0.033  # 0.01 degrees is about 1km in each direction, so 2km total
+    buffer = 0.07  # 0.01 degrees is about 1km in each direction, so 2km total
     
     # Filenames
-    stub = "MILG_6km"
+    stub = "MILG_14km"
     canopy_height_dir = '/g/data/xe2/cb8590/Global_Canopy_Height'
     tiles_geojson = os.path.join(canopy_height_dir, 'tiles_global.geojson')
     outdir = os.path.join(gdata_dir)
@@ -170,8 +170,11 @@ if __name__ == '__main__':
     
     tiles = identify_relevant_tiles(lat, lon, buffer)
     download_new_tiles(tiles)
-    merge_tiles(lat, lon, buffer)
-    visualise_canopy_height("/g/data/xe2/cb8590/combined_image.tif")
-    
+    merge_tiles(lat, lon, buffer, stub)
+    visualise_canopy_height("/g/data/xe2/cb8590/MILG_14km.tif")
 
+# !ls /g/data/xe2/cb8590/MILG14km_canopy_height.tif
 
+# !mv /g/data/xe2/cb8590/_canopy_height.tif /g/data/xe2/cb8590/MILG14km_canopy_height.tif
+
+# !du -sh /g/data/xe2/cb8590/_canopy_height.tif
