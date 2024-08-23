@@ -7,12 +7,14 @@ import pickle
 import os
 
 # Dependencies
+import numpy as np
 import xarray as xr
 import rioxarray as rxr
 from rasterio.enums import Resampling
 import matplotlib.pyplot as plt
 from dea_tools.plotting import rgb
 from shapely.geometry import box, Polygon
+import scipy.ndimage
 
 # Local imports
 os.chdir(os.path.join(os.path.expanduser('~'), "Projects/PaddockTS"))
@@ -63,7 +65,30 @@ canopy_height_reprojected.rio.to_raster(filename)
 filename
 
 canopy_height_band = canopy_height_reprojected.isel(band=0)
-
 ds['canopy_height'] = canopy_height_band
 
-ds
+
+
+# Assign the trees
+tree_threshold = 1
+tree_mask = ds['canopy_height'] >= tree_threshold
+
+# Find the pixels adjacent to trees
+structuring_element = np.ones((3, 3))  # This defines adjacency (including diagonals)
+adjacent_mask = scipy.ndimage.binary_dilation(tree_mask, structure=structuring_element)
+
+adjacent_mask
+
+tree_count
+
+# Shelter score = number of trees within 300m
+distance = 100 
+shelter_score = xr.full_like(ds['canopy_height'], np.nan)
+tree_count = scipy.ndimage.uniform_filter(tree_mask.astype(float), size=(distance, distance))
+shelter_score = shelter_score.where(adjacent_mask, other=tree_count)
+ds['shelter_score1'] = shelter_score
+plt.imshow(shelter_score)
+
+filename = os.path.join(gdata_dir, "MILG14km_shelter_score1.tif")
+ds['shelter_score1'].rio.to_raster(filename)
+print(filename)
