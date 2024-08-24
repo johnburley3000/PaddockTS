@@ -157,18 +157,16 @@ def visualise_canopy_height(filename):
     plt.show()
 
 
-# %%time
-if __name__ == '__main__':
-    # Specify the region of interest
-    lat, lon = -34.3890427, 148.469499
-    buffer = 0.07  # 0.01 degrees is about 1km in each direction, so 2km total
-    
-    # Filenames
-    tiles_geojson = os.path.join(canopy_height_dir, 'tiles_global.geojson')
-    outdir = os.path.join(gdata_dir)
-    tmp_dir = os.path.join(scratch_dir)
-    
+def canopy_height(lat=-34.3890427, lon=148.469499, buffer=0.005, outdir=scratch_dir, stub="Test", tmp_dir='/scratch/xe2/cb8590/tmp'):
+    """Create a merged canopy height raster, downloading new tiles if necessary"""
     tiles = identify_relevant_tiles(lat, lon, buffer)
     download_new_tiles(tiles)
-    merge_tiles(lat, lon, buffer)
+    merge_tiles(lat, lon, buffer, outdir, stub, tmp_dir)
+
+
+# %%time
+if __name__ == '__main__':
+    canopy_height()
     # visualise_canopy_height("/g/data/xe2/cb8590/MILG_14km.tif")
+
+
