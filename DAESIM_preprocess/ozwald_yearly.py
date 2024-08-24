@@ -110,9 +110,9 @@ def write_tiff(df, variable="Tmax", filename="output.tiff", pixel_size=0.05):
     print("Saved:", filename)
 
 
-def ozwald_yearly_average(variables=["Tmax", "Pg"], lat=-34.3890427, lon=148.469499, buffer=0.005, start_year=2020, end_year=2021, outdir="", stub="test", tmp_dir=""):
+def ozwald_yearly_average(variables=["Tmax", "Pg"], lat=-34.3890427, lon=148.469499, buffer=0.005, start_year='2020', end_year='2021', outdir="", stub="test", tmp_dir=""):
     """Download yearly averages from SILO stored on Ozwald"""
-    years = [str(year) for year in list(range(start_year, end_year + 1))]
+    years = [str(year) for year in list(range(int(start_year), int(end_year) + 1))]
     for variable in variables:
         df = ozwald_multiyear(var=variable, years=years, stub=stub, tmp_dir=tmp_dir)
         pixel_size = pixel_sizes[variable]

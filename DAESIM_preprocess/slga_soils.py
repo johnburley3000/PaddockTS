@@ -72,7 +72,7 @@ def slga_soils(variables=["Clay", "Sand", "Silt", "pH_CaCl2"], lat=-34.3890427, 
         
         # The SLGA server is a bit temperamental, so sometimes you have to try again
         attempt = 0
-        delay = 5
+        delay = 10
         max_retries = 3
         while attempt < max_retries:
             time.sleep(delay)

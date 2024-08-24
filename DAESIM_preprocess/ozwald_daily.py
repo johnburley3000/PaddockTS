@@ -61,9 +61,9 @@ def ozwald_daily_multiyear(var="VPeff", latitude=-34.3890427, longitude=148.4694
     return ds_concat
 
 
-def ozwald_daily(variables=["VPeff", "Uavg"], lat=-34.3890427, lon=148.469499, buffer=0.1, start_year=2020, end_year=2021, outdir="", stub="", tmp_dir="", cleanup=True):
+def ozwald_daily(variables=["VPeff", "Uavg"], lat=-34.3890427, lon=148.469499, buffer=0.1, start_year="2020", end_year="2021", outdir="", stub="", tmp_dir="", cleanup=True):
     dss = []
-    years = [str(year) for year in list(range(start_year, end_year + 1))]
+    years = [str(year) for year in list(range(int(start_year), int(end_year) + 1))]
     for variable in variables:
         ds_variable = ozwald_daily_multiyear(variable, lat, lon, buffer, years, stub, tmp_dir)
         dss.append(ds_variable)

@@ -67,10 +67,10 @@ def ozwald_8day_multiyear(var="Ssoil", latitude=-34.3890427, longitude=148.46949
     return ds_concat
 
 
-def ozwald_8day(variables=["Ssoil", "GPP"], lat=-34.3890427, lon=148.469499, buffer=0.01, start_year=2020, end_year=2021, outdir="", stub="", tmp_dir="", cleanup=True):
+def ozwald_8day(variables=["Ssoil", "GPP"], lat=-34.3890427, lon=148.469499, buffer=0.01, start_year="2020", end_year="2021", outdir="", stub="", tmp_dir="", cleanup=True):
     """Download 8day variables from OzWald"""
     dss = []
-    years = [str(year) for year in list(range(start_year, end_year + 1))]
+    years = [str(year) for year in list(range(int(start_year), int(end_year) + 1))]
     for variable in variables:
         ds_variable = ozwald_8day_multiyear(variable, lat, lon, buffer, years, stub, tmp_dir)
         dss.append(ds_variable)

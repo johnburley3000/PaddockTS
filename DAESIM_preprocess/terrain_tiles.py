@@ -15,7 +15,8 @@ from scipy.ndimage import zoom
 import rioxarray as rxr
 
 # Local imports
-os.chdir(os.path.join(os.path.expanduser('~'), "Projects/PaddockTS"))
+paddockTS_dir = os.path.join(os.path.expanduser('~'), "Projects/PaddockTS")
+os.chdir(paddockTS_dir)
 from DAESIM_preprocess.util import gdata_dir, scratch_dir, create_bbox, transform_bbox
 
 def run_gdalwarp(bbox=[148.464499, -34.394042, 148.474499, -34.3840426], filename="output.tif"):
@@ -24,7 +25,7 @@ def run_gdalwarp(bbox=[148.464499, -34.394042, 148.474499, -34.3840426], filenam
     if os.path.exists(filename):
         os.remove(filename)
     
-    xml="DAESIM_preprocess/terrain_tiles.xml"
+    xml=os.path.join("DAESIM_preprocess/terrain_tiles.xml")
         
     bbox_3857 = transform_bbox(bbox)
     min_x, min_y, max_x, max_y = bbox_3857
@@ -35,8 +36,8 @@ def run_gdalwarp(bbox=[148.464499, -34.394042, 148.474499, -34.3840426], filenam
         xml, filename
     ]
     result = subprocess.run(command, capture_output=True, text=True)
-    # print("STDOUT:", result.stdout, flush=True)
-    # print("STDERR:", result.stderr, flush=True)
+    # print("Terrain Tiles STDOUT:", result.stdout, flush=True)
+    # print("Terrain Tiles STDERR:", result.stderr, flush=True)
     print(f"Downloaded {filename}")
 
 def interpolate_nan(filename="output.tif"):

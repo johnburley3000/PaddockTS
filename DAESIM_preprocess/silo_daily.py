@@ -81,9 +81,9 @@ def silo_daily_multiyear(var="radiation", latitude=-34.3890427, longitude=148.46
     return ds_concat
 
 
-def silo_daily(variables=["radiation", "et_morton_actual"], lat=-34.3890427, lon=148.469499, buffer=0.1, start_year=2020, end_year=2021, outdir="", stub=""):
+def silo_daily(variables=["radiation", "et_morton_actual"], lat=-34.3890427, lon=148.469499, buffer=0.1, start_year="2020", end_year="2021", outdir="", stub=""):
     dss = []
-    years = [str(year) for year in list(range(start_year, end_year + 1))]
+    years = [str(year) for year in list(range(int(start_year), int(end_year) + 1))]
     for variable in variables:
         ds = silo_daily_multiyear(variable, lat, lon, buffer, years)
         dss.append(ds)
