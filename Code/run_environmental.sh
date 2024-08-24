@@ -6,7 +6,11 @@
 #PBS -l ncpus=1
 #PBS -P xe2
 #PBS -l walltime=04:00:00
-#PBS -l storage=gdata/xe2
+#PBS -l storage=gdata/xe2+gdata/ub8
+
+# Notes:
+# 'copyq' queue required for internet access
+# 'ub8' storage access required for OzWald soil moisture 
 
 # Print out input variables to the error log
 echo "Running environmental script with the following variables:"
@@ -22,6 +26,7 @@ echo "buffer: $buffer"
 # activate virtual environment:
 source /g/data/xe2/John/geospatenv/bin/activate
 module load gdal/3.6.4
+# module load netcdf/4.7.3
 
 cd $wd
 echo "Working directory: $wd"

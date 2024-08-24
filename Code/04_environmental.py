@@ -68,15 +68,12 @@ def main(args):
     variables = ['Clay', 'Sand', 'Silt', 'pH_CaCl2']
     slga_soils(variables, lat, lon, buffer, outdir, stub)
 
-    # OzWald not working via PBS for some reason. Have to rewrite to access the directories directly instead of via Thredds.
-    # variables = ["Tmax", "Tmin", "Pg"]
-    # ozwald_yearly_average(variables, lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir)
+    # NCI Thredds not working via PBS for some reason. Have to rewrite these two functions to access the directories directly like with ozwald_8day below.
+    # ozwald_yearly_average(["Tmax", "Tmin", "Pg"], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir)
+    # ozwald_daily(["VPeff", "Uavg"], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir)
 
-    # variables = ['Ssoil']
-    # ozwald_8day(variables, lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir)
-
-    # variables = ["VPeff", "Uavg"]
-    # ozwald_daily(variables, lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir)
+    variables = ['Ssoil']
+    ozwald_8day(variables, lat, lon, buffer, start_year, end_year, outdir, stub)
 
     variables = ["daily_rain", "max_temp", "min_temp", "et_morton_actual", "et_morton_potential"]
     ds_silo_daily = silo_daily(variables, lat, lon, buffer, start_year, end_year, outdir, stub)

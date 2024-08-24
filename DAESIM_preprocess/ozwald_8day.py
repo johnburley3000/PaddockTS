@@ -12,6 +12,9 @@ import requests
 import xarray as xr
 import pandas as pd
 import matplotlib.pyplot as plt
+
+os.chdir(os.path.join(os.path.expanduser('~'), "Projects/PaddockTS"))
+from DAESIM_preprocess.util import create_bbox, scratch_dir
 # -
 
 ozwald_8day_abbreviations = {
@@ -31,7 +34,8 @@ ozwald_8day_abbreviations = {
 }
 
 
-def ozwald_8day_singleyear(var="Ssoil", latitude=-34.3890427, longitude=148.469499, buffer=0.01, year="2021", stub="", tmp_dir=""):
+# I couldn't get Thredds working from a PBS script for some reason
+def ozwald_8day_singleyear_thredds(var="Ssoil", latitude=-34.3890427, longitude=148.469499, buffer=0.01, year="2021", stub="Test", tmp_dir=scratch_dir):
     
     # buffer = 0.0000000001    # Using a buffer less than the grid size of 500m (0.005 degrees) gives you a single point
     
@@ -54,33 +58,48 @@ def ozwald_8day_singleyear(var="Ssoil", latitude=-34.3890427, longitude=148.4694
         
     print("Downloaded", filename)
 
-    ds = xr.open_dataset(filename)
+    ds = xr.open_dataset(filename, engine='netcdf4')
     return ds
 
 
-def ozwald_8day_multiyear(var="Ssoil", latitude=-34.3890427, longitude=148.469499, buffer=0.01, years=["2020", "2021"], stub="", tmp_dir=""):
+def ozwald_8day_singleyear(var="Ssoil", latitude=-34.3890427, longitude=148.469499, buffer=0.1, year="2021"):
+    """Select the region of interest from the Australia wide NetCDF file"""
+    filename = os.path.join("/g/data/ub8/au/OzWALD/8day", var, f"OzWALD.{var}.{year}.nc")
+
+    # OzWald doesn't have 2024 data in this folder yet.
+    if not os.path.exists(filename):
+        return None
+    
+    ds = xr.open_dataset(filename)
+    bbox = create_bbox(latitude, longitude, buffer)
+    ds_region = ds.sel(latitude=slice(bbox[3], bbox[1]), longitude=slice(bbox[0], bbox[2]))
+
+    # If the region is too small, then just find a single point
+    if ds_region[var].shape[1] == 0:
+        ds_region = ds.sel(latitude=latitude, longitude=longitude, method="nearest")
+        
+    return ds_region
+
+
+def ozwald_8day_multiyear(var="Ssoil", latitude=-34.3890427, longitude=148.469499, buffer=0.01, years=["2020", "2021"]):
     dss = []
     for year in years:
-        ds_year = ozwald_8day_singleyear(var, latitude, longitude, buffer, year, stub, tmp_dir)
-        dss.append(ds_year)
+        ds_year = ozwald_8day_singleyear(var, latitude, longitude, buffer, year)
+        if ds_year:
+            dss.append(ds_year)
     ds_concat = xr.concat(dss, dim='time')
     return ds_concat
 
 
-def ozwald_8day(variables=["Ssoil", "GPP"], lat=-34.3890427, lon=148.469499, buffer=0.01, start_year="2020", end_year="2021", outdir="", stub="", tmp_dir="", cleanup=True):
+def ozwald_8day(variables=["Ssoil", "GPP"], lat=-34.3890427, lon=148.469499, buffer=0.01, start_year="2020", end_year="2021", outdir=scratch_dir, stub="Test"):
     """Download 8day variables from OzWald"""
     dss = []
     years = [str(year) for year in list(range(int(start_year), int(end_year) + 1))]
     for variable in variables:
-        ds_variable = ozwald_8day_multiyear(variable, lat, lon, buffer, years, stub, tmp_dir)
+        ds_variable = ozwald_8day_multiyear(variable, lat, lon, buffer, years)
         dss.append(ds_variable)
     ds_concat = xr.merge(dss)
     
-    if cleanup:
-        nc_files = glob.glob(os.path.join(tmp_dir, '*.nc'))
-        for file in nc_files:
-            os.remove(file)
-
     filename = os.path.join(outdir, f'{stub}_ozwald_8day.nc')
     ds_concat.to_netcdf(filename)
     print("Saved:", filename)
@@ -90,13 +109,6 @@ def ozwald_8day(variables=["Ssoil", "GPP"], lat=-34.3890427, lon=148.469499, buf
 
 # %%time
 if __name__ == '__main__':
-    lat, lon = -34.3890427, 148.469499
-    ds = ozwald_8day(lat=lat, lon=lon)
+    ds = ozwald_8day()
     print(ds)
-
-    os.chdir(os.path.join(os.path.expanduser('~'), "Projects/PaddockTS"))
-    from DAESIM_preprocess.util import plot_time_series, plot_time_point
-    
-    plot_time_series(ds, "Ssoil", lat, lon)
-    plot_time_point(ds, "Ssoil", '2020-03-13')
 
