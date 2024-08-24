@@ -113,7 +113,7 @@ def terrain_tiles(lat=-34.3890427, lon=148.469499, buffer=0.005, outdir="", stub
 
     # Fix bad measurements
     dem, meta = interpolate_nan(filename)        
-    filename = os.path.join(outdir, f"{stub}_terrain_cleaned.tif")
+    filename = os.path.join(outdir, f"{stub}_terrain.tif")
     download_dem(dem, meta, filename)
 
 if __name__ == '__main__':
@@ -130,5 +130,5 @@ if __name__ == '__main__':
     terrain_tiles(lat, lon, buffer, outdir, stub, tmp_dir)
 
     # Visualise the downloaded data
-    filename = os.path.join(outdir, f"{stub}_terrain_cleaned.tif")
+    filename = os.path.join(outdir, f"{stub}_terrain.tif")
     visualise_tif(filename, "Terrain Tiles")
