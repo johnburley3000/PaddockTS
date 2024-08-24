@@ -31,10 +31,12 @@ os.chdir(os.path.join(os.path.expanduser('~'), "Projects/PaddockTS"))
 from DAESIM_preprocess.util import create_bbox, transform_bbox, scratch_dir, gdata_dir
 # endregion
 
-def identify_relevant_tiles(lat=-34.3890427, lon=148.469499, buffer=0.005, canopy_height_dir='/g/data/xe2/cb8590/Global_Canopy_Height'):
+canopy_height_dir ='/g/data/xe2/datasets/Global_Canopy_Height'
+
+def identify_relevant_tiles(lat=-34.3890427, lon=148.469499, buffer=0.005):
     """Find the tiles that overlap with the region of interest"""
     tiles_geojson_filename = os.path.join(canopy_height_dir, 'tiles_global.geojson')
-    gdf = gpd.read_file(tiles_geojson)
+    gdf = gpd.read_file(tiles_geojson_filename)
     bbox = create_bbox(lat, lon, buffer)
     roi_coords = box(*bbox)
     roi_polygon = Polygon(roi_coords)
@@ -47,7 +49,7 @@ def identify_relevant_tiles(lat=-34.3890427, lon=148.469499, buffer=0.005, canop
     return relevant_tiles
 
 
-def download_new_tiles(tiles, canopy_height_dir='/g/data/xe2/cb8590/Global_Canopy_Height'):
+def download_new_tiles(tiles):
     """Download any tiles that we haven't already downloaded"""
     # Find tiles we haven't downloaded yet
     to_download = []
@@ -72,7 +74,7 @@ def download_new_tiles(tiles, canopy_height_dir='/g/data/xe2/cb8590/Global_Canop
         print("Downloaded:", local_file_path)
 
 
-def merge_tiles(lat=-34.3890427, lon=148.469499, buffer=0.005, stub = "", outdir="/g/data/xe2/cb8590/", tmp_dir='/scratch/xe2/cb8590/tmp', canopy_height_dir='/g/data/xe2/cb8590/Global_Canopy_Height'):
+def merge_tiles(lat=-34.3890427, lon=148.469499, buffer=0.005, outdir="/g/data/xe2/cb8590/", stub="Test", tmp_dir='/scratch/xe2/cb8590/tmp'):
     """Create a tiff file with just the region of interest. This may use just one tile, or merge multiple tiles"""
     
     # Convert the bounding box to EPSG:3857 (tiles.geojson uses EPSG:4326, but the tiff files use EPSG:3857')
@@ -162,19 +164,11 @@ if __name__ == '__main__':
     buffer = 0.07  # 0.01 degrees is about 1km in each direction, so 2km total
     
     # Filenames
-    stub = "MILG_14km"
-    canopy_height_dir = '/g/data/xe2/cb8590/Global_Canopy_Height'
     tiles_geojson = os.path.join(canopy_height_dir, 'tiles_global.geojson')
     outdir = os.path.join(gdata_dir)
     tmp_dir = os.path.join(scratch_dir)
     
     tiles = identify_relevant_tiles(lat, lon, buffer)
     download_new_tiles(tiles)
-    merge_tiles(lat, lon, buffer, stub)
-    visualise_canopy_height("/g/data/xe2/cb8590/MILG_14km.tif")
-
-# !ls /g/data/xe2/cb8590/MILG14km_canopy_height.tif
-
-# !mv /g/data/xe2/cb8590/_canopy_height.tif /g/data/xe2/cb8590/MILG14km_canopy_height.tif
-
-# !du -sh /g/data/xe2/cb8590/_canopy_height.tif
+    merge_tiles(lat, lon, buffer)
+    # visualise_canopy_height("/g/data/xe2/cb8590/MILG_14km.tif")

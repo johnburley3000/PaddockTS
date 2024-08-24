@@ -62,7 +62,6 @@ def download_tif(bbox=[148.46449900000002, -34.3940427, 148.474499, -34.38404269
 
     # Make sure to time.sleep(1) if running this multiple times to avoid throttling
 
-# +
 def slga_soils(variables=["Clay", "Sand", "Silt", "pH_CaCl2"], lat=-34.3890427, lon=148.469499, buffer=0.005, outdir=scratch_dir, stub="Test"):
     """Download soil variables from CSIRO"""
     bbox = create_bbox(lat, lon, buffer)
@@ -85,9 +84,6 @@ def slga_soils(variables=["Clay", "Sand", "Silt", "pH_CaCl2"], lat=-34.3890427, 
                 print(f"Failed to download {variable}")
                 attempt+=1
         
-
-slga_soils()
-# -
 
 if __name__ == '__main__':
     slga_soils()

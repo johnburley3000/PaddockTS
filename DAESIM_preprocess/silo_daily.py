@@ -39,9 +39,7 @@ silo_abbreviations = {
     }
 
 
-# +
-# # !ls /g/data/xe2/cb8590/SILO
-# -
+silo_path = "/g/data/xe2/datasets/Climate_SILO"
 
 # I used this script to download data from SILO into gdata
 def download_from_SILO():
@@ -62,7 +60,6 @@ def download_from_SILO():
     # Uses about 400MB per file, so about 3GB per variable, or 15GB for these 5 variables
 def silo_daily_singleyear(var="radiation", latitude=-34.3890427, longitude=148.469499, buffer=0.1, year="2021"):
     """Select the region of interest from the Australia wide NetCDF file"""
-    silo_path = "/g/data/xe2/cb8590/SILO"
     filename = os.path.join(silo_path, f"{year}.{var}.nc")
     ds = xr.open_dataset(filename)
     bbox = create_bbox(latitude, longitude, buffer)
