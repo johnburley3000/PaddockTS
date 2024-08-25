@@ -10,6 +10,8 @@ import glob
 import requests
 import xarray as xr
 import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
 
 os.chdir(os.path.join(os.path.expanduser('~'), "Projects/PaddockTS"))
 from DAESIM_preprocess.util import gdata_dir, scratch_dir, create_bbox
@@ -152,7 +154,7 @@ def resample_weekly(df):
 
     return weekly_df
 
-def visualise_water(df, title="", outdir=scratch_dir, stub="Test"):
+def visualise_water(df, outdir=scratch_dir, stub="Test"):
     """Create a plot comparing Rainfall, evapotranspiration, and soil moisture"""
     plt.figure(figsize=(50, 20))
     
@@ -171,7 +173,7 @@ def visualise_water(df, title="", outdir=scratch_dir, stub="Test"):
     handles = [rainfall_plot, et_actual_plot[0], et_potential_plot[0], moisture_max_plot[0], moisture_min_plot[0]]
     labels = ['Total Rainfall (mm)', "Potential Evapotranspiration (mm)", "Actual Evapotranspiration (mm)", "Maximum Soil Moisture (mm/10)", "Minimum Soil Moisture (mm/10)"]
     plt.legend(handles=handles, labels=labels, fontsize=30, loc='upper left')
-    plt.title(title, fontsize=50)
+    plt.title("Weather", fontsize=50)
     plt.tight_layout()
     
     filename = os.path.join(outdir, f"{stub}_weather.png")
@@ -179,7 +181,7 @@ def visualise_water(df, title="", outdir=scratch_dir, stub="Test"):
     print("Saved", filename)
     plt.show()
 
-def visualise_temp(df, title="", outpath=scratch_dir, stub="Test"):
+def visualise_temp(df, outpath=scratch_dir, stub="Test"):
     """Create a plot showing min and max temp over time"""
     
     plt.figure(figsize=(50, 10))
@@ -190,7 +192,7 @@ def visualise_temp(df, title="", outpath=scratch_dir, stub="Test"):
     handles = [maxtemp_plot[0], mintemp_plot[0]]
     labels = ['Maximum Temperature (°C)', 'Minimum Temperature (°C)']
     plt.legend(handles=handles, labels=labels, fontsize=30, loc='upper left')
-    plt.title(title, fontsize=50)
+    plt.title("Temperature", fontsize=50)
     plt.tight_layout()
     
     filename = os.path.join(outpath, f"{stub}_temperature.png")

@@ -232,7 +232,7 @@ def calendar_plot_sentinel(ds, image_size = 1, bands=['nbart_red', 'nbart_green'
         
     plt.tight_layout(pad=0.2)
 
-    filename = os.path.join(outdir,f"{stub}_calendar_plot_{size}.png")
+    filename = os.path.join(outdir,f"{stub}_calendar_plot_{image_size}.png")
     plt.savefig(filename)
     print(f"Saved:", filename)
     plt.show()
@@ -260,6 +260,22 @@ def time_lapse(ds, bands=['nbart_red', 'nbart_green', 'nbart_blue'], interpolate
     # Video(output, embed=True)
 
 
+# +
+# Filepaths
+# outdir = os.path.join(gdata_dir, "Data/PadSeg/")
+# visuals_dir = os.path.join(scratch_dir, "Visuals")
+# stub = "MULL"
+
+# filename = os.path.join(outdir, f"{stub}_ds2.pkl")
+# with open(filename, 'rb') as file:
+#     ds = pickle.load(file)
+
+# # available_imagery_sentinel(ds)
+# calendar_plot_sentinel(ds)
+# time_lapse(ds)
+
+# -
+
 # %%time
 if __name__ == '__main__':
     # Specify parameters
@@ -274,22 +290,10 @@ if __name__ == '__main__':
     chris_outdir = os.path.join(gdata_dir, "Data/PadSeg/")
     filename = os.path.join(chris_outdir, f"{stub}.nc")
         
-        
     query = define_query(lat, lon, buffer, start_year, end_year)
     ds = load_and_process_data(query)
     
     available_imagery_sentinel(ds)
     calendar_plot_sentinel(ds)
     time_lapse(ds)
-
-    stub = "MILG_1km"
-    lat = -34.389042
-    lon = 148.469499
-    buffer = 0.005    # 0.01 is 1km in each direction to 2kmx2km total     
-    start_year = 2010  # This automatically gets the earlist timepoint (late 2015)
-    end_year = 2030    # This automatically gets the most recent timepoint
-
-    # Filenames
-    chris_outdir = os.path.join(gdata_dir, "Data/PadSeg/")
-    filename = os.path.join(chris_outdir, f"{stub}.nc")
 

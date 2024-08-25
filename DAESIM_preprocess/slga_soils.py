@@ -8,14 +8,17 @@ import pickle
 import time
 
 # Dependencies
+import numpy as np
 import xarray as xr
+import rioxarray as rxr
 import pandas as pd
 from owslib.wcs import WebCoverageService
 from pyproj import Proj, Transformer
+import matplotlib.pyplot as plt
 
 # Local imports
 os.chdir(os.path.join(os.path.expanduser('~'), "Projects/PaddockTS"))
-from DAESIM_preprocess.util import create_bbox, scratch_dir
+from DAESIM_preprocess.util import create_bbox, scratch_dir, plot_categorical
 
 # Taken from GeoDataHarvester: https://github.com/Sydney-Informatics-Hub/geodata-harvester/blob/main/src/geodata_harvester/getdata_slga.py
 asris_urls = {
@@ -138,10 +141,12 @@ def visualise_soil_texture(outdir, visuals_dir=scratch_dir, stub="Test"):
         'Sandy Clay Loam': "salmon",
         'Loam':"chocolate"
     }
+    colour_dict = {key: value for key, value in colour_dict.items() if key in np.unique(soil_texture)}
     filename = os.path.join(visuals_dir, f"{stub}_soil_texture.png")
     plot_categorical(soil_texture, colour_dict, "Soil Texture", filename)
 
 def visualise_soil_pH(outdir, visuals_dir=scratch_dir, stub="Test"):
+    fig, ax = plt.subplots(figsize=(8, 6))
     filename = os.path.join(outdir, f"{stub}_pH_CaCl2.tif")
     ds_pH = rxr.open_rasterio(filename)
     ds_pH_scaled = ds_pH[0].values
@@ -155,6 +160,11 @@ def visualise_soil_pH(outdir, visuals_dir=scratch_dir, stub="Test"):
     plt.show()
 
 if __name__ == '__main__':
-    slga_soils()
+    # slga_soils()
+    from DAESIM_preprocess.util import gdata_dir
+    outdir = os.path.join(gdata_dir, "Data/PadSeg/")
+    visuals_dir = os.path.join(scratch_dir, "Visuals")
+    stub = "MULL"
+    visualise_soil_texture(outdir, visuals_dir, stub)
 
 
