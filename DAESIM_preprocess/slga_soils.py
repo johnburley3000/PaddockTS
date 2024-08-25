@@ -83,7 +83,76 @@ def slga_soils(variables=["Clay", "Sand", "Silt", "pH_CaCl2"], lat=-34.3890427, 
             except:
                 print(f"Failed to download {variable}")
                 attempt+=1
-        
+
+
+def visualise_soil_texture(outdir, visuals_dir=scratch_dir, stub="Test"):
+    """Convert from sand silt and clay percent to the 12 categories in the soil texture triangle"""
+
+    # Load the sand, silt and clay layers
+    filename_sand = os.path.join(outdir, f"{stub}_Sand.tif")
+    filename_silt = os.path.join(outdir, f"{stub}_Silt.tif")
+    filename_clay = os.path.join(outdir, f"{stub}_Clay.tif")
+                            
+    ds_sand = rxr.open_rasterio(filename_sand)
+    ds_silt = rxr.open_rasterio(filename_silt)
+    ds_clay = rxr.open_rasterio(filename_clay)
+    
+    sand_array = ds_sand.isel(band=0).values
+    silt_array = ds_silt.isel(band=0).values
+    clay_array = ds_clay.isel(band=0).values
+    
+    # Rescale values to add up to 100 (range was 74%-108% in Mullon example)
+    total_percent = sand_array + silt_array + clay_array
+    sand_percent = (sand_array / total_percent) * 100
+    silt_percent = (silt_array / total_percent) * 100
+    clay_percent = (clay_array / total_percent) * 100
+
+    # Assign soil texture categories
+    soil_texture = np.empty(sand_array.shape, dtype=object)
+    
+    # Fudged the boundaries between sand, loamy sand, and sandy loam a little, but the rest of these values should match the soil texture triangle exactly
+    soil_texture[(clay_array < 20) & (silt_array < 50)] = 'Sandy Loam'      # Sandy Loam needs to come before Loam
+    soil_texture[(sand_array >= 70) & (clay_array < 15)] = 'Loamy Sand'     # Loamy Sand needs to come from Sand
+    soil_texture[(sand_array >= 85) & (clay_array < 10)] = 'Sand'
+    soil_texture[(clay_array < 30) & (silt_array >= 50)] = 'Silt Loam'     # Silt Loam needs to come before Silt
+    soil_texture[(clay_array < 15) & (silt_array >= 80)] = 'Silt'
+    soil_texture[(clay_array >= 27) & (clay_array < 40) & (sand_array < 20)] = 'Silty Clay Loam'
+    soil_texture[(clay_array >= 40) & (silt_array >= 40)] = 'Silty Clay'
+    soil_texture[(clay_array >= 40) & (silt_array < 40) & (sand_array < 45)] = 'Clay'
+    soil_texture[(clay_array >= 35) & (sand_array >= 45)] = 'Sandy Clay'
+    soil_texture[(clay_array >= 27) & (clay_array < 40) & (sand_array >= 20) & (sand_array < 45) ] = 'Clay Loam'
+    soil_texture[(clay_array >= 20) & (clay_array < 35) & (sand_array >= 45) & (silt_array < 28)] = 'Sandy Clay Loam'
+    soil_texture[(clay_array >= 15) & (clay_array < 27) & (silt_array >= 28) & (silt_array < 50) & (sand_array < 53)] = 'Loam'
+
+    colour_dict = {
+        'Sandy Loam': "violet",
+        'Loamy Sand': "lightpink",
+        'Sand': "orange",
+        'Silt Loam': "yellowgreen",
+        'Silt': "limegreen",
+        'Silty Clay Loam': "lightseagreen",
+        'Silty Clay': "turquoise",
+        'Clay': "gold",
+        'Sandy Clay': "red",
+        'Clay Loam': "greenyellow",
+        'Sandy Clay Loam': "salmon",
+        'Loam':"chocolate"
+    }
+    filename = os.path.join(visuals_dir, f"{stub}_soil_texture.png")
+    plot_categorical(soil_texture, colour_dict, "Soil Texture", filename)
+
+def visualise_soil_pH(outdir, visuals_dir=scratch_dir, stub="Test"):
+    filename = os.path.join(outdir, f"{stub}_pH_CaCl2.tif")
+    ds_pH = rxr.open_rasterio(filename)
+    ds_pH_scaled = ds_pH[0].values
+    plt.imshow(ds_pH_scaled, cmap='RdYlGn')
+    plt.colorbar()
+    plt.title("Soil pH")
+    plt.tight_layout()
+    filename = os.path.join(visuals_dir, f"{stub}_pH.png")
+    plt.savefig(filename)
+    print("Saved", filename)
+    plt.show()
 
 if __name__ == '__main__':
     slga_soils()

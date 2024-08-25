@@ -75,8 +75,10 @@ def plot_time_point(ds, variable="Ssoil", timepoint='2020-03-13'):
     plt.show()
 
 def plot_categorical(array_categorical, colour_dict, title="", filename=f"{scratch_dir}_categorical.png"):
+    fig, ax = plt.subplots(figsize=(8, 6))
+
     # Find unique colours
-    categories = sorted(np.unique(array_categorical))
+    categories = colour_dict.keys()
     category_to_int = {cat: i for i, cat in enumerate(categories)}
     array_int = np.vectorize(category_to_int.get)(array_categorical)
     colour_list = [colour_dict[colour] for colour in categories]
@@ -98,8 +100,8 @@ def plot_categorical(array_categorical, colour_dict, title="", filename=f"{scrat
     plt.title(title)
     plt.tight_layout()
     plt.savefig(filename)
-    plt.show()
     print(f"Saved {filename}")
+    plt.show()
 
 if __name__ == '__main__':
     print("username:", username)

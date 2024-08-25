@@ -1,7 +1,6 @@
 # +
 # Pysheds documentation is here: https://mattbartos.com/pysheds/
 
-# +
 import os
 
 # Dependencies
@@ -16,7 +15,6 @@ import rasterio
 os.chdir(os.path.join(os.path.expanduser('~'), "Projects/PaddockTS"))
 from DAESIM_preprocess.util import gdata_dir, scratch_dir, plot_categorical
 
-# +
 dirmap = (64, 128, 1, 2, 4, 8, 16, 32)
 
 def pysheds_accumulation(tiff_file):
@@ -130,10 +128,6 @@ def catchment_ridges(grid, fdir, acc, full_branches):
 
     return ridges
 
-
-
-# -
-
 def show_acc(acc, outdir=scratch_dir, stub="Test"):
     """Very pretty visualisation of water accumulation"""
     fig, ax = plt.subplots(figsize=(8,6))
@@ -170,10 +164,12 @@ def show_ridge_gullies(dem, ridges, gullies, outdir=scratch_dir, stub="Test"):
     plt.tight_layout()
     filename = os.path.join(outdir, f"{stub}_ridge_gullies.png")
     plt.savefig(filename)
-    plt.show()
     print("Saved:", filename)
+    plt.show()
     
 
+
+# -
 
 def show_aspect(fdir, outdir=scratch_dir, stub="Test"):
     """Somewhat pretty visualisation of the aspect"""
@@ -188,19 +184,18 @@ def show_aspect(fdir, outdir=scratch_dir, stub="Test"):
         8: "Southwest",
         16: "West",
         32: "Northwest",
-        -1: "Flat",
-        -2: "Flat"
+        -1: "East",
+        -2: "East"
     }
     colour_dict = {
-                   "Northeast": '#DC143C',  # Crimson
-                   "North": '#FFA500',      # Orange
-                   "Northwest": '#FFFF00',  # Yellow
-                   "West": '#90EE90',       # Light Green
-                   "Southwest": '#006400',  # Dark Green
-                   "South": '#ADD8E6',      # Light Blue
-                   "Southeast": '#00008B',  # Dark Blue
                    "East": '#EE82EE',       # Violet
-                   "Flat": '#808080',       # Grey
+                   "Southeast": '#00008B',  # Dark Blue
+                   "South": '#ADD8E6',      # Light Blue
+                   "Southwest": '#006400',  # Dark Green
+                   "West": '#90EE90',       # Light Green
+                   "Northwest": '#FFFF00',  # Yellow
+                   "North": '#FFA500',      # Orange
+                   "Northeast": '#DC143C',  # Crimson
                   }
 
     fdir_categorized = np.vectorize(directions.get)(fdir)
@@ -208,6 +203,7 @@ def show_aspect(fdir, outdir=scratch_dir, stub="Test"):
     plot_categorical(fdir_categorized, colour_dict, "Aspect", filename)
 
 
+# +
 def calculate_slope(tiff_file):
     """Calculate the slope of a DEM"""
     with rasterio.open(tiff_file) as src:
@@ -243,22 +239,24 @@ def show_slope(slope, outdir=scratch_dir, stub="Test"):
     filename = os.path.join(outdir, f"{stub}_slope.png")
     plt.savefig(filename)
     print("Saved:", filename)
+    plt.show()
 
+
+# -
 
 # %%time
 if __name__ == '__main__':
     filepath = "/g/data/xe2/cb8590/Data/PadSeg/MILG_terrain.tif"
     grid, dem, fdir, acc = pysheds_accumulation(filepath)
-    show_acc(acc)
+    # show_acc(acc)
     show_aspect(fdir)
     
-    num_catchments = 10
-    gullies, full_branches = catchment_gullies(grid, fdir, acc, num_catchments)
-    ridges = catchment_ridges(grid, fdir, acc, full_branches)
-    show_ridge_gullies(dem, ridges, gullies)
+    # num_catchments = 10
+    # gullies, full_branches = catchment_gullies(grid, fdir, acc, num_catchments)
+    # ridges = catchment_ridges(grid, fdir, acc, full_branches)
+    # show_ridge_gullies(dem, ridges, gullies)
 
-    slope = calculate_slope(filepath)
-    show_slope(slope)
-
+    # slope = calculate_slope(filepath)
+    # show_slope(slope)
 
 

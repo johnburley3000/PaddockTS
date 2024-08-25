@@ -128,37 +128,46 @@ def merge_tiles(lat=-34.3890427, lon=148.469499, buffer=0.005, outdir="/g/data/x
     print("Saved:", output_tiff_filename)
 
 
+# region
 def visualise_canopy_height(filename, outpath=scratch_dir, stub="Test"):
     """Pretty visualisation of the canopy height"""
     
     with rasterio.open(filename) as src:
         image = src.read(1)  
         transform = src.transform 
-
+    
     # Bin the slope into categories
     bin_edges = np.arange(0, 16, 1) 
     categories = np.digitize(image, bin_edges, right=True)
-
+    
     # Define a color for each category
     colours = plt.cm.viridis(np.linspace(0, 1, len(bin_edges) - 2))
     cmap = colors.ListedColormap(['white'] + list(colours))
-
+    
     # Plot the values
     fig, ax = plt.subplots(figsize=(8, 6))
     im = ax.imshow(categories, cmap=cmap)
-
+    
     # Assign the colours
     labels = [f'{bin_edges[i]}' for i in range(len(bin_edges))]
     labels[-1] = '>=15'
-    cbar = plt.colorbar(im, ticks=np.arange(len(bin_edges)))
+    
+    # Place the tick label in the middle of each category
+    num_categories = len(bin_edges)
+    start_position = 0.5
+    end_position = num_categories + 0.5
+    step = (end_position - start_position)/(num_categories)
+    tick_positions = np.arange(start_position, end_position, step)
+    
+    cbar = plt.colorbar(im, ticks=tick_positions)
     cbar.ax.set_yticklabels(labels)
-
+    
     plt.title('Canopy Height (m)', size=14)
     plt.tight_layout()
-    filename = os.path.join(outpath, f"{stub}_canopy_height.png")
-    plt.savefig(filename)
     plt.show()
 
+visualise_canopy_height("/g/data/xe2/cb8590/Data/PadSeg/MILG_canopy_height.tif")
+# endregion
 
 def canopy_height(lat=-34.3890427, lon=148.469499, buffer=0.005, outdir=scratch_dir, stub="Test", tmp_dir='/scratch/xe2/cb8590/tmp'):
     """Create a merged canopy height raster, downloading new tiles if necessary"""
@@ -169,7 +178,7 @@ def canopy_height(lat=-34.3890427, lon=148.469499, buffer=0.005, outdir=scratch_
 
 # %%time
 if __name__ == '__main__':
-    canopy_height()
-    # visualise_canopy_height("/g/data/xe2/cb8590/MILG_14km.tif")
+    # canopy_height()
+    visualise_canopy_height("/g/data/xe2/cb8590/Data/PadSeg/MILG_canopy_height.tif")
 
 
