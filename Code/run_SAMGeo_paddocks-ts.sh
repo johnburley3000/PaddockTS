@@ -1,11 +1,11 @@
 #!/bin/bash
 #PBS -N SAMGeo
 #PBS -l mem=128GB
-#PBS -ljobfs=24GB
+#PBS -l jobfs=24GB
 #PBS -q gpuvolta
-#PBS -lncpus=12,ngpus=1
+#PBS -l ncpus=12,ngpus=1
 #PBS -P xe2
-#PBS -lwalltime=04:00:00
+#PBS -l walltime=04:00:00
 #PBS -l storage=gdata/xe2
 
 # Print out input variables to the error log
