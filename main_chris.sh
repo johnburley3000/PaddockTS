@@ -17,7 +17,7 @@ dir=/g/data/xe2/cb8590/Data/PadSeg      # We can read but can't write to each ot
 tmpdir=/scratch/xe2/cb8590/tmp  
 
 # params
-stub=MILG_1km
+stub=MILG
 lat=-35.289561061551844
 lon=149.06381325367872
 buffer=0.005    # In degrees in a single direction. For example, 0.01 degrees is about 1km so it would give a 2kmx2km area.
@@ -31,19 +31,19 @@ max_perim_area_ratio=40
 
 
 ## Run first job
-# job_id1=$(qsub -v wd=$wd,stub=$stub,dir=$dir,lat=$lat,lon=$lon,buffer=$buffer,start_time=$start,end_time=$end_ Code/run_pre-seg.sh)
-# echo "First job submitted with ID $job_id1"
+job_id1=$(qsub -v wd=$wd,stub=$stub,dir=$dir,lat=$lat,lon=$lon,buffer=$buffer,start_time=$start,end_time=$end_ Code/run_pre-seg.sh)
+echo "First job submitted with ID $job_id1"
 
-# ## Run second job (if job ID was produced, and when job complete)
-# if [[ -z "$job_id1" ]]
-# then
-#     echo "Failed to submit the first job."
-#     exit 1
-# else
-#     echo "Submitting second job, dependent on the completion of the first."
-#     qsub -W depend=afterok:$job_id1 -v wd=$wd,stub=$stub,dir=$dir,min_area_ha=$min_area_ha,max_area_ha=$max_area_ha,max_perim_area_ratio=$max_perim_area_ratio Code/run_SAMGeo_paddocks-ts.sh
-#     #qsub -v stub=$stub,dir=$dir,min_area_ha=$min_area_ha,max_area_ha=$max_area_ha,max_perim_area_ratio=$max_perim_area_ratio Code/run_SAMGeo_paddocks-ts.sh
-# fi
+## Run second job (if job ID was produced, and when job complete)
+if [[ -z "$job_id1" ]]
+then
+    echo "Failed to submit the first job."
+    exit 1
+else
+    echo "Submitting second job, dependent on the completion of the first."
+    qsub -W depend=afterok:$job_id1 -v wd=$wd,stub=$stub,dir=$dir,min_area_ha=$min_area_ha,max_area_ha=$max_area_ha,max_perim_area_ratio=$max_perim_area_ratio Code/run_SAMGeo_paddocks-ts.sh
+    #qsub -v stub=$stub,dir=$dir,min_area_ha=$min_area_ha,max_area_ha=$max_area_ha,max_perim_area_ratio=$max_perim_area_ratio Code/run_SAMGeo_paddocks-ts.sh
+fi
 
 ## Run third job (independent of first two)
 job_id3=$(qsub -v wd=$wd,stub=$stub,dir=$dir,tmpdir=$tmpdir,lat=$lat,lon=$lon,buffer=$buffer,start_time=$start,end_time=$end_ Code/run_environmental.sh)

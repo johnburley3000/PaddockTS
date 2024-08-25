@@ -149,10 +149,11 @@ def visualise_canopy_height(filename):
 
     # Assign the colours
     labels = [f'{bin_edges[i]}' for i in range(len(bin_edges))]
+    labels[-1] = '>=15'
     cbar = plt.colorbar(im, ticks=np.arange(len(bin_edges)))
     cbar.ax.set_yticklabels(labels)
 
-    plt.title('Canopy Height', size=14)
+    plt.title('Canopy Height (m)', size=14)
     plt.tight_layout()
     plt.show()
 

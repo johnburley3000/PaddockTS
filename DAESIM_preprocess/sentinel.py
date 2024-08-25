@@ -80,7 +80,7 @@ def load_and_process_data(query, outdir="", stub=""):
 
 
 # %%time
-def available_imagery_sentinel(ds, outdir="", stub=""):
+def available_imagery_sentinel(ds, outdir=scratch_dir, stub="Test"):
     """Create a heatmap showing the available imagery and cloud cover percentage"""    
     # Create an empty heatmap with the dimensions: years, weeks
     dates = pd.to_datetime(ds['time'].values)
@@ -132,7 +132,7 @@ def available_imagery_sentinel(ds, outdir="", stub=""):
 
 
 # %%time
-def calendar_plot_sentinel(ds, image_size = 1, bands=['nbart_red', 'nbart_green', 'nbart_blue'], outdir="", stub=""):
+def calendar_plot_sentinel(ds, image_size = 1, bands=['nbart_red', 'nbart_green', 'nbart_blue'], outdir=scratch_dir, stub="Test"):
     """Create a calendar plot spaced nicely across each year"""
     # Should set the image size to at least 1 (100x100 pixels per image), but above 5 the filesize can be over 100MB
     
@@ -238,7 +238,7 @@ def calendar_plot_sentinel(ds, image_size = 1, bands=['nbart_red', 'nbart_green'
 
 
 # %%time
-def time_lapse(ds, bands=['nbart_red', 'nbart_green', 'nbart_blue'], interpolate=True, outdir="", stub=""):
+def time_lapse(ds, bands=['nbart_red', 'nbart_green', 'nbart_blue'], interpolate=True, outdir=scratch_dir, stub="Test"):
     """Create a video of the time-series"""
     # Video has a smaller filesize than a calendar plot, but a calendar plot lets you see all the data at once"""
     
