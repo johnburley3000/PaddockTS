@@ -232,17 +232,16 @@ def calendar_plot_sentinel(ds, image_size = 1, bands=['nbart_red', 'nbart_green'
         
     plt.tight_layout(pad=0.2)
 
-    filename = os.path.join(outdir,f"{stub}_calendar_plot.png")
+    filename = os.path.join(outdir,f"{stub}_calendar_plot_{size}.png")
     plt.savefig(filename)
-    print(f"Saved:", filename)   
+    print(f"Saved:", filename)
+    plt.show()
 
 
 # %%time
 def time_lapse(ds, bands=['nbart_red', 'nbart_green', 'nbart_blue'], interpolate=True, outdir=scratch_dir, stub="Test"):
     """Create a video of the time-series"""
     # Video has a smaller filesize than a calendar plot, but a calendar plot lets you see all the data at once"""
-    
-    # I think it's valuable having a video without resampling to see the raw data, and with resampling for a smooth experience
     if interpolate:
         ds_weekly = ds.resample(time="1W").interpolate("linear").interpolate_na(dim = 'time', method = 'linear')
     else:

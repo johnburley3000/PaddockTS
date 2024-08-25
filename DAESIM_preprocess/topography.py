@@ -14,7 +14,7 @@ import rasterio
 
 # Local imports
 os.chdir(os.path.join(os.path.expanduser('~'), "Projects/PaddockTS"))
-from DAESIM_preprocess.util import gdata_dir, scratch_dir
+from DAESIM_preprocess.util import gdata_dir, scratch_dir, plot_categorical
 
 # +
 dirmap = (64, 128, 1, 2, 4, 8, 16, 32)
@@ -134,7 +134,7 @@ def catchment_ridges(grid, fdir, acc, full_branches):
 
 # -
 
-def show_acc(acc):
+def show_acc(acc, outdir=scratch_dir, stub="Test"):
     """Very pretty visualisation of water accumulation"""
     fig, ax = plt.subplots(figsize=(8,6))
     fig.patch.set_alpha(0)
@@ -146,10 +146,13 @@ def show_acc(acc):
     plt.colorbar(im, ax=ax, label='Upstream Cells')
     plt.title('Topographic Index', size=14)
     plt.tight_layout()
+    filename = os.path.join(outdir, f"{stub}_topographic_index.png")
+    plt.savefig(filename)
+    print("Saved:", filename)
     plt.show()
 
 
-def show_ridge_gullies(dem, ridges, gullies):
+def show_ridge_gullies(dem, ridges, gullies, outdir=scratch_dir, stub="Test"):
     """Very pretty visualisation of ridges and gullies"""
     fig, ax = plt.subplots(figsize=(8, 6))
     fig.patch.set_alpha(0)
@@ -165,13 +168,17 @@ def show_ridge_gullies(dem, ridges, gullies):
 
     plt.title('Ridges and Gullies', size=14)
     plt.tight_layout()
+    filename = os.path.join(outdir, f"{stub}_ridge_gullies.png")
+    plt.savefig(filename)
     plt.show()
+    print("Saved:", filename)
+    
 
 
-def show_aspect(fdir):
+def show_aspect(fdir, outdir=scratch_dir, stub="Test"):
     """Somewhat pretty visualisation of the aspect"""
     
-    # Apparently these are the default ESRI directions
+    # These are the default ESRI directions
     directions = {
         64: "North",
         128: "Northeast",
@@ -181,30 +188,24 @@ def show_aspect(fdir):
         8: "Southwest",
         16: "West",
         32: "Northwest",
-        -1: "Flat"
+        -1: "Flat",
+        -2: "Flat"
     }
-    
-    # I arrived at these colours through trial and error
-    colours = ['#808080',  # Grey
-               '#EE82EE',  # Violet
-               '#00008B',  # Dark Blue
-               '#ADD8E6',  # Light Blue
-               '#006400',  # Dark Green
-               '#90EE90',  # Light Green
-               '#FFFF00',  # Yellow
-               '#FFA500',  # Orange
-              ]
-    cmap = colors.ListedColormap(colours)
-    bounds = sorted(list(directions.keys()))
-    norm = colors.BoundaryNorm(bounds, cmap.N)
-    
-    # Plotting the aspect 
-    fig, ax = plt.subplots(figsize=(8, 6))
-    im = ax.imshow(fdir, cmap=cmap, norm=norm, zorder=2)
-    cbar = plt.colorbar(im, ticks=sorted(directions.keys()))
-    cbar.ax.set_yticklabels([directions[key] for key in sorted(directions.keys())])
-    plt.title('Aspect', size=14)
-    plt.tight_layout()
+    colour_dict = {
+                   "Northeast": '#DC143C',  # Crimson
+                   "North": '#FFA500',      # Orange
+                   "Northwest": '#FFFF00',  # Yellow
+                   "West": '#90EE90',       # Light Green
+                   "Southwest": '#006400',  # Dark Green
+                   "South": '#ADD8E6',      # Light Blue
+                   "Southeast": '#00008B',  # Dark Blue
+                   "East": '#EE82EE',       # Violet
+                   "Flat": '#808080',       # Grey
+                  }
+
+    fdir_categorized = np.vectorize(directions.get)(fdir)
+    filename = os.path.join(outdir, f"{stub}_aspect.png")
+    plot_categorical(fdir_categorized, colour_dict, "Aspect", filename)
 
 
 def calculate_slope(tiff_file):
@@ -217,7 +218,7 @@ def calculate_slope(tiff_file):
     return slope
 
 
-def show_slope(slope):
+def show_slope(slope, outdir=scratch_dir, stub="Test"):
     """Somewhat pretty visualisation of the slope"""
 
     # Bin the slope into categories
@@ -239,12 +240,14 @@ def show_slope(slope):
     
     plt.title('Slope', size=14)
     plt.tight_layout()
-    plt.show()
+    filename = os.path.join(outdir, f"{stub}_slope.png")
+    plt.savefig(filename)
+    print("Saved:", filename)
 
 
 # %%time
 if __name__ == '__main__':
-    filepath = "/g/data/xe2/cb8590/Data/PadSeg/MILG_6km_terrain_cleaned.tif"
+    filepath = "/g/data/xe2/cb8590/Data/PadSeg/MILG_terrain.tif"
     grid, dem, fdir, acc = pysheds_accumulation(filepath)
     show_acc(acc)
     show_aspect(fdir)

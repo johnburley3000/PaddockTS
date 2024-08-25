@@ -128,7 +128,7 @@ def merge_tiles(lat=-34.3890427, lon=148.469499, buffer=0.005, outdir="/g/data/x
     print("Saved:", output_tiff_filename)
 
 
-def visualise_canopy_height(filename):
+def visualise_canopy_height(filename, outpath=scratch_dir, stub="Test"):
     """Pretty visualisation of the canopy height"""
     
     with rasterio.open(filename) as src:
@@ -155,6 +155,8 @@ def visualise_canopy_height(filename):
 
     plt.title('Canopy Height (m)', size=14)
     plt.tight_layout()
+    filename = os.path.join(outpath, f"{stub}_canopy_height.png")
+    plt.savefig(filename)
     plt.show()
 
 

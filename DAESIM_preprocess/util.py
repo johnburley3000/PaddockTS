@@ -8,6 +8,7 @@ import rasterio
 import rioxarray as rxr
 import matplotlib.pyplot as plt
 from pyproj import Transformer
+from matplotlib.colors import ListedColormap
 
 home_dir = os.path.expanduser('~')
 username = os.path.basename(home_dir)
@@ -72,6 +73,33 @@ def plot_time_point(ds, variable="Ssoil", timepoint='2020-03-13'):
     data = ds[variable].sel(time=timepoint, method='nearest')
     data.plot()
     plt.show()
+
+def plot_categorical(array_categorical, colour_dict, title="", filename=f"{scratch_dir}_categorical.png"):
+    # Find unique colours
+    categories = sorted(np.unique(array_categorical))
+    category_to_int = {cat: i for i, cat in enumerate(categories)}
+    array_int = np.vectorize(category_to_int.get)(array_categorical)
+    colour_list = [colour_dict[colour] for colour in categories]
+    cmap = ListedColormap(colour_list)
+    
+    # Create the plot
+    plt.imshow(array_int, cmap=cmap)
+    colorbar = plt.colorbar()
+    
+    # Place the tick label in the middle of each category
+    num_categories = len(categories)
+    start_position = 0.5
+    end_position = num_categories - 0.5
+    step = (end_position - start_position)/(num_categories)
+    tick_positions = np.arange(start_position, end_position, step)
+    colorbar.set_ticks(tick_positions)
+    colorbar.set_ticklabels(categories)
+    
+    plt.title(title)
+    plt.tight_layout()
+    plt.savefig(filename)
+    plt.show()
+    print(f"Saved {filename}")
 
 if __name__ == '__main__':
     print("username:", username)
