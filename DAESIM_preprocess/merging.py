@@ -73,6 +73,12 @@ print("Saved:", filename)
 # Attach the canopy height to the satellite imagery xarray
 canopy_height_band = canopy_height_reprojected.isel(band=0)
 ds['canopy_height'] = canopy_height_band
+# -
+
+# Terrain
+filename = os.path.join(outdir, f"{stub}_terrain.tif")
+grid, dem, fdir, acc = pysheds_accumulation(filename)
+slope = calculate_slope(filename)
 
 # +
 # Elevation
@@ -100,16 +106,36 @@ acc_da = xr.DataArray(
 )
 acc_da.rio.write_crs("EPSG:3857", inplace=True)
 
-# Match the satellite imagery coordinates
+# Using Resampling.max for accumulation and canopy height, but average for everything else
 reprojected = acc_da.rio.reproject_match(ds, resampling=Resampling.max)
-
-# Attach to the satellite imagery xarray
 ds['acc'] = reprojected
+
+# +
+# Aspect
+da = xr.DataArray(
+    fdir, 
+    dims=["y", "x"], 
+    attrs={
+        "transform": grid.affine,
+        "crs": "EPSG:3857"
+    }
+)
+da.rio.write_crs("EPSG:3857", inplace=True)
+
+# Using Resampling.nearest for aspect
+reprojected = da.rio.reproject_match(ds, resampling=Resampling.nearest)
+ds['aspect'] = reprojected
 # -
 
-ds['acc'].plot()
-
-# Terrain
-filename = os.path.join(outdir, f"{stub}_terrain.tif")
-grid, dem, fdir, acc = pysheds_accumulation(filename)
-slope = calculate_slope(filename)
+# Slope
+da = xr.DataArray(
+    fdir, 
+    dims=["y", "x"], 
+    attrs={
+        "transform": grid.affine,
+        "crs": "EPSG:3857"
+    }
+)
+da.rio.write_crs("EPSG:3857", inplace=True)
+reprojected = da.rio.reproject_match(ds, resampling=Resampling.average) # Using Resampling.average for slope
+ds['aspect'] = reprojected
