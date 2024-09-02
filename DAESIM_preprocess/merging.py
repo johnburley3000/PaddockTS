@@ -7,6 +7,8 @@ import os
 import pickle
 
 # Dependencies
+import numpy as np
+import pandas as pd
 import rioxarray as rxr
 from shapely.geometry import box, Polygon
 from rasterio.enums import Resampling
@@ -58,6 +60,9 @@ cropped_canopy_height = canopy_height.rio.clip([roi_polygon_3857])
 # Rescale to canopy height to match the satellite imagery, taking the maximum canopy height for each pixel
 canopy_height_reprojected = cropped_canopy_height.rio.reproject_match(ds, resampling=Resampling.max)
 
+# The resampling on the boundary sometimes doesn't work. We should remove all cells on the edge to fix this.
+canopy_height_reprojected[np.where(canopy_height_reprojected == 255)] = 0
+
 # Save the reprojected canopy height
 filename = os.path.join(outdir, f"{stub}_canopy_height_reprojected.tif")
 canopy_height_reprojected.rio.to_raster(filename)
@@ -73,4 +78,21 @@ filename = os.path.join(outdir, f"{stub}_terrain.tif")
 grid, dem, fdir, acc = pysheds_accumulation(filename)
 slope = calculate_slope(filename)
 
+# +
+# Elevation
 
+# Load the tiff file
+elevation = rxr.open_rasterio(filename)
+
+# Clip the variable to the region of interest
+cropped = elevation.rio.clip([roi_polygon_3857])
+
+# The resampling on the boundary sometimes doesn't work. We should remove all cells on the edge to fix this.
+reprojected = cropped.rio.reproject_match(ds, resampling=Resampling.average)
+
+# Attach the canopy height to the satellite imagery xarray
+band = reprojected.isel(band=0)
+ds['elevation'] = band
+# -
+
+ds['elevation'].plot()
