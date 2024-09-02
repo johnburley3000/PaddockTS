@@ -1,0 +1,76 @@
+# +
+# Aim of this notebook is to combine all the datasources into a single xarray
+
+# +
+# Standard library
+import os
+import pickle
+
+# Dependencies
+import rioxarray as rxr
+from shapely.geometry import box, Polygon
+from rasterio.enums import Resampling
+
+
+# Local imports
+os.chdir(os.path.join(os.path.expanduser('~'), "Projects/PaddockTS"))
+from DAESIM_preprocess.util import gdata_dir, scratch_dir, transform_bbox
+from DAESIM_preprocess.topography import pysheds_accumulation, calculate_slope
+
+# -
+
+stubs = {
+    "MULL": "Mulloon",
+    "CRGM": "Craig Moritz Farm",
+    "MILG": "Milgadara",
+    "ARBO": "Arboreturm",
+    "KOWN": "Kowen Forest",
+    "ADAM": "Canowindra"
+}
+
+# Filepaths
+outdir = os.path.join(gdata_dir, "Data/PadSeg/")
+stub = "MILG"
+
+# Sentinel imagery
+filename = os.path.join(outdir, f"{stub}_ds2.pkl")
+with open(filename, 'rb') as file:
+    ds = pickle.load(file)
+
+# +
+# Canopy height
+filename = os.path.join(outdir, f"{stub}_canopy_height.tif")
+canopy_height = rxr.open_rasterio(filename)
+
+# Convert the satellite imagery bbox (EPSG:6933) to match the canopy height coordinates (EPSG:3857)
+min_lat = ds.y.min().item()
+max_lat = ds.y.max().item()
+min_lon = ds.x.min().item()
+max_lon = ds.x.max().item()
+bbox = [min_lat, min_lon, max_lat, max_lon]
+bbox_3857 = transform_bbox(bbox, inputEPSG="EPSG:6933", outputEPSG="EPSG:3857")
+roi_coords_3857 = box(*bbox_3857)
+roi_polygon_3857 = Polygon(roi_coords_3857)
+
+# Clip the canopy height to the region of interest
+cropped_canopy_height = canopy_height.rio.clip([roi_polygon_3857])
+
+# Rescale to canopy height to match the satellite imagery, taking the maximum canopy height for each pixel
+canopy_height_reprojected = cropped_canopy_height.rio.reproject_match(ds, resampling=Resampling.max)
+
+# Save the reprojected canopy height
+filename = os.path.join(outdir, f"{stub}_canopy_height_reprojected.tif")
+canopy_height_reprojected.rio.to_raster(filename)
+print("Saved:", filename)
+
+# Attach the canopy height to the satellite imagery xarray
+canopy_height_band = canopy_height_reprojected.isel(band=0)
+ds['canopy_height'] = canopy_height_band
+# -
+
+# Terrain
+filename = os.path.join(outdir, f"{stub}_terrain.tif")
+grid, dem, fdir, acc = pysheds_accumulation(filename)
+slope = calculate_slope(filename)
+
+
