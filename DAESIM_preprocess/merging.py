@@ -21,8 +21,6 @@ from DAESIM_preprocess.topography import pysheds_accumulation, calculate_slope
 
 # -
 
-
-
 stubs = {
     "MULL": "Mulloon",
     "CRGM": "Craig Moritz Farm",
@@ -46,6 +44,7 @@ with open(filename, 'rb') as file:
 filename = os.path.join(outdir, f"{stub}_canopy_height.tif")
 canopy_height = rxr.open_rasterio(filename)
 
+# We might not need any of this cropping since the previous script should have gathered data for the exact region anyway.
 # Convert the satellite imagery bbox (EPSG:6933) to match the canopy height coordinates (EPSG:3857)
 min_lat = ds.y.min().item()
 max_lat = ds.y.max().item()
@@ -74,10 +73,6 @@ print("Saved:", filename)
 canopy_height_band = canopy_height_reprojected.isel(band=0)
 ds['canopy_height'] = canopy_height_band
 # -
-
-no_crop = canopy_height.rio.reproject_match(ds, resampling=Resampling.max)
-
-no_crop.plot()
 
 # Terrain
 filename = os.path.join(outdir, f"{stub}_terrain.tif")
@@ -144,19 +139,32 @@ da.rio.write_crs("EPSG:3857", inplace=True)
 reprojected = da.rio.reproject_match(ds, resampling=Resampling.average) # Using Resampling.average for slope
 ds['slope'] = reprojected
 
-# +
+# Clay
 filename = os.path.join(outdir, f"{stub}_Clay.tif")
 array = rxr.open_rasterio(filename)
-
-# The clipping doesn't work for soils, I think because there is nothing outside the boox to clip. 
-# bbox_4326 = transform_bbox(bbox, inputEPSG="EPSG:6933", outputEPSG="EPSG:4326")
-# roi_coords_4326 = box(*bbox_4326)
-# roi_polygon_4326 = Polygon(roi_coords_4326)
-# cropped = array.rio.clip([roi_polygon_3857])
-
-# Reprojecting directly works for soils
 reprojected = array.rio.reproject_match(ds, resampling=Resampling.average)
 ds['Clay'] = reprojected
-# -
 
-ds['Clay'].plot()
+# Silt
+filename = os.path.join(outdir, f"{stub}_Silt.tif")
+array = rxr.open_rasterio(filename)
+reprojected = array.rio.reproject_match(ds, resampling=Resampling.average)
+ds['Silt'] = reprojected
+
+ds['Silt'].plot()
+
+# Sand
+variable = "Sand"
+filename = os.path.join(outdir, f"{stub}_{variable}.tif")
+array = rxr.open_rasterio(filename)
+reprojected = array.rio.reproject_match(ds, resampling=Resampling.average)
+ds[variable] = reprojected
+
+ds[variable].plot()
+
+# pH
+variable = "Sand"
+filename = os.path.join(outdir, f"{stub}_{variable}.tif")
+array = rxr.open_rasterio(filename)
+reprojected = array.rio.reproject_match(ds, resampling=Resampling.average)
+ds[variable] = reprojected
