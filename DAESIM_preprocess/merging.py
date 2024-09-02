@@ -75,6 +75,10 @@ canopy_height_band = canopy_height_reprojected.isel(band=0)
 ds['canopy_height'] = canopy_height_band
 # -
 
+no_crop = canopy_height.rio.reproject_match(ds, resampling=Resampling.max)
+
+no_crop.plot()
+
 # Terrain
 filename = os.path.join(outdir, f"{stub}_terrain.tif")
 grid, dem, fdir, acc = pysheds_accumulation(filename)
@@ -129,7 +133,7 @@ ds['aspect'] = reprojected
 
 # Slope
 da = xr.DataArray(
-    fdir, 
+    slope, 
     dims=["y", "x"], 
     attrs={
         "transform": grid.affine,
@@ -138,4 +142,21 @@ da = xr.DataArray(
 )
 da.rio.write_crs("EPSG:3857", inplace=True)
 reprojected = da.rio.reproject_match(ds, resampling=Resampling.average) # Using Resampling.average for slope
-ds['aspect'] = reprojected
+ds['slope'] = reprojected
+
+# +
+filename = os.path.join(outdir, f"{stub}_Clay.tif")
+array = rxr.open_rasterio(filename)
+
+# The clipping doesn't work for soils, I think because there is nothing outside the boox to clip. 
+# bbox_4326 = transform_bbox(bbox, inputEPSG="EPSG:6933", outputEPSG="EPSG:4326")
+# roi_coords_4326 = box(*bbox_4326)
+# roi_polygon_4326 = Polygon(roi_coords_4326)
+# cropped = array.rio.clip([roi_polygon_3857])
+
+# Reprojecting directly works for soils
+reprojected = array.rio.reproject_match(ds, resampling=Resampling.average)
+ds['Clay'] = reprojected
+# -
+
+ds['Clay'].plot()
