@@ -1,94 +1,193 @@
 # +
-# Idea of this notebook is assign productivity and shelter scores and plot them against each other
+# Aim of this notebook is to combine all the datasources into a single xarray
 
 # +
-# Standard Libraries
-import pickle
+# Standard library
 import os
+import pickle
 
 # Dependencies
 import numpy as np
+import pandas as pd
 import xarray as xr
 import rioxarray as rxr
-from rasterio.enums import Resampling
-import matplotlib.pyplot as plt
-from dea_tools.plotting import rgb
 from shapely.geometry import box, Polygon
+from rasterio.enums import Resampling
 import scipy.ndimage
+from scipy import stats
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 
 # Local imports
 os.chdir(os.path.join(os.path.expanduser('~'), "Projects/PaddockTS"))
 from DAESIM_preprocess.util import gdata_dir, scratch_dir, transform_bbox
+from DAESIM_preprocess.topography import pysheds_accumulation, calculate_slope
+
 # -
 
+from scipy import stats
 
 
-# filename = "/g/data/xe2/John/Data/PadSeg/MILGA_ds2.pkl"
-filename = "/g/data/xe2/John/Data/PadSeg/MILG_b033_2023_ds2.pkl"
+stubs = {
+    "MULL": "Mulloon",
+    "CRGM": "Craig Moritz Farm",
+    "MILG": "Milgadara",
+    "ARBO": "Arboreturm",
+    "KOWN": "Kowen Forest",
+    "ADAM": "Canowindra"
+}
+
+# Filepaths
+outdir = os.path.join(gdata_dir, "Data/PadSeg/")
+stub = "MILG"
+
+# Sentinel imagery
+filename = os.path.join(outdir, f"{stub}_ds2.pkl")
 with open(filename, 'rb') as file:
     ds = pickle.load(file)
 
-# Need to delete the grid mapping attribute for the to_raster function to work
-if 'grid_mapping' in ds.attrs:
-    del ds.attrs['grid_mapping']
-image = ds.isel(time=0)[['nbart_red', 'nbart_green', 'nbart_blue']]
-filename = os.path.join(gdata_dir, "sentinel_2020-01-03.tif")
-image.rio.to_raster(filename)
-print("Saved:", filename)
-
-filename = os.path.join(gdata_dir, "MILG14km_canopy_height.tif")
-canopy_height = rxr.open_rasterio(filename)
-
-canopy_height
-
-min_lat = ds.y.min().item()
-max_lat = ds.y.max().item()
-min_lon = ds.x.min().item()
-max_lon = ds.x.max().item()
-bbox = [min_lat, min_lon, max_lat, max_lon]
-bbox_3857 = transform_bbox(bbox, inputEPSG="EPSG:6933", outputEPSG="EPSG:3857")
-roi_coords_3857 = box(*bbox_3857)
-roi_polygon_3857 = Polygon(roi_coords_3857)
-roi_polygon_3857
-
-cropped_canopy_height = canopy_height.rio.clip([roi_polygon_3857])
+# Terrain calculations
+filename = os.path.join(outdir, f"{stub}_terrain.tif")
+grid, dem, fdir, acc = pysheds_accumulation(filename)
+slope = calculate_slope(filename)
 
 
-filename = os.path.join(gdata_dir, "MILG14km_cropped_canopy_height.tif")
-cropped_canopy_height.rio.to_raster(filename)
-print("Saved:", filename)
+# +
+def add_tiff_band(ds, variable, resampling_method, outdir, stub):
+    """Add a new band to the xarray from a tiff file using the given resampling method"""
+    filename = os.path.join(outdir, f"{stub}_{variable}.tif")
+    array = rxr.open_rasterio(filename)
+    reprojected = array.rio.reproject_match(ds, resampling=resampling_method)
+    ds[variable] = reprojected.isel(band=0).drop_vars('band')
+    return ds
 
-canopy_height_reprojected = cropped_canopy_height.rio.reproject_match(ds, resampling=Resampling.max)
+# Add the soil bands
+ds = add_tiff_band(ds, "Clay", Resampling.average, outdir, stub)
+ds = add_tiff_band(ds, "Silt", Resampling.average, outdir, stub)
+ds = add_tiff_band(ds, "Sand", Resampling.average, outdir, stub)
+ds = add_tiff_band(ds, "pH_CaCl2", Resampling.average, outdir, stub)
+# -
 
-filename = os.path.join(gdata_dir, "MILG14km_canopy_height_max.tif")
-canopy_height_reprojected.rio.to_raster(filename)
-filename
-
-canopy_height_band = canopy_height_reprojected.isel(band=0)
-ds['canopy_height'] = canopy_height_band
+# Add the height bands
+ds = add_tiff_band(ds, "terrain", Resampling.average, outdir, stub)
+ds = add_tiff_band(ds, "canopy_height", Resampling.max, outdir, stub)
 
 
+# +
+def add_numpy_band(ds, variable, array, affine, resampling_method):
+    """Add a new band to the xarray from a numpy array and affine using the given resampling method"""
+    da = xr.DataArray(
+        array, 
+        dims=["y", "x"], 
+        attrs={
+            "transform": affine,
+            "crs": "EPSG:3857"
+        }
+    )
+    da.rio.write_crs("EPSG:3857", inplace=True)
+    reprojected = da.rio.reproject_match(ds, resampling=resampling_method)
+    ds[variable] = reprojected
+    return ds
 
-# Assign the trees
-tree_threshold = 1
-tree_mask = ds['canopy_height'] >= tree_threshold
+# Add the terrain bands
+ds = add_numpy_band(ds, "slope", slope, grid.affine, Resampling.average)
+ds = add_numpy_band(ds, "topographic_index", acc, grid.affine, Resampling.max)
+ds = add_numpy_band(ds, "aspect", fdir, grid.affine, Resampling.nearest)
+# -
 
-# Find the pixels adjacent to trees
-structuring_element = np.ones((3, 3))  # This defines adjacency (including diagonals)
-adjacent_mask = scipy.ndimage.binary_dilation(tree_mask, structure=structuring_element)
+# The resampling often messes up the boundary, so we trim the outside pixels after adding all the resampled bounds
+ds_trimmed = ds.isel(
+    y=slice(1, -1),
+    x=slice(1, -1) 
+)
 
-adjacent_mask
+ds_original = ds.copy()
+ds = ds_trimmed
 
-tree_count
+# +
+# Original shelterscore from 0 to 1
+# tree_threshold = 1
+# tree_mask = ds['canopy_height'] >= tree_threshold
 
-# Shelter score = number of trees within 300m
-distance = 100 
-shelter_score = xr.full_like(ds['canopy_height'], np.nan)
-tree_count = scipy.ndimage.uniform_filter(tree_mask.astype(float), size=(distance, distance))
-shelter_score = shelter_score.where(adjacent_mask, other=tree_count)
-ds['shelter_score1'] = shelter_score
-plt.imshow(shelter_score)
+# # Find the pixels adjacent to trees
+# structuring_element = np.ones((3, 3))  # This defines adjacency (including diagonals)
+# adjacent_mask = scipy.ndimage.binary_dilation(tree_mask, structure=structuring_element)
 
-filename = os.path.join(gdata_dir, "MILG14km_shelter_score1.tif")
-ds['shelter_score1'].rio.to_raster(filename)
-print(filename)
+# # Shelter score = number of trees within 300m
+# distance = 100 
+# shelter_score = xr.full_like(ds['canopy_height'], np.nan)
+# tree_count = scipy.ndimage.uniform_filter(tree_mask.astype(float), size=(distance, distance))
+# shelter_score = shelter_score.where(adjacent_mask, other=tree_count)
+# ds['shelter_score1'] = shelter_score
+# plt.imshow(shelter_score)
+
+# +
+# Better shelterscore showing the number of trees 
+pixel_size = 10  # metres
+distance = 20  # This corresponds to a 200m radius if the pixel size is 10m
+
+# Create a circular kernel with a radius of 20 pixels (equivalent to 200m)
+y, x = np.ogrid[-distance:distance+1, -distance:distance+1]
+kernel = x**2 + y**2 <= distance**2
+kernel = kernel.astype(float)
+shelter_score = scipy.ndimage.convolve(tree_mask.astype(float), kernel, mode='constant', cval=0.0)
+
+# Mask out trees and adjacent pixels
+shelter_score[np.where(adjacent_mask)] = np.nan
+
+# Add the shelter_score to the xarray
+shelter_score_da = xr.DataArray(
+    shelter_score, 
+    dims=("y", "x"),  
+    coords={"y": ds.coords["y"], "x": ds.coords["x"]}, 
+    name="shelter_score" 
+)
+ds["num_trees_200m"] = shelter_score_da
+
+# +
+# Calculate the productivity score
+time = '2020-01-03'
+ndvi = ds.sel(time=time, method='nearest')['NDVI']
+productivity_score1 = ndvi.where(~adjacent_mask)
+s = ds['num_trees_200m'].values
+
+# Flatten the arrays for plotting
+x = productivity_score1.values.flatten()
+x_values = x[~np.isnan(x)]   # Remove all pixels that are trees or adjacent to trees
+y = s.flatten()
+y_values = y[~np.isnan(x)]   # Match the shape of the x_values
+
+# Plot
+plt.hist2d(y_values, x_values, bins=100, norm=mcolors.PowerNorm(0.1))
+plt.ylabel('NDVI', fontsize=12)
+pixel_size = 10
+plt.xlabel(f'Number of tree pixels within {distance * pixel_size}m', fontsize=12)
+plt.title(stub + ": " + str(time)[:10], fontsize=14)
+plt.show()
+# -
+
+res = stats.linregress(y_values, x_values)
+print(f"R-squared: {result.rvalue**2:.6f}")
+plt.plot(y_values, x_values, 'o', label='original data')
+plt.plot(y_values, res.intercept + res.slope*y_values, 'r', label='fitted line')
+plt.legend()
+plt.show()
+
+# +
+# Example linear regression
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy import stats
+rng = np.random.default_rng()
+
+x = rng.random(10)
+y = 1.6*x + rng.random(10)
+
+res = stats.linregress(x, y)
+
+print(f"R-squared: {res.rvalue**2:.6f}")
+
+plt.plot(x, y, 'o', label='original data')
+plt.plot(x, res.intercept + res.slope*x, 'r', label='fitted line')
+plt.legend()
+plt.show()
