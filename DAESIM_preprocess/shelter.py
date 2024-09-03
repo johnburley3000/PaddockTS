@@ -11,8 +11,10 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 import rioxarray as rxr
+import geopandas as gpd
 from shapely.geometry import box, Polygon
 from rasterio.enums import Resampling
+from rasterio import features
 import scipy.ndimage
 from scipy import stats
 import matplotlib.pyplot as plt
@@ -24,9 +26,6 @@ from DAESIM_preprocess.util import gdata_dir, scratch_dir, transform_bbox
 from DAESIM_preprocess.topography import pysheds_accumulation, calculate_slope
 
 # -
-
-from scipy import stats
-
 
 stubs = {
     "MULL": "Mulloon",
@@ -171,6 +170,64 @@ plt.show()
 
 res = stats.linregress(y_values, x_values)
 print(f"R-squared: {res.rvalue**2:.6f}")
+plt.plot(y_values, x_values, 'o', label='original data')
+plt.plot(y_values, res.intercept + res.slope*y_values, 'r', label='fitted line')
+plt.legend()
+plt.show()
+
+# +
+# Manually created paddocks with absolutely no trees
+filename = os.path.join(gdata_dir,'MILG_paddocks_notrees.gpkg')
+pol = gpd.read_file(filename)
+
+# Change from multipolygon to polygon, because I created the layer with the wrong type in QGIS
+def convert_multipolygon_to_polygon(geometry):
+    return geometry.union(geometry)
+pol['geometry'] = pol['geometry'].apply(convert_multipolygon_to_polygon)
+
+# Create a mask from the geometries
+xarray_dataset = ds
+gdf = pol.to_crs(xarray_dataset.crs) 
+transform = xarray_dataset.rio.transform()
+out_shape = (xarray_dataset.dims['y'], xarray_dataset.dims['x'])
+geometries = gdf.geometry
+paddock_mask = features.geometry_mask(
+    [geom for geom in geometries],
+    transform=transform,
+    invert=True,
+    out_shape=out_shape
+)
+# Some of the pixels in my manually selected area are in the mask of tree + buffer pixels
+paddock_mask = paddock_mask & ~adjacent_mask
+
+# +
+# Repeating the linear regression on the notrees subset
+# Calculate the productivity score
+time = '2020-01-03'
+ndvi = ds.sel(time=time, method='nearest')['NDVI']
+productivity_score1 = ndvi.where(paddock_mask)
+s = ds['num_trees_200m'].where(paddock_mask)
+
+# Flatten the arrays for plotting
+x = productivity_score1.values.flatten()
+x_values = x[~np.isnan(x)]   # Remove all pixels that are trees or adjacent to trees
+y = s.values.flatten()
+y_values = y[~np.isnan(y)]   # Match the shape of the x_values
+
+# Plot
+plt.hist2d(y_values, x_values, bins=100, norm=mcolors.PowerNorm(0.1))
+plt.ylabel('NDVI', fontsize=12)
+pixel_size = 10
+plt.xlabel(f'Number of tree pixels within {distance * pixel_size}m', fontsize=12)
+plt.title(stub + ": " + str(time)[:10], fontsize=14)
+plt.show()
+# -
+
+
+
+res = stats.linregress(y_values, x_values)
+print(f"R-squared: {res.rvalue**2:.6f}")
+print(f"Slope: {res.slope**2:.12f}")
 plt.plot(y_values, x_values, 'o', label='original data')
 plt.plot(y_values, res.intercept + res.slope*y_values, 'r', label='fitted line')
 plt.legend()
