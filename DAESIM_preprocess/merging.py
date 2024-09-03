@@ -39,132 +39,59 @@ filename = os.path.join(outdir, f"{stub}_ds2.pkl")
 with open(filename, 'rb') as file:
     ds = pickle.load(file)
 
-# +
-# Canopy height
-filename = os.path.join(outdir, f"{stub}_canopy_height.tif")
-canopy_height = rxr.open_rasterio(filename)
-
-# We might not need any of this cropping since the previous script should have gathered data for the exact region anyway.
-# Convert the satellite imagery bbox (EPSG:6933) to match the canopy height coordinates (EPSG:3857)
-min_lat = ds.y.min().item()
-max_lat = ds.y.max().item()
-min_lon = ds.x.min().item()
-max_lon = ds.x.max().item()
-bbox = [min_lat, min_lon, max_lat, max_lon]
-bbox_3857 = transform_bbox(bbox, inputEPSG="EPSG:6933", outputEPSG="EPSG:3857")
-roi_coords_3857 = box(*bbox_3857)
-roi_polygon_3857 = Polygon(roi_coords_3857)
-
-# Clip the canopy height to the region of interest
-cropped_canopy_height = canopy_height.rio.clip([roi_polygon_3857])
-
-# Rescale to canopy height to match the satellite imagery, taking the maximum canopy height for each pixel
-canopy_height_reprojected = cropped_canopy_height.rio.reproject_match(ds, resampling=Resampling.max)
-
-# The resampling on the boundary sometimes doesn't work. We should remove all cells on the edge to fix this.
-canopy_height_reprojected[np.where(canopy_height_reprojected == 255)] = 0
-
-# Save the reprojected canopy height
-filename = os.path.join(outdir, f"{stub}_canopy_height_reprojected.tif")
-canopy_height_reprojected.rio.to_raster(filename)
-print("Saved:", filename)
-
-# Attach the canopy height to the satellite imagery xarray
-canopy_height_band = canopy_height_reprojected.isel(band=0)
-ds['canopy_height'] = canopy_height_band
-# -
-
-# Terrain
+# Terrain calculations
 filename = os.path.join(outdir, f"{stub}_terrain.tif")
 grid, dem, fdir, acc = pysheds_accumulation(filename)
 slope = calculate_slope(filename)
 
-# +
-# Elevation
-elevation = rxr.open_rasterio(filename)
-
-# Clip the variable to the region of interest
-cropped = elevation.rio.clip([roi_polygon_3857])
-
-# The resampling on the boundary sometimes doesn't work. We should remove all cells on the edge to fix this.
-reprojected = cropped.rio.reproject_match(ds, resampling=Resampling.average)
-
-# Attach to the satellite imagery xarray
-band = reprojected.isel(band=0)
-ds['elevation'] = band
 
 # +
-# Accumulation
-acc_da = xr.DataArray(
-    acc, 
-    dims=["y", "x"], 
-    attrs={
-        "transform": grid.affine,
-        "crs": "EPSG:3857"
-    }
-)
-acc_da.rio.write_crs("EPSG:3857", inplace=True)
+def add_tiff_band(ds, variable, resampling_method, outdir, stub):
+    """Add a new band to the xarray from a tiff file using the given resampling method"""
+    filename = os.path.join(outdir, f"{stub}_{variable}.tif")
+    array = rxr.open_rasterio(filename)
+    reprojected = array.rio.reproject_match(ds, resampling=resampling_method)
+    ds[variable] = reprojected.isel(band=0).drop_vars('band')
+    return ds
 
-# Using Resampling.max for accumulation and canopy height, but average for everything else
-reprojected = acc_da.rio.reproject_match(ds, resampling=Resampling.max)
-ds['acc'] = reprojected
-
-# +
-# Aspect
-da = xr.DataArray(
-    fdir, 
-    dims=["y", "x"], 
-    attrs={
-        "transform": grid.affine,
-        "crs": "EPSG:3857"
-    }
-)
-da.rio.write_crs("EPSG:3857", inplace=True)
-
-# Using Resampling.nearest for aspect
-reprojected = da.rio.reproject_match(ds, resampling=Resampling.nearest)
-ds['aspect'] = reprojected
+# Add the soil bands
+ds = add_tiff_band(ds, "Clay", Resampling.average, outdir, stub)
+ds = add_tiff_band(ds, "Silt", Resampling.average, outdir, stub)
+ds = add_tiff_band(ds, "Sand", Resampling.average, outdir, stub)
+ds = add_tiff_band(ds, "pH_CaCl2", Resampling.average, outdir, stub)
 # -
 
-# Slope
-da = xr.DataArray(
-    slope, 
-    dims=["y", "x"], 
-    attrs={
-        "transform": grid.affine,
-        "crs": "EPSG:3857"
-    }
+# Add the height bands
+ds = add_tiff_band(ds, "terrain", Resampling.average, outdir, stub)
+ds = add_tiff_band(ds, "canopy_height", Resampling.max, outdir, stub)
+
+
+# +
+def add_numpy_band(ds, variable, array, affine, resampling_method):
+    """Add a new band to the xarray from a numpy array and affine using the given resampling method"""
+    da = xr.DataArray(
+        array, 
+        dims=["y", "x"], 
+        attrs={
+            "transform": affine,
+            "crs": "EPSG:3857"
+        }
+    )
+    da.rio.write_crs("EPSG:3857", inplace=True)
+    reprojected = da.rio.reproject_match(ds, resampling=resampling_method)
+    ds[variable] = reprojected
+    return ds
+
+# Add the terrain bands
+ds = add_numpy_band(ds, "slope", slope, grid.affine, Resampling.average)
+ds = add_numpy_band(ds, "topographic_index", acc, grid.affine, Resampling.max)
+ds = add_numpy_band(ds, "aspect", fdir, grid.affine, Resampling.nearest)
+# -
+
+# The resampling often messes up the boundary, so we trim the outside pixels after adding all the resampled bounds
+ds_trimmed = ds.isel(
+    y=slice(1, -1),
+    x=slice(1, -1) 
 )
-da.rio.write_crs("EPSG:3857", inplace=True)
-reprojected = da.rio.reproject_match(ds, resampling=Resampling.average) # Using Resampling.average for slope
-ds['slope'] = reprojected
 
-# Clay
-filename = os.path.join(outdir, f"{stub}_Clay.tif")
-array = rxr.open_rasterio(filename)
-reprojected = array.rio.reproject_match(ds, resampling=Resampling.average)
-ds['Clay'] = reprojected
-
-# Silt
-filename = os.path.join(outdir, f"{stub}_Silt.tif")
-array = rxr.open_rasterio(filename)
-reprojected = array.rio.reproject_match(ds, resampling=Resampling.average)
-ds['Silt'] = reprojected
-
-ds['Silt'].plot()
-
-# Sand
-variable = "Sand"
-filename = os.path.join(outdir, f"{stub}_{variable}.tif")
-array = rxr.open_rasterio(filename)
-reprojected = array.rio.reproject_match(ds, resampling=Resampling.average)
-ds[variable] = reprojected
-
-ds[variable].plot()
-
-# pH
-variable = "Sand"
-filename = os.path.join(outdir, f"{stub}_{variable}.tif")
-array = rxr.open_rasterio(filename)
-reprojected = array.rio.reproject_match(ds, resampling=Resampling.average)
-ds[variable] = reprojected
+ds_trimmed
