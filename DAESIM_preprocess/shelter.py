@@ -106,12 +106,7 @@ ds = ds_trimmed
 
 # +
 # Original shelterscore from 0 to 1
-# tree_threshold = 1
-# tree_mask = ds['canopy_height'] >= tree_threshold
 
-# # Find the pixels adjacent to trees
-# structuring_element = np.ones((3, 3))  # This defines adjacency (including diagonals)
-# adjacent_mask = scipy.ndimage.binary_dilation(tree_mask, structure=structuring_element)
 
 # # Shelter score = number of trees within 300m
 # distance = 100 
@@ -126,7 +121,15 @@ ds = ds_trimmed
 pixel_size = 10  # metres
 distance = 20  # This corresponds to a 200m radius if the pixel size is 10m
 
-# Create a circular kernel with a radius of 20 pixels (equivalent to 200m)
+# Classify anything with a height greater than 1 as a tree
+tree_threshold = 1
+tree_mask = ds['canopy_height'] >= tree_threshold
+
+# # Find the pixels adjacent to trees
+structuring_element = np.ones((3, 3))  # This defines adjacency (including diagonals)
+adjacent_mask = scipy.ndimage.binary_dilation(tree_mask, structure=structuring_element)
+
+# Create a circular kernel to determine the distance from a tree for each pixel
 y, x = np.ogrid[-distance:distance+1, -distance:distance+1]
 kernel = x**2 + y**2 <= distance**2
 kernel = kernel.astype(float)
@@ -167,27 +170,8 @@ plt.show()
 # -
 
 res = stats.linregress(y_values, x_values)
-print(f"R-squared: {result.rvalue**2:.6f}")
+print(f"R-squared: {res.rvalue**2:.6f}")
 plt.plot(y_values, x_values, 'o', label='original data')
 plt.plot(y_values, res.intercept + res.slope*y_values, 'r', label='fitted line')
-plt.legend()
-plt.show()
-
-# +
-# Example linear regression
-import numpy as np
-import matplotlib.pyplot as plt
-from scipy import stats
-rng = np.random.default_rng()
-
-x = rng.random(10)
-y = 1.6*x + rng.random(10)
-
-res = stats.linregress(x, y)
-
-print(f"R-squared: {res.rvalue**2:.6f}")
-
-plt.plot(x, y, 'o', label='original data')
-plt.plot(x, res.intercept + res.slope*x, 'r', label='fitted line')
 plt.legend()
 plt.show()
