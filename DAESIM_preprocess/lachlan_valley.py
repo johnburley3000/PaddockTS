@@ -39,7 +39,7 @@ stubs = {
 
 # Filepaths
 outdir = os.path.join(gdata_dir, "Data/PadSeg/")
-stub = "LCHV"
+stub = "MULL"
 
 # %%time
 # Sentinel imagery
@@ -140,44 +140,67 @@ shelter_score_da = xr.DataArray(
 ds["num_trees_200m"] = shelter_score_da
 
 # +
-# Sanity check of linear regression on the manually created paddocks with absolutely no trees
-filename = os.path.join(gdata_dir,'lachlan_valley_notrees.geojson')
-pol = gpd.read_file(filename)
+# # Sanity check of linear regression on the manually created paddocks with absolutely no trees
+# filename = os.path.join(gdata_dir,'lachlan_valley_notrees.geojson')
+# pol = gpd.read_file(filename)
 
-# Change from multipolygon to polygon, because I created the layer with the wrong type in QGIS
-def convert_multipolygon_to_polygon(geometry):
-    return geometry.union(geometry)
-pol['geometry'] = pol['geometry'].apply(convert_multipolygon_to_polygon)
+# # Change from multipolygon to polygon, because I created the layer with the wrong type in QGIS
+# def convert_multipolygon_to_polygon(geometry):
+#     return geometry.union(geometry)
+# pol['geometry'] = pol['geometry'].apply(convert_multipolygon_to_polygon)
 
-# Create a mask from the geometries
-xarray_dataset = ds
-gdf = pol.to_crs(xarray_dataset.crs) 
-transform = xarray_dataset.rio.transform()
-out_shape = (xarray_dataset.dims['y'], xarray_dataset.dims['x'])
-geometries = gdf.geometry
-paddock_mask = features.geometry_mask(
-    [geom for geom in geometries],
-    transform=transform,
-    invert=True,
-    out_shape=out_shape
-)
+# # Create a mask from the geometries
+# xarray_dataset = ds
+# gdf = pol.to_crs(xarray_dataset.crs) 
+# transform = xarray_dataset.rio.transform()
+# out_shape = (xarray_dataset.dims['y'], xarray_dataset.dims['x'])
+# geometries = gdf.geometry
+# paddock_mask = features.geometry_mask(
+#     [geom for geom in geometries],
+#     transform=transform,
+#     invert=True,
+#     out_shape=out_shape
+# )
 
-# Some of the pixels in my manually selected area are in the mask of tree + buffer pixels
-paddock_mask = paddock_mask & ~adjacent_mask
-# -
+# # Some of the pixels in my manually selected area are in the mask of tree + buffer pixels
+# paddock_mask = paddock_mask & ~adjacent_mask
+# plt.imshow(paddock_mask)
 
-plt.imshow(paddock_mask)
+# # Calculate the productivity score
+# # time = '2020-07-23'
+# # ndvi = ds.sel(time=time, method='nearest')['NDVI']
+# time = 'all years sum'
+# ndvi = ds['NDVI'].sum(dim='time')
+# productivity_score1 = ndvi.where(paddock_mask)
+# s = ds['num_trees_200m'].where(paddock_mask)
 
+# # Flatten the arrays for plotting
+# x = productivity_score1.values.flatten()
+# x_values = x[~np.isnan(x)]   # Remove all pixels that are trees or adjacent to trees
+# y = s.values.flatten()
+# y_values = y[~np.isnan(y)]   # Match the shape of the x_values
 
+# # Plot
+# plt.hist2d(y_values, x_values, bins=100, norm=mcolors.PowerNorm(0.1))
+# plt.ylabel('NDVI', fontsize=12)
+# pixel_size = 10
+# plt.xlabel(f'Number of tree pixels within {distance * pixel_size}m', fontsize=12)
+# plt.title("Manual Polygons with no trees" + ": " + str(time)[:10], fontsize=14)
+# plt.show()
+
+# res = stats.linregress(y_values, x_values)
+# print(f"R-squared: {res.rvalue**2:.6f}")
+# print(f"Slope: {res.slope**2:.12f}")
+# plt.plot(y_values, x_values, 'o', label='original data')
+# plt.plot(y_values, res.intercept + res.slope*y_values, 'r', label='fitted line')
+# plt.legend()
+# plt.show()
 
 # +
-# Calculate the productivity score
-# time = '2020-07-23'
-# ndvi = ds.sel(time=time, method='nearest')['NDVI']
 time = 'all years sum'
 ndvi = ds['NDVI'].sum(dim='time')
-productivity_score1 = ndvi.where(paddock_mask)
-s = ds['num_trees_200m'].where(paddock_mask)
+productivity_score1 = ndvi.where(~adjacent_mask)
+s = ds['num_trees_200m'].where(~adjacent_mask)
 
 # Flatten the arrays for plotting
 x = productivity_score1.values.flatten()
@@ -231,71 +254,14 @@ plt.plot(y_values, res.intercept + res.slope*y_values, 'r', label='fitted line')
 plt.legend()
 plt.show()
 
-# +
-# new_mask = ~adjacent_mask & ((ds['aspect'] == 1) | (ds['aspect'] == 2) | (ds['aspect'] == 4)) # Strongest effect on the southeast slopes
-# new_mask = ~adjacent_mask & (ds['slope'] > 10)                                                # Strongest effect on the steepest slopes
-# -
 
-df_slope = pd.DataFrame(ds['terrain'].values.flatten())
-df_slope.describe()
-
-# new_mask = ~adjacent_mask & (ds['terrain'] > 560) & (ds['Silt'] < 15)
-new_mask = ~adjacent_mask & (ds['aspect'] == 4) & (ds['slope'] > 10)
-
-# +
-# Calculate the productivity score
-time = '2020-01-03'
-ndvi = ds.sel(time=time, method='nearest')['NDVI']
-productivity_score1 = ndvi.where(new_mask)
-s = ds['num_trees_200m'].values
-
-# Flatten the arrays for plotting
-x = productivity_score1.values.flatten()
-x_values = x[~np.isnan(x)]   # Remove all pixels that are trees or adjacent to trees
-y = s.flatten()
-y_values = y[~np.isnan(x)]   # Match the shape of the x_values
-
-# Plot
-plt.hist2d(y_values, x_values, bins=100, norm=mcolors.PowerNorm(0.1))
-plt.ylabel('NDVI', fontsize=12)
-pixel_size = 10
-plt.xlabel(f'Number of tree pixels within {distance * pixel_size}m', fontsize=12)
-plt.title(stub + ": " + str(time)[:10], fontsize=14)
-plt.show()
-
-res = stats.linregress(y_values, x_values)
-print(f"R-squared: {res.rvalue**2:.6f}")
-print(f"Slope: {res.slope**2:.12f}")
-plt.plot(y_values, x_values, 'o', label='original data')
-plt.plot(y_values, res.intercept + res.slope*y_values, 'r', label='fitted line')
-plt.legend()
-plt.show()
-
-# +
-# Winter
-time = '2020-07-23'
-ndvi = ds.sel(time=time, method='nearest')['NDVI']
-productivity_score1 = ndvi.where(~adjacent_mask)
-s = ds['num_trees_200m'].values
-
-# Flatten the arrays for plotting
-x = productivity_score1.values.flatten()
-x_values = x[~np.isnan(x)]   # Remove all pixels that are trees or adjacent to trees
-y = s.flatten()
-y_values = y[~np.isnan(x)]   # Match the shape of the x_values
-
-# Plot
-plt.hist2d(y_values, x_values, bins=100, norm=mcolors.PowerNorm(0.1))
-plt.ylabel('NDVI', fontsize=12)
-pixel_size = 10
-plt.xlabel(f'Number of tree pixels within {distance * pixel_size}m', fontsize=12)
-plt.title(stub + ": " + str(time)[:10], fontsize=14)
-plt.show()
-# -
 
 # Winter
-time = '2020-07-23'
-productivity_score = ds.sel(time=time, method='nearest')['NDVI'].where(~adjacent_mask)
+# time = '2020-07-23'
+# time = '2020-01-03'
+time = 'all years sum'
+productivity_score = ds['NDVI'].sum(dim='time').where(~adjacent_mask)
+# productivity_score = ds.sel(time=time, method='nearest')['NDVI'].where(~adjacent_mask)
 shelter_score = ds['num_trees_200m']
 
 # +
@@ -329,7 +295,9 @@ np.sum(mask.values)
 
 # +
 # Flatten the arrays for plotting
-ps = ds.sel(time=time, method='nearest')['NDVI'].where(mask)
+# ps = ds.sel(time=time, method='nearest')['NDVI'].where(mask)
+ps = ds['NDVI'].sum(dim='time').where(mask)
+
 x = ps.values.flatten()
 x_values = x[~np.isnan(x)]   # Remove all pixels that are trees or adjacent to trees
 y = s.flatten()
@@ -352,5 +320,4 @@ plt.plot(y_values, res.intercept + res.slope*y_values, 'r', label='fitted line')
 plt.legend()
 plt.show()
 # -
-
 
