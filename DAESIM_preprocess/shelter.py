@@ -40,11 +40,13 @@ stubs = {
 outdir = os.path.join(gdata_dir, "Data/PadSeg/")
 stub = "MILG"
 
+# %%time
 # Sentinel imagery
 filename = os.path.join(outdir, f"{stub}_ds2.pkl")
 with open(filename, 'rb') as file:
     ds = pickle.load(file)
 
+# %%time
 # Terrain calculations
 filename = os.path.join(outdir, f"{stub}_terrain.tif")
 grid, dem, fdir, acc = pysheds_accumulation(filename)
@@ -249,6 +251,87 @@ plt.xlabel(f'Number of tree pixels within {distance * pixel_size}m', fontsize=12
 plt.title(stub + ": " + str(time)[:10], fontsize=14)
 plt.show()
 
+res = stats.linregress(y_values, x_values)
+print(f"R-squared: {res.rvalue**2:.6f}")
+print(f"Slope: {res.slope**2:.12f}")
+plt.plot(y_values, x_values, 'o', label='original data')
+plt.plot(y_values, res.intercept + res.slope*y_values, 'r', label='fitted line')
+plt.legend()
+plt.show()
+
+# +
+# Winter
+time = '2020-07-23'
+ndvi = ds.sel(time=time, method='nearest')['NDVI']
+productivity_score1 = ndvi.where(~adjacent_mask)
+s = ds['num_trees_200m'].values
+
+# Flatten the arrays for plotting
+x = productivity_score1.values.flatten()
+x_values = x[~np.isnan(x)]   # Remove all pixels that are trees or adjacent to trees
+y = s.flatten()
+y_values = y[~np.isnan(x)]   # Match the shape of the x_values
+
+# Plot
+plt.hist2d(y_values, x_values, bins=100, norm=mcolors.PowerNorm(0.1))
+plt.ylabel('NDVI', fontsize=12)
+pixel_size = 10
+plt.xlabel(f'Number of tree pixels within {distance * pixel_size}m', fontsize=12)
+plt.title(stub + ": " + str(time)[:10], fontsize=14)
+plt.show()
+# -
+
+# Winter
+time = '2020-07-23'
+productivity_score = ds.sel(time=time, method='nearest')['NDVI'].where(~adjacent_mask)
+shelter_score = ds['num_trees_200m']
+
+# +
+# Create a mask with the lowest n productivities for each shelterscore
+n = 100
+bins = 10
+
+# Calculate the bin edges
+flattened = shelter_score.values.flatten()
+max_shelter_score = max(flattened[~np.isnan(flattened)])
+bin_edges = np.linspace(0,max_shelter_score,bins)
+shelter_bins = np.digitize(shelter_score, bin_edges)
+
+mask = np.zeros_like(shelter_bins, dtype=bool)
+for bin in range(1,bins):
+
+    # Create a list of nan values in this bin
+    bin_mask = (shelter_bins == bin)
+    productivity_in_bin = productivity_score.where(bin_mask)
+    flattened_productivities = productivity_in_bin.values.flatten()
+    notnan_productivities = flattened_productivities[~np.isnan(flattened_productivities)]
+
+    if len(notnan_productivities) > 0:
+        # Cutoff threshold based on the lowest n values in the bin
+        threshold = max(sorted(notnan_productivities)[:n])
+        
+        # Update the mask
+        mask |= (productivity_score <= threshold) & bin_mask
+        
+np.sum(mask.values)
+
+# +
+# Flatten the arrays for plotting
+ps = ds.sel(time=time, method='nearest')['NDVI'].where(mask)
+x = ps.values.flatten()
+x_values = x[~np.isnan(x)]   # Remove all pixels that are trees or adjacent to trees
+y = s.flatten()
+y_values = y[~np.isnan(x)]   # Match the shape of the x_values
+
+# 2d histogram
+plt.hist2d(y_values, x_values, bins=100, norm=mcolors.PowerNorm(0.1))
+plt.ylabel(f'NDVI of lowest {n} pixels in {bins} bins', fontsize=12)
+pixel_size = 10
+plt.xlabel(f'Number of tree pixels within {distance * pixel_size}m', fontsize=12)
+plt.title(stub + ": " + str(time)[:10], fontsize=14)
+plt.show()
+
+# Linear regression
 res = stats.linregress(y_values, x_values)
 print(f"R-squared: {res.rvalue**2:.6f}")
 print(f"Slope: {res.slope**2:.12f}")
