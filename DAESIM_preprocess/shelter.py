@@ -288,8 +288,8 @@ shelter_score = ds['num_trees_200m']
 
 # +
 # Create a mask with the lowest n productivities for each shelterscore
-n = 100
-bins = 10
+n = 1000
+bins = 100
 
 # Calculate the bin edges
 flattened = shelter_score.values.flatten()
