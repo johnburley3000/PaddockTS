@@ -39,7 +39,7 @@ stubs = {
 
 # Filepaths
 outdir = os.path.join(gdata_dir, "Data/PadSeg/")
-stub = "MULL"
+stub = "MILG"
 
 # %%time
 # Sentinel imagery
@@ -213,7 +213,7 @@ plt.hist2d(y_values, x_values, bins=100, norm=mcolors.PowerNorm(0.1))
 plt.ylabel('NDVI', fontsize=12)
 pixel_size = 10
 plt.xlabel(f'Number of tree pixels within {distance * pixel_size}m', fontsize=12)
-plt.title("Manual Polygons with no trees" + ": " + str(time)[:10], fontsize=14)
+plt.title(f"{stub}" + ": " + str(time)[:10], fontsize=14)
 plt.show()
 
 res = stats.linregress(y_values, x_values)
@@ -254,8 +254,6 @@ plt.plot(y_values, res.intercept + res.slope*y_values, 'r', label='fitted line')
 plt.legend()
 plt.show()
 
-
-
 # Winter
 # time = '2020-07-23'
 # time = '2020-01-03'
@@ -266,7 +264,10 @@ shelter_score = ds['num_trees_200m']
 
 # +
 # Create a mask with the lowest n productivities for each shelterscore
-n = 1000
+# percentiles = [0,1,2,3,4,5,6,7,8,9,10, 25, 50, 75, 100]
+# percentiles = [0,1,2,3,4,5,6,7,8,9,10]
+# percentiles = [0,1,2,3,4,5]
+percentiles = [0]
 bins = 100
 
 # Calculate the bin edges
@@ -284,12 +285,12 @@ for bin in range(1,bins):
     flattened_productivities = productivity_in_bin.values.flatten()
     notnan_productivities = flattened_productivities[~np.isnan(flattened_productivities)]
 
+    # Find the coordinate of the nearest value to each percentile, and add to the mask
     if len(notnan_productivities) > 0:
-        # Cutoff threshold based on the lowest n values in the bin
-        threshold = max(sorted(notnan_productivities)[:n])
-        
-        # Update the mask
-        mask |= (productivity_score <= threshold) & bin_mask
+        for percentile in percentiles:
+            value_at_percentile = np.percentile(notnan_productivities, percentile)
+            closest_value = notnan_productivities[np.abs(notnan_productivities - value_at_percentile).argmin()]
+            mask |= (productivity_in_bin == closest_value) & bin_mask
         
 np.sum(mask.values)
 
@@ -320,4 +321,88 @@ plt.plot(y_values, res.intercept + res.slope*y_values, 'r', label='fitted line')
 plt.legend()
 plt.show()
 # -
+# Verifying that a random distribution wouldn't give the same results
+p = np.random.normal(0.5, 0.1, 100000)
+plt.hist(p, bins=30)
+plt.title("Random distribution of productivity scores")
+plt.show()
+
+s = np.random.lognormal(0, 1, 100000)
+s2 = s[s < np.percentile(s, 95)]
+plt.hist(s2, bins=10)
+plt.title("Log random distribution of shelter scores")
+plt.show()
+
+# +
+x_values = p
+y_values = s
+
+# 2d histogram
+plt.hist2d(y_values, x_values, bins=100, norm=mcolors.PowerNorm(0.1))
+plt.ylabel(f'Productivity Score', fontsize=12)
+pixel_size = 10
+plt.xlabel(f'Shelter Score', fontsize=12)
+plt.title("Random distribution comparison", fontsize=14)
+plt.show()
+
+# Linear regression
+res = stats.linregress(y_values, x_values)
+print(f"R-squared: {res.rvalue**2:.6f}")
+print(f"Slope: {res.slope**2:.12f}")
+plt.plot(y_values, x_values, 'o', label='original data')
+plt.plot(y_values, res.intercept + res.slope*y_values, 'r', label='fitted line')
+plt.legend()
+plt.show()
+
+# +
+# Create a mask with the lowest n productivities for each shelterscore
+percentiles = [0]
+bins = 100
+
+# Calculate the bin edges
+flattened = s
+max_shelter_score = max(flattened)
+bin_edges = np.linspace(0,max_shelter_score,bins)
+shelter_bins = np.digitize(s, bin_edges)
+
+s_mins = []
+p_mins = []
+
+# Find the minimum value in each bin
+for bin in range(1,bins):
+    # Mask out any values outside of this bin
+    bin_mask = (shelter_bins == bin)
+    productivity_in_bin = p.copy()
+    productivity_in_bin[np.where(~bin_mask)] = np.nan
+    
+    # Find the minimum value in this bin
+    if np.sum(~np.isnan(productivity_in_bin)) > 0:
+        min_index = np.nanargmin(productivity_in_bin)
+        s_min = s[min_index]
+        p_min = p[min_index]
+        s_mins.append(s_min)
+        p_mins.append(p_min)
+
+# +
+x_values = p_mins
+y_values = s_mins
+
+# 2d histogram
+plt.hist2d(y_values, x_values, bins=100, norm=mcolors.PowerNorm(0.1))
+plt.ylabel(f'Productivity Score', fontsize=12)
+pixel_size = 10
+plt.xlabel(f'Shelter Score', fontsize=12)
+plt.title("Lowest productivity in each shelter bin", fontsize=14)
+plt.show()
+
+# Linear regression
+res = stats.linregress(y_values, x_values)
+print(f"R-squared: {res.rvalue**2:.6f}")
+print(f"Slope: {res.slope**2:.12f}")
+plt.plot(y_values, x_values, 'o', label='original data')
+plt.plot(y_values, res.intercept + res.slope*np.array(y_values), 'r', label='fitted line')
+plt.legend()
+plt.show()
+# -
+
 
