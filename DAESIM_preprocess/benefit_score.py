@@ -194,60 +194,78 @@ print("p_value:", p_value)
 plt.boxplot([sheltered, unsheltered], labels=['Sheltered', 'Unsheltered'])
 plt.show()
 
-np.median(sheltered) - np.median(unsheltered)
-
-pd.concat([pd.DataFrame(sheltered).describe(), pd.DataFrame(unsheltered).describe()], axis=1)
-
 # +
 # %%time
 # Calculate the productivity score
-benefit_scores = []
 
-# time = str(ds.time.values[0])[:10]
+shelter_thresholds = 0.05, 0.1, 0.2, 0.3, 0.4   # Percentage tree cover
+total_benefits = []
+benefit_scores_dict = {}
 
-for i, time in enumerate(ds.time.values):
-    # time = str(time)[:10]
-    if i%50 == 0:
-        print(f"Working on {i}/{len(ds.time.values)}", time)
+for i, shelter_threshold in enumerate(shelter_thresholds):
+    print(f"Working on {i}/{len(shelter_thresholds)}", shelter_threshold)
+    num_trees_threshold = ((distance * 2) ** 2) * shelter_threshold # Number of tree pixels
 
-    ndvi = ds.sel(time=time, method='nearest')['NDVI']
-    productivity_score1 = ndvi.where(~adjacent_mask)
-    # productivity_score1 = ndvi.where(new_mask)
-    s = ds['num_trees_200m'].values
+    benefit_scores = []
+    for i, time in enumerate(ds.time.values):
+        # time = str(time)[:10]
+        # if i%50 == 0:
+        #     print(f"Working on {i}/{len(ds.time.values)}", time)
     
-    # Flatten the arrays for plotting
-    y = productivity_score1.values.flatten()
-    y_values = y[~np.isnan(y)]   # Remove all pixels that are trees or adjacent to trees
-    x = s.flatten()
-    x_values = x[~np.isnan(y)]   # Match the shape of the x_values
-
-    # Select sheltered/unsheltered pixels before normalising
-    sheltered = y_values[np.where(x_values >= num_trees_threshold)]
-    unsheltered = y_values[np.where(x_values < num_trees_threshold)]
-    # F_statistic, p_value = stats.f_oneway(sheltered, unsheltered)
-
-    median_diff = np.median(sheltered) - np.median(unsheltered)
-    
-    # # Min max normalisation
-    # x_values = (x_values - min(x_values)) / (max(x_values) - min(x_values))
-    # y_values = (y_values - min(y_values)) / (max(y_values) - min(y_values))
-    # res = stats.linregress(x_values, y_values)
+        ndvi = ds.sel(time=time, method='nearest')['NDVI']
+        productivity_score1 = ndvi.where(~adjacent_mask)
+        # productivity_score1 = ndvi.where(new_mask)
+        s = ds['num_trees_200m'].values
         
-    benefit_score = {
-        "time":time,
-        "median_diff": median_diff,
-        # "r2":res.rvalue**2,
-        # "slope":res.slope,
-        # "f":F_statistic,
-        # "p":p_value
-    }
+        # Flatten the arrays for plotting
+        y = productivity_score1.values.flatten()
+        y_values = y[~np.isnan(y)]   # Remove all pixels that are trees or adjacent to trees
+        x = s.flatten()
+        x_values = x[~np.isnan(y)]   # Match the shape of the x_values
     
-    benefit_scores.append(benefit_score)
+        # Select sheltered/unsheltered pixels before normalising
+        sheltered = y_values[np.where(x_values >= num_trees_threshold)]
+        unsheltered = y_values[np.where(x_values < num_trees_threshold)]
+        # F_statistic, p_value = stats.f_oneway(sheltered, unsheltered)
+    
+        median_diff = np.median(sheltered) - np.median(unsheltered)
+        
+        # # Min max normalisation
+        # x_values = (x_values - min(x_values)) / (max(x_values) - min(x_values))
+        # y_values = (y_values - min(y_values)) / (max(y_values) - min(y_values))
+        # res = stats.linregress(x_values, y_values)
+            
+        benefit_score = {
+            "time":time,
+            "median_diff": median_diff,
+            # "r2":res.rvalue**2,
+            # "slope":res.slope,
+            # "f":F_statistic,
+            # "p":p_value
+        }
+        benefit_scores.append(benefit_score)
+        
+    benefit_scores_dict[shelter_threshold] = benefit_scores
+    df = pd.DataFrame(benefit_scores)
+    df = df.set_index('time')
+    max_diff = max(df['median_diff'].values)
+    benefit_sum = sum(df['median_diff'].values[np.where(df['median_diff'].values > 0)])
+    total_benefit = {
+            "shelter_threshold":shelter_threshold,
+            "sample_size":len(sheltered),
+            "max_diff":max_diff,
+            "benefit_sum":benefit_sum
+        }
+    total_benefits.append(total_benefit)
 
-print(len(benefit_scores))
+print(len(total_benefits))
 # -
 
-df = pd.DataFrame(benefit_scores)
+len(y_values)
+
+pd.DataFrame(total_benefits)
+
+df = pd.DataFrame(benefit_scores_dict[0.001])
 df = df.set_index('time')
 df = df.astype(float)
 df.index = pd.to_datetime(df.index)
