@@ -178,7 +178,25 @@ plt.plot(x_values, y_values, 'o', label='original data')
 plt.plot(x_values, res.intercept + res.slope*x_values, 'r', label='fitted line')
 plt.legend()
 plt.show()
+# -
 
+
+shelter_threshold = 0.1  # Percentage tree cover
+num_trees_threshold = ((distance * 2) ** 2) * shelter_threshold # Number of tree pixels
+num_trees_threshold
+
+sheltered = y_values[np.where(x_values >= num_trees_threshold)]
+unsheltered = y_values[np.where(x_values < num_trees_threshold)]
+F_statistic, p_value = stats.f_oneway(sheltered, unsheltered)
+print(f"Number of sheltered pixels: {len(sheltered)}/{len(y_values)}")
+print("F_statistic:", F_statistic) 
+print("p_value:", p_value)
+plt.boxplot([sheltered, unsheltered], labels=['Sheltered', 'Unsheltered'])
+plt.show()
+
+np.median(sheltered) - np.median(unsheltered)
+
+pd.concat([pd.DataFrame(sheltered).describe(), pd.DataFrame(unsheltered).describe()], axis=1)
 
 # +
 # %%time
@@ -202,17 +220,26 @@ for i, time in enumerate(ds.time.values):
     y_values = y[~np.isnan(y)]   # Remove all pixels that are trees or adjacent to trees
     x = s.flatten()
     x_values = x[~np.isnan(y)]   # Match the shape of the x_values
+
+    # Select sheltered/unsheltered pixels before normalising
+    sheltered = y_values[np.where(x_values >= num_trees_threshold)]
+    unsheltered = y_values[np.where(x_values < num_trees_threshold)]
+    # F_statistic, p_value = stats.f_oneway(sheltered, unsheltered)
+
+    median_diff = np.median(sheltered) - np.median(unsheltered)
     
-    # Min max normalisation
-    x_values = (x_values - min(x_values)) / (max(x_values) - min(x_values))
-    y_values = (y_values - min(y_values)) / (max(y_values) - min(y_values))
-    
-    res = stats.linregress(x_values, y_values)
-    
+    # # Min max normalisation
+    # x_values = (x_values - min(x_values)) / (max(x_values) - min(x_values))
+    # y_values = (y_values - min(y_values)) / (max(y_values) - min(y_values))
+    # res = stats.linregress(x_values, y_values)
+        
     benefit_score = {
         "time":time,
-        "r2":res.rvalue**2,
-        "Slope":res.slope
+        "median_diff": median_diff,
+        # "r2":res.rvalue**2,
+        # "slope":res.slope,
+        # "f":F_statistic,
+        # "p":p_value
     }
     
     benefit_scores.append(benefit_score)
@@ -227,10 +254,11 @@ df.index = pd.to_datetime(df.index)
 df = df.rename(columns={'R-squared':'r2', 'Slope':'slope'})
 df.iloc[:1]
 
-df.plot(title='MILG shelter benefit scores', figsize=(50,10))
-plt.savefig("MILG_benefit.png")
-
-# +
+df.plot(figsize=(50,10))
+ax = plt.gca()
+ax.xaxis.set_major_locator(MaxNLocator(100))
+plt.xticks(rotation=45)
+plt.show()
 
 # Plot the DataFrame for the specified date range
 df.loc['2024-01':'2024-06'].plot(figsize=(20,10))
@@ -238,7 +266,4 @@ ax = plt.gca()
 ax.xaxis.set_major_locator(MaxNLocator(50))
 plt.xticks(rotation=45)
 plt.show()
-
-# -
-
 
