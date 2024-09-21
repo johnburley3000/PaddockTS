@@ -265,7 +265,7 @@ len(y_values)
 
 pd.DataFrame(total_benefits)
 
-df = pd.DataFrame(benefit_scores_dict[0.001])
+df = pd.DataFrame(benefit_scores_dict[0.05])
 df = df.set_index('time')
 df = df.astype(float)
 df.index = pd.to_datetime(df.index)
@@ -285,3 +285,24 @@ ax.xaxis.set_major_locator(MaxNLocator(50))
 plt.xticks(rotation=45)
 plt.show()
 
+
+# Global drought index at 50km spatial resolution from 1901 to 2023
+# !ls /g/data/xe2/datasets/Climate_SILO/spei01.nc
+
+filepath = "/g/data/xe2/datasets/Climate_SILO/spei01.nc"
+ds_drought = xr.load_dataset(filepath)
+
+ds_original.isel(time=0, y=0, x=0)
+
+ds_drought
+
+# +
+lat_point = -34.390363
+lon_point = 148.469515
+ds_closest = ds_drought.sel(lat=lat_point, lon=lon_point, method='nearest')
+
+# Now, select the time range between 2017 and 2024
+ds_selected = ds_closest.sel(time=slice('2017-01-01', '2024-12-31'))
+# -
+
+ds_selected['spei'].plot(figsize=(50,10))
