@@ -261,11 +261,9 @@ for i, shelter_threshold in enumerate(shelter_thresholds):
 print(len(total_benefits))
 # -
 
-len(y_values)
-
 pd.DataFrame(total_benefits)
 
-df = pd.DataFrame(benefit_scores_dict[0.05])
+df = pd.DataFrame(benefit_scores_dict[0.1])
 df = df.set_index('time')
 df = df.astype(float)
 df.index = pd.to_datetime(df.index)
@@ -287,22 +285,41 @@ plt.show()
 
 
 # Global drought index at 50km spatial resolution from 1901 to 2023
-# !ls /g/data/xe2/datasets/Climate_SILO/spei01.nc
-
 filepath = "/g/data/xe2/datasets/Climate_SILO/spei01.nc"
 ds_drought = xr.load_dataset(filepath)
 
-ds_original.isel(time=0, y=0, x=0)
-
-ds_drought
-
-# +
 lat_point = -34.390363
 lon_point = 148.469515
 ds_closest = ds_drought.sel(lat=lat_point, lon=lon_point, method='nearest')
-
-# Now, select the time range between 2017 and 2024
 ds_selected = ds_closest.sel(time=slice('2017-01-01', '2024-12-31'))
-# -
 
 ds_selected['spei'].plot(figsize=(50,10))
+
+# +
+# Merge the shelter benefits with the drought index.
+df_drought = pd.DataFrame(ds_selected['spei'], index=ds_selected.time)
+df_drought = df_drought.rename(columns={0:'drought_index'})
+
+df_shelter = df.rename(columns={'median_diff':'benefit'})
+df_shelter.index = df_shelter.index.date
+
+df_shelter.index = pd.to_datetime(df_shelter.index)
+df_drought.index = pd.to_datetime(df_drought.index)
+df_shelter = df_shelter.sort_index()
+df_drought = df_drought.sort_index()
+
+df_shelter['benefit'] = df_shelter['benefit'] * 20
+
+df_merged = pd.merge_asof(df_shelter, df_drought, left_index=True, right_index=True, direction='nearest')
+# -
+
+df_merged.describe()
+
+df_merged.plot(figsize=(50,10))
+ax = plt.gca()
+ax.xaxis.set_major_locator(MaxNLocator(100))
+ax.axhline(0, color='black', linestyle='--', linewidth=1)
+plt.xticks(rotation=45)
+plt.show()
+
+df_merged['benefit'].sum()
