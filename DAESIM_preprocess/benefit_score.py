@@ -25,7 +25,7 @@ from matplotlib.ticker import MaxNLocator
 os.chdir(os.path.join(os.path.expanduser('~'), "Projects/PaddockTS"))
 from DAESIM_preprocess.util import gdata_dir, scratch_dir, transform_bbox
 from DAESIM_preprocess.topography import pysheds_accumulation, calculate_slope
-
+from DAESIM_preprocess.silo_daily import merge_ozwald_silo, resample_weekly, visualise_water, visualise_temp
 # -
 
 stubs = {
@@ -295,10 +295,15 @@ ds_selected = ds_closest.sel(time=slice('2017-01-01', '2024-12-31'))
 
 ds_selected['spei'].plot(figsize=(50,10))
 
+df_weekly[['Maximum temperature']]
+
 # +
 # Merge the shelter benefits with the drought index.
-df_drought = pd.DataFrame(ds_selected['spei'], index=ds_selected.time)
-df_drought = df_drought.rename(columns={0:'drought_index'})
+# df_drought = pd.DataFrame(ds_selected['spei'], index=ds_selected.time)
+# df_drought = df_drought.rename(columns={0:'drought_index'})
+environmental_variable = 'Potential Evapotranspiration'
+
+df_drought = df_weekly[[environmental_variable]]
 
 df_shelter = df.rename(columns={'median_diff':'benefit'})
 df_shelter.index = df_shelter.index.date
@@ -308,7 +313,11 @@ df_drought.index = pd.to_datetime(df_drought.index)
 df_shelter = df_shelter.sort_index()
 df_drought = df_drought.sort_index()
 
+# Normalise the values
 df_shelter['benefit'] = df_shelter['benefit'] * 20
+df_max_temp = df_drought[environmental_variable]
+df_maxtemp_norm = (df_max_temp - df_max_temp.median()) / max(abs(df_max_temp - df_max_temp.median()))
+df_drought[environmental_variable] = df_maxtemp_norm
 
 df_merged = pd.merge_asof(df_shelter, df_drought, left_index=True, right_index=True, direction='nearest')
 # -
@@ -322,4 +331,40 @@ ax.axhline(0, color='black', linestyle='--', linewidth=1)
 plt.xticks(rotation=45)
 plt.show()
 
-df_merged['benefit'].sum()
+df_weekly['Maximum temperature']
+
+visualise_temp(df_weekly, outdir, stub)
+
+stub = "MILG"
+filename_ozwald = os.path.join(outdir, f"{stub}_ozwald_8day.nc")
+filename_silo = os.path.join(outdir, f"{stub}_silo_daily.nc")
+ds_ozwald = xr.open_dataset(filename_ozwald)
+ds_silo = xr.open_dataset(filename_silo)
+df_ozwald_silo = merge_ozwald_silo(ds_ozwald, ds_silo)
+df_weekly = resample_weekly(df_ozwald_silo)
+
+rainfall_plot = plt.bar(df.index, df['Rainfall'], color='skyblue', width=5)
+et_actual_plot = plt.plot(df.index, df['Potential Evapotranspiration'], color='orange')
+
+# +
+plt.figure(figsize=(50, 20))
+
+# Plot the data
+rainfall_plot = plt.bar(df.index, df['Rainfall'], color='skyblue', width=5)
+et_actual_plot = plt.bar(df.index, df['Potential Evapotranspiration'], color='orange')
+
+# Adjust the size of the tick labels on the x-axis and y-axis
+plt.xticks(fontsize=20)  
+plt.yticks(fontsize=20)  
+
+# Reorder the legend items
+handles = [rainfall_plot, et_actual_plot[0], et_potential_plot[0], moisture_max_plot[0], moisture_min_plot[0]]
+labels = ['Total Rainfall (mm)', "Potential Evapotranspiration (mm)", "Actual Evapotranspiration (mm)", "Maximum Soil Moisture (mm/10)", "Minimum Soil Moisture (mm/10)"]
+plt.legend(handles=handles, labels=labels, fontsize=30, loc='upper left')
+plt.title("Weather", fontsize=50)
+plt.tight_layout()
+
+filename = os.path.join(outdir, f"{stub}_weather.png")
+plt.savefig(filename)
+print("Saved", filename)
+plt.show()
