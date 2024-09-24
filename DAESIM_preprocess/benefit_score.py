@@ -191,14 +191,14 @@ F_statistic, p_value = stats.f_oneway(sheltered, unsheltered)
 print(f"Number of sheltered pixels: {len(sheltered)}/{len(y_values)}")
 print("F_statistic:", F_statistic) 
 print("p_value:", p_value)
-plt.boxplot([sheltered, unsheltered], labels=['Sheltered', 'Unsheltered'])
+plt.boxplot([unsheltered, sheltered], labels=['Unsheltered', 'Sheltered'])
 plt.show()
 
 # +
 # %%time
 # Calculate the productivity score
 
-shelter_thresholds = 0.05, 0.1, 0.2, 0.3, 0.4   # Percentage tree cover
+shelter_thresholds = 0.0.05, 0.1, 0.2, 0.3   # Percentage tree cover
 total_benefits = []
 benefit_scores_dict = {}
 
@@ -226,30 +226,37 @@ for i, shelter_threshold in enumerate(shelter_thresholds):
         # Select sheltered/unsheltered pixels before normalising
         sheltered = y_values[np.where(x_values >= num_trees_threshold)]
         unsheltered = y_values[np.where(x_values < num_trees_threshold)]
-        # F_statistic, p_value = stats.f_oneway(sheltered, unsheltered)
-    
-        median_diff = np.median(sheltered) - np.median(unsheltered)
+
+        sheltered_z = (sheltered - np.mean(y_values))/np.std(y_values)
+        unsheltered_z = (unsheltered - np.mean(y_values))/np.std(y_values)
+
+        percentiles = 10, 25, 50, 75, 90
+        percentile_benefits = {}
+        for percentile in percentiles:
+            percentile_benefits[f"p{percentile}"] = np.percentile(sheltered_z, percentile) - np.percentile(unsheltered_z, percentile)
+
+        # F_statistic, p_value = stats.f_oneway(sheltered, unsheltered)    
         
         # # Min max normalisation
-        x_values = (x_values - min(x_values)) / (max(x_values) - min(x_values))
-        y_values = (y_values - min(y_values)) / (max(y_values) - min(y_values))
-        res = stats.linregress(x_values, y_values)
+        # x_values = (x_values - min(x_values)) / (max(x_values) - min(x_values))
+        # y_values = (y_values - min(y_values)) / (max(y_values) - min(y_values))
+        # res = stats.linregress(x_values, y_values)
             
         benefit_score = {
             "time":time,
-            "median_diff": median_diff,
-            "r2":res.rvalue**2,
-            "slope":res.slope,
+            # "r2":res.rvalue**2,
+            # "slope":res.slope,
             # "f":F_statistic,
             # "p":p_value
         }
+        benefit_score = benefit_score | percentile_benefits
         benefit_scores.append(benefit_score)
         
     benefit_scores_dict[shelter_threshold] = benefit_scores
     df = pd.DataFrame(benefit_scores)
     df = df.set_index('time')
-    max_diff = max(df['median_diff'].values)
-    benefit_sum = sum(df['median_diff'].values[np.where(df['median_diff'].values > 0)])
+    max_diff = max(df['p50'].values)
+    benefit_sum = sum(df['p50'].values[np.where(df['p50'].values > 0)])
     total_benefit = {
             "shelter_threshold":shelter_threshold,
             "sample_size":len(sheltered),
@@ -259,29 +266,7 @@ for i, shelter_threshold in enumerate(shelter_thresholds):
     total_benefits.append(total_benefit)
 
 print(len(total_benefits))
-
-# +
-ndvi = ds.sel(time='2020-01-01', method='nearest')['NDVI']
-productivity_score1 = ndvi.where(~adjacent_mask)
-# productivity_score1 = ndvi.where(new_mask)
-s = ds['num_trees_200m'].values
-
-# Flatten the arrays for plotting
-y = productivity_score1.values.flatten()
-y_values = y[~np.isnan(y)]   # Remove all pixels that are trees or adjacent to trees
-x = s.flatten()
-x_values = x[~np.isnan(y)]   # Match the shape of the x_values
-
-# Select sheltered/unsheltered pixels before normalising
-sheltered = y_values[np.where(x_values >= num_trees_threshold)]
-unsheltered = y_values[np.where(x_values < num_trees_threshold)]
 # -
-
-sheltered_z = (sheltered - np.mean(y_values))/np.std(y_values)
-np.mean(sheltered_z)
-
-unsheltered_z = (unsheltered - np.mean(y_values))/np.std(y_values)
-np.mean(unsheltered_z)
 
 pd.DataFrame(total_benefits)
 
@@ -289,12 +274,13 @@ df = pd.DataFrame(benefit_scores_dict[0.1])
 df = df.set_index('time')
 df = df.astype(float)
 df.index = pd.to_datetime(df.index)
-df = df.rename(columns={'R-squared':'r2', 'Slope':'slope'})
+df = df[['p10', 'p25', 'p50', 'p75', 'p90']]
 df.iloc[:1]
 
-df.plot(figsize=(50,10))
+df['p50'].plot(figsize=(50,20))
 ax = plt.gca()
 ax.xaxis.set_major_locator(MaxNLocator(100))
+ax.axhline(0, color='black', linestyle='--', linewidth=1)
 plt.xticks(rotation=45)
 plt.show()
 
@@ -306,8 +292,6 @@ df_ozwald_silo = merge_ozwald_silo(ds_ozwald, ds_silo)
 df_weekly = resample_weekly(df_ozwald_silo)
 visualise_temp(df_weekly, outdir, stub)
 
-df_weekly.columns
-
 # +
 # Merge the shelter benefits with the drought index.
 # df_drought = pd.DataFrame(ds_selected['spei'], index=ds_selected.time)
@@ -318,7 +302,7 @@ df_drought = df_weekly[[environmental_variable]]
 
 df_shelter = pd.DataFrame(benefit_scores_dict[0.1])
 df_shelter = df_shelter.set_index('time')
-df_shelter = df_shelter.rename(columns={'median_diff':'Shelter benefit'})
+df_shelter = df_shelter.rename(columns={'p50':'Shelter benefit'})
 df_shelter.index = df_shelter.index.date
 
 df_shelter.index = pd.to_datetime(df_shelter.index)
@@ -331,15 +315,10 @@ df_merged = pd.merge_asof(df_shelter, df_drought, left_index=True, right_index=T
 
 df_merged.describe()
 
-df_merged.plot(figsize=(50,10))
-ax = plt.gca()
-ax.xaxis.set_major_locator(MaxNLocator(100))
-ax.axhline(0, color='black', linestyle='--', linewidth=1)
-plt.xticks(rotation=45)
-plt.show()
+df = df_merged
 
 temperature_threshold = 25
-hot_days = np.where(df['Maximum temperature'] > temperature_threshold)
+hot_days = np.where(df_merged['Maximum temperature'] > temperature_threshold)
 
 df['Shelter benefit'].iloc[hot_days].sum()
 
@@ -370,3 +349,6 @@ ax2.legend(loc='upper right')
 
 # Show the plot
 plt.show()
+# -
+
+
