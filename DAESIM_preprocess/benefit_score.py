@@ -276,48 +276,33 @@ ax.xaxis.set_major_locator(MaxNLocator(100))
 plt.xticks(rotation=45)
 plt.show()
 
-# Plot the DataFrame for the specified date range
-df.loc['2024-01':'2024-06'].plot(figsize=(20,10))
-ax = plt.gca()
-ax.xaxis.set_major_locator(MaxNLocator(50))
-plt.xticks(rotation=45)
-plt.show()
+stub = "MILG"
+filename_silo = os.path.join(outdir, f"{stub}_silo_daily.nc")
+ds_ozwald = xr.open_dataset(filename_ozwald)
+ds_silo = xr.open_dataset(filename_silo)
+df_ozwald_silo = merge_ozwald_silo(ds_ozwald, ds_silo)
+df_weekly = resample_weekly(df_ozwald_silo)
+visualise_temp(df_weekly, outdir, stub)
 
-
-# Global drought index at 50km spatial resolution from 1901 to 2023
-filepath = "/g/data/xe2/datasets/Climate_SILO/spei01.nc"
-ds_drought = xr.load_dataset(filepath)
-
-lat_point = -34.390363
-lon_point = 148.469515
-ds_closest = ds_drought.sel(lat=lat_point, lon=lon_point, method='nearest')
-ds_selected = ds_closest.sel(time=slice('2017-01-01', '2024-12-31'))
-
-ds_selected['spei'].plot(figsize=(50,10))
-
-df_weekly[['Maximum temperature']]
+df_weekly.columns
 
 # +
 # Merge the shelter benefits with the drought index.
 # df_drought = pd.DataFrame(ds_selected['spei'], index=ds_selected.time)
 # df_drought = df_drought.rename(columns={0:'drought_index'})
-environmental_variable = 'Potential Evapotranspiration'
+environmental_variable = 'Maximum temperature'
 
 df_drought = df_weekly[[environmental_variable]]
 
-df_shelter = df.rename(columns={'median_diff':'benefit'})
+df_shelter = pd.DataFrame(benefit_scores_dict[0.1])
+df_shelter = df_shelter.set_index('time')
+df_shelter = df_shelter.rename(columns={'median_diff':'Shelter benefit'})
 df_shelter.index = df_shelter.index.date
 
 df_shelter.index = pd.to_datetime(df_shelter.index)
 df_drought.index = pd.to_datetime(df_drought.index)
 df_shelter = df_shelter.sort_index()
 df_drought = df_drought.sort_index()
-
-# Normalise the values
-df_shelter['benefit'] = df_shelter['benefit'] * 20
-df_max_temp = df_drought[environmental_variable]
-df_maxtemp_norm = (df_max_temp - df_max_temp.median()) / max(abs(df_max_temp - df_max_temp.median()))
-df_drought[environmental_variable] = df_maxtemp_norm
 
 df_merged = pd.merge_asof(df_shelter, df_drought, left_index=True, right_index=True, direction='nearest')
 # -
@@ -331,40 +316,34 @@ ax.axhline(0, color='black', linestyle='--', linewidth=1)
 plt.xticks(rotation=45)
 plt.show()
 
-df_weekly['Maximum temperature']
 
-visualise_temp(df_weekly, outdir, stub)
 
-stub = "MILG"
-filename_ozwald = os.path.join(outdir, f"{stub}_ozwald_8day.nc")
-filename_silo = os.path.join(outdir, f"{stub}_silo_daily.nc")
-ds_ozwald = xr.open_dataset(filename_ozwald)
-ds_silo = xr.open_dataset(filename_silo)
-df_ozwald_silo = merge_ozwald_silo(ds_ozwald, ds_silo)
-df_weekly = resample_weekly(df_ozwald_silo)
+hot_days = np.where(df['Maximum temperature'] > 25)
 
-rainfall_plot = plt.bar(df.index, df['Rainfall'], color='skyblue', width=5)
-et_actual_plot = plt.plot(df.index, df['Potential Evapotranspiration'], color='orange')
+df['Shelter benefit'].iloc[hot_days].describe()
 
 # +
-plt.figure(figsize=(50, 20))
+df = df_merged
+fig, ax1 = plt.subplots(figsize=(10, 6))  # Create the base figure and axis
 
-# Plot the data
-rainfall_plot = plt.bar(df.index, df['Rainfall'], color='skyblue', width=5)
-et_actual_plot = plt.bar(df.index, df['Potential Evapotranspiration'], color='orange')
+# Plot Maximum temperature on the left y-axis
+ax1.plot(df.index, df['Maximum temperature'], color='tab:blue', label='Maximum temperature')
+ax1.set_xlabel('Date')
+ax1.set_ylabel('Maximum temperature (°C)', color='tab:blue')  # Set the y-axis label
+ax1.tick_params(axis='y', labelcolor='tab:blue')  # Change tick colors to match the line
 
-# Adjust the size of the tick labels on the x-axis and y-axis
-plt.xticks(fontsize=20)  
-plt.yticks(fontsize=20)  
+# Create a second y-axis for Shelter benefit
+ax2 = ax1.twinx()  
+ax2.plot(df.index, df['Shelter benefit'], color='tab:red', label='Shelter benefit')
+ax2.set_ylabel('Shelter benefit', color='tab:red')  # Set the second y-axis label
+ax2.tick_params(axis='y', labelcolor='tab:red')  # Change tick colors to match the line
 
-# Reorder the legend items
-handles = [rainfall_plot, et_actual_plot[0], et_potential_plot[0], moisture_max_plot[0], moisture_min_plot[0]]
-labels = ['Total Rainfall (mm)', "Potential Evapotranspiration (mm)", "Actual Evapotranspiration (mm)", "Maximum Soil Moisture (mm/10)", "Minimum Soil Moisture (mm/10)"]
-plt.legend(handles=handles, labels=labels, fontsize=30, loc='upper left')
-plt.title("Weather", fontsize=50)
-plt.tight_layout()
+# Rotate x-axis labels for readability
+plt.xticks(rotation=45)
 
-filename = os.path.join(outdir, f"{stub}_weather.png")
-plt.savefig(filename)
-print("Saved", filename)
+# Optional: Add a legend
+ax1.legend(loc='upper left')
+ax2.legend(loc='upper right')
+
+# Show the plot
 plt.show()
