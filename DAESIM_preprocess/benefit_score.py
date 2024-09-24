@@ -231,15 +231,15 @@ for i, shelter_threshold in enumerate(shelter_thresholds):
         median_diff = np.median(sheltered) - np.median(unsheltered)
         
         # # Min max normalisation
-        # x_values = (x_values - min(x_values)) / (max(x_values) - min(x_values))
-        # y_values = (y_values - min(y_values)) / (max(y_values) - min(y_values))
-        # res = stats.linregress(x_values, y_values)
+        x_values = (x_values - min(x_values)) / (max(x_values) - min(x_values))
+        y_values = (y_values - min(y_values)) / (max(y_values) - min(y_values))
+        res = stats.linregress(x_values, y_values)
             
         benefit_score = {
             "time":time,
             "median_diff": median_diff,
-            # "r2":res.rvalue**2,
-            # "slope":res.slope,
+            "r2":res.rvalue**2,
+            "slope":res.slope,
             # "f":F_statistic,
             # "p":p_value
         }
@@ -259,7 +259,29 @@ for i, shelter_threshold in enumerate(shelter_thresholds):
     total_benefits.append(total_benefit)
 
 print(len(total_benefits))
+
+# +
+ndvi = ds.sel(time='2020-01-01', method='nearest')['NDVI']
+productivity_score1 = ndvi.where(~adjacent_mask)
+# productivity_score1 = ndvi.where(new_mask)
+s = ds['num_trees_200m'].values
+
+# Flatten the arrays for plotting
+y = productivity_score1.values.flatten()
+y_values = y[~np.isnan(y)]   # Remove all pixels that are trees or adjacent to trees
+x = s.flatten()
+x_values = x[~np.isnan(y)]   # Match the shape of the x_values
+
+# Select sheltered/unsheltered pixels before normalising
+sheltered = y_values[np.where(x_values >= num_trees_threshold)]
+unsheltered = y_values[np.where(x_values < num_trees_threshold)]
 # -
+
+sheltered_z = (sheltered - np.mean(y_values))/np.std(y_values)
+np.mean(sheltered_z)
+
+unsheltered_z = (unsheltered - np.mean(y_values))/np.std(y_values)
+np.mean(unsheltered_z)
 
 pd.DataFrame(total_benefits)
 
@@ -316,11 +338,12 @@ ax.axhline(0, color='black', linestyle='--', linewidth=1)
 plt.xticks(rotation=45)
 plt.show()
 
+temperature_threshold = 25
+hot_days = np.where(df['Maximum temperature'] > temperature_threshold)
 
+df['Shelter benefit'].iloc[hot_days].sum()
 
-hot_days = np.where(df['Maximum temperature'] > 25)
-
-df['Shelter benefit'].iloc[hot_days].describe()
+df['Shelter benefit'].sum()
 
 # +
 df = df_merged
