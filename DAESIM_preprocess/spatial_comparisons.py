@@ -40,7 +40,7 @@ stubs = {
 
 # Filepaths
 outdir = os.path.join(gdata_dir, "Data/PadSeg/")
-stub = "LCHV"
+stub = "MILG"
 
 # %%time
 # Sentinel imagery
@@ -153,10 +153,40 @@ ds["num_trees_200m"] = shelter_score_da
 ds["num_trees_200m"].plot()
 
 # +
+# Repeating the linear regression on the manually created paddocks with absolutely no trees
+filename = os.path.join(gdata_dir,'MILG_paddocks_notrees.gpkg')
+pol = gpd.read_file(filename)
+
+# Change from multipolygon to polygon, because I created the layer with the wrong type in QGIS
+def convert_multipolygon_to_polygon(geometry):
+    return geometry.union(geometry)
+pol['geometry'] = pol['geometry'].apply(convert_multipolygon_to_polygon)
+
+# Create a mask from the geometries
+xarray_dataset = ds
+gdf = pol.to_crs(xarray_dataset.crs) 
+transform = xarray_dataset.rio.transform()
+out_shape = (xarray_dataset.dims['y'], xarray_dataset.dims['x'])
+geometries = gdf.geometry
+paddock_mask = features.geometry_mask(
+    [geom for geom in geometries],
+    transform=transform,
+    invert=True,
+    out_shape=out_shape
+)
+# Some of the pixels in my manually selected area are in the mask of tree + buffer pixels
+paddock_mask = paddock_mask & ~adjacent_mask
+# -
+
+plt.imshow(paddock_mask)
+
+# +
 # Calculate the productivity score
 time = '2020-01-01'
 ndvi = ds.sel(time=time, method='nearest')['NDVI']
-productivity_score1 = ndvi.where(~adjacent_mask)
+# productivity_score1 = ndvi.where(~adjacent_mask)
+productivity_score1 = ndvi.where(paddock_mask)
+
 s = ds['num_trees_200m'].values
 
 ## Filtering by soils or topography
@@ -183,11 +213,11 @@ sheltered_productivities_da = xr.DataArray(
 ds["sheltered_productivities"] = sheltered_productivities_da
 ds["sheltered_productivities"].plot()
 
-filename = os.path.join(scratch_dir, f'{stub}_sheltered_productivities_2020-01-01.tif')
+filename = os.path.join(scratch_dir, f'{stub}_sheltered_productivities_2020-01-01_manual_paddocks.tif')
 ds["sheltered_productivities"].rio.to_raster(filename)
 print(filename)
 
-filename = os.path.join(scratch_dir, f'{stub}_num_trees_200m.tif')
+filename = os.path.join(scratch_dir, f'{stub}_num_trees_200m_manual_paddocks.tif')
 ds["num_trees_200m"].rio.to_raster(filename)
 print(filename)
 
@@ -236,7 +266,8 @@ for i, shelter_threshold in enumerate(shelter_thresholds):
     benefit_scores = []
     for i, time in enumerate(ds.time.values):
         ndvi = ds.sel(time=time, method='nearest')['NDVI']
-        productivity_score1 = ndvi.where(~adjacent_mask)
+        # productivity_score1 = ndvi.where(~adjacent_mask)
+        productivity_score1 = ndvi.where(paddock_mask)
         # productivity_score1 = ndvi.where(new_mask)
         s = ds['num_trees_200m'].values
         
@@ -248,6 +279,9 @@ for i, shelter_threshold in enumerate(shelter_thresholds):
     
         # Select sheltered pixels and calculate z scores for NDVI at each pixel
         sheltered = y_values[np.where(x_values >= num_trees_threshold)]
+        if len(sheltered) == 0:
+            print(f"No pixels with a shelterscore > {num_trees_threshold}")
+            continue
         sheltered_z = (sheltered - np.mean(y_values))/np.std(y_values)
         all_z = (y_values - np.mean(y_values))/np.std(y_values)
         
@@ -271,7 +305,10 @@ for i, shelter_threshold in enumerate(shelter_thresholds):
         }
         benefit_score = benefit_score | percentile_benefits
         benefit_scores.append(benefit_score)
-        
+
+    if len(sheltered) == 0:
+        continue
+
     benefit_scores_dict[shelter_threshold] = benefit_scores
     df_shelter = pd.DataFrame(benefit_scores)
     df_shelter = df_shelter.set_index('time')
@@ -334,3 +371,6 @@ plt.xticks(rotation=45)
 ax1.legend(loc='upper left')
 ax2.legend(loc='upper right')
 plt.show()
+# -
+
+
