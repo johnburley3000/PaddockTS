@@ -40,7 +40,7 @@ stubs = {
 
 # Filepaths
 outdir = os.path.join(gdata_dir, "Data/PadSeg/")
-stub = "MILG"
+stub = "LCHV"
 
 # %%time
 # Sentinel imagery
@@ -56,7 +56,6 @@ slope = calculate_slope(filename)
 
 # +
 # Weather data
-stub = "MILG"
 filename_silo = os.path.join(outdir, f"{stub}_silo_daily.nc")
 ds_silo = xr.open_dataset(filename_silo)
 
@@ -82,6 +81,7 @@ ds = add_tiff_band(ds, "pH_CaCl2", Resampling.average, outdir, stub)
 
 # Add the height bands
 ds = add_tiff_band(ds, "terrain", Resampling.average, outdir, stub)
+
 ds = add_tiff_band(ds, "canopy_height", Resampling.max, outdir, stub)
 
 
@@ -112,6 +112,8 @@ ds_trimmed = ds.isel(
     y=slice(1, -1),
     x=slice(1, -1) 
 )
+
+ds_trimmed['canopy_height'].plot()
 
 ds_trimmed['NDVI'].isel(time=0).plot()
 
@@ -155,7 +157,7 @@ ds["num_trees_200m"] = shelter_score_da
 
 # +
 # Calculate the productivity score
-time = '2024-03-02'
+time = '2020-01-01'
 ndvi = ds.sel(time=time, method='nearest')['NDVI']
 productivity_score1 = ndvi.where(~adjacent_mask)
 # productivity_score1 = ndvi.where(new_mask)
@@ -200,46 +202,8 @@ F_statistic, p_value = stats.f_oneway(sheltered, unsheltered)
 print(f"Number of sheltered pixels: {len(sheltered)}/{len(y_values)}")
 print("F_statistic:", F_statistic) 
 print("p_value:", p_value)
-plt.boxplot([unsheltered, sheltered], labels=['Unsheltered', 'Sheltered'])
+plt.boxplot([sheltered, unsheltered], labels=['Sheltered', 'Unsheltered'])
 plt.show()
-
-# +
-ndvi = ds.sel(time='2020-01-01', method='nearest')['NDVI']
-productivity_score1 = ndvi.where(~adjacent_mask)
-# productivity_score1 = ndvi.where(new_mask)
-s = ds['num_trees_200m'].values
-
-# Flatten the arrays for plotting
-y = productivity_score1.values.flatten()
-y_values = y[~np.isnan(y)]   # Remove all pixels that are trees or adjacent to trees
-x = s.flatten()
-x_values = x[~np.isnan(y)]   # Match the shape of the x_values
-
-num_trees_threshold = -1
-# Select sheltered/unsheltered pixels before normalising
-sheltered = y_values[np.where(x_values > num_trees_threshold)]
-unsheltered = y_values[np.where(x_values <= num_trees_threshold)]
-
-sheltered_z = (sheltered - np.mean(y_values))/np.std(y_values)
-unsheltered_z = (unsheltered - np.mean(y_values))/np.std(y_values)
-all_z = (y_values - np.mean(y_values))/np.std(y_values)
-
-
-percentile = 10
-np.percentile(sheltered_z, percentile) - np.percentile(all_z, percentile)
-# -
-
-len(sheltered_z)
-
-len(unsheltered_z)
-
-np.percentile(sheltered_z, percentile) - np.percentile(unsheltered_z, percentile)
-
-((distance * 2) ** 2) * -1 
-
-((distance * 2) ** 2) * 0
-
-y_values[np.where((x_values < num_trees_threshold) | (x_values == 0))]
 
 # +
 # %%time
@@ -255,10 +219,6 @@ for i, shelter_threshold in enumerate(shelter_thresholds):
 
     benefit_scores = []
     for i, time in enumerate(ds.time.values):
-        # time = str(time)[:10]
-        # if i%50 == 0:
-        #     print(f"Working on {i}/{len(ds.time.values)}", time)
-    
         ndvi = ds.sel(time=time, method='nearest')['NDVI']
         productivity_score1 = ndvi.where(~adjacent_mask)
         # productivity_score1 = ndvi.where(new_mask)
@@ -313,7 +273,8 @@ for i, shelter_threshold in enumerate(shelter_thresholds):
         
     total_benefit = {
             "shelter_threshold":shelter_threshold,
-            "sample_size":len(sheltered),
+            "sheltered_pixels":len(sheltered),
+            "unsheltered_pixels":len(y_values) - len(sheltered),
             "max_z":max_z,
             "median_z_summer": median_z_summer,
         }
@@ -324,7 +285,7 @@ pd.DataFrame(total_benefits)
 # -
 
 # Plotting benefits over time at different productivity percentiles
-df = pd.DataFrame(benefit_scores_dict[0])
+df = pd.DataFrame(benefit_scores_dict[0.1])
 df = df.set_index('time')
 df = df.astype(float)
 df.index = pd.to_datetime(df.index)
@@ -337,29 +298,25 @@ plt.xticks(rotation=45)
 plt.show()
 
 # +
+# Plot a comparison of max temp and shelter benefit
 df = df_merged
 fig, ax1 = plt.subplots(figsize=(10, 6))  # Create the base figure and axis
 
-# Plot Maximum temperature on the left y-axis
+# Maximum temperature
 ax1.plot(df.index, df['max_temp'], color='tab:red', label='Maximum temperature')
 ax1.set_xlabel('Date')
 ax1.set_ylabel('Maximum temperature (°C)', color='tab:red')  # Set the y-axis label
 ax1.tick_params(axis='y', labelcolor='tab:red')  # Change tick colors to match the line
 
-# Create a second y-axis for Shelter benefit
+# Shelter benefit
 ax2 = ax1.twinx()  
 ax2.plot(df.index, df['p50'], color='tab:green', label='Shelter benefit')
 ax2.set_ylabel('Shelter benefit', color='tab:green')  # Set the second y-axis label
 ax2.tick_params(axis='y', labelcolor='tab:green')  # Change tick colors to match the line
 
-# Rotate x-axis labels for readability
 plt.xticks(rotation=45)
-
-# Optional: Add a legend
 ax1.legend(loc='upper left')
 ax2.legend(loc='upper right')
-
-# Show the plot
 plt.show()
 # -
 
