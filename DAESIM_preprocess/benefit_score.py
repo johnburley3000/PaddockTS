@@ -54,6 +54,15 @@ filename = os.path.join(outdir, f"{stub}_terrain.tif")
 grid, dem, fdir, acc = pysheds_accumulation(filename)
 slope = calculate_slope(filename)
 
+# +
+# Weather data
+stub = "MILG"
+filename_silo = os.path.join(outdir, f"{stub}_silo_daily.nc")
+ds_silo = xr.open_dataset(filename_silo)
+
+variable = 'max_temp'
+df_drought = pd.DataFrame(ds_silo.isel(lat=0, lon=0)[variable], index=ds_silo.isel(lat=0, lon=0).time, columns=[variable])
+
 
 # +
 def add_tiff_band(ds, variable, resampling_method, outdir, stub):
@@ -195,10 +204,48 @@ plt.boxplot([unsheltered, sheltered], labels=['Unsheltered', 'Sheltered'])
 plt.show()
 
 # +
+ndvi = ds.sel(time='2020-01-01', method='nearest')['NDVI']
+productivity_score1 = ndvi.where(~adjacent_mask)
+# productivity_score1 = ndvi.where(new_mask)
+s = ds['num_trees_200m'].values
+
+# Flatten the arrays for plotting
+y = productivity_score1.values.flatten()
+y_values = y[~np.isnan(y)]   # Remove all pixels that are trees or adjacent to trees
+x = s.flatten()
+x_values = x[~np.isnan(y)]   # Match the shape of the x_values
+
+num_trees_threshold = -1
+# Select sheltered/unsheltered pixels before normalising
+sheltered = y_values[np.where(x_values > num_trees_threshold)]
+unsheltered = y_values[np.where(x_values <= num_trees_threshold)]
+
+sheltered_z = (sheltered - np.mean(y_values))/np.std(y_values)
+unsheltered_z = (unsheltered - np.mean(y_values))/np.std(y_values)
+all_z = (y_values - np.mean(y_values))/np.std(y_values)
+
+
+percentile = 10
+np.percentile(sheltered_z, percentile) - np.percentile(all_z, percentile)
+# -
+
+len(sheltered_z)
+
+len(unsheltered_z)
+
+np.percentile(sheltered_z, percentile) - np.percentile(unsheltered_z, percentile)
+
+((distance * 2) ** 2) * -1 
+
+((distance * 2) ** 2) * 0
+
+y_values[np.where((x_values < num_trees_threshold) | (x_values == 0))]
+
+# +
 # %%time
 # Calculate the productivity score
 
-shelter_thresholds = 0.0.05, 0.1, 0.2, 0.3   # Percentage tree cover
+shelter_thresholds = 0, 0.05, 0.1, 0.2, 0.3   # Percentage tree cover
 total_benefits = []
 benefit_scores_dict = {}
 
@@ -223,25 +270,22 @@ for i, shelter_threshold in enumerate(shelter_thresholds):
         x = s.flatten()
         x_values = x[~np.isnan(y)]   # Match the shape of the x_values
     
-        # Select sheltered/unsheltered pixels before normalising
+        # Select sheltered pixels and calculate z scores for NDVI at each pixel
         sheltered = y_values[np.where(x_values >= num_trees_threshold)]
-        unsheltered = y_values[np.where(x_values < num_trees_threshold)]
-
         sheltered_z = (sheltered - np.mean(y_values))/np.std(y_values)
-        unsheltered_z = (unsheltered - np.mean(y_values))/np.std(y_values)
-
+        all_z = (y_values - np.mean(y_values))/np.std(y_values)
+        
         percentiles = 10, 25, 50, 75, 90
         percentile_benefits = {}
         for percentile in percentiles:
-            percentile_benefits[f"p{percentile}"] = np.percentile(sheltered_z, percentile) - np.percentile(unsheltered_z, percentile)
+            percentile_benefits[f"p{percentile}"] = np.percentile(sheltered_z, percentile) - np.percentile(all_z, percentile)
 
-        # F_statistic, p_value = stats.f_oneway(sheltered, unsheltered)    
-        
         # # Min max normalisation
         # x_values = (x_values - min(x_values)) / (max(x_values) - min(x_values))
         # y_values = (y_values - min(y_values)) / (max(y_values) - min(y_values))
         # res = stats.linregress(x_values, y_values)
-            
+        # F_statistic, p_value = stats.f_oneway(sheltered, unsheltered)    
+
         benefit_score = {
             "time":time,
             # "r2":res.rvalue**2,
@@ -253,92 +297,60 @@ for i, shelter_threshold in enumerate(shelter_thresholds):
         benefit_scores.append(benefit_score)
         
     benefit_scores_dict[shelter_threshold] = benefit_scores
-    df = pd.DataFrame(benefit_scores)
-    df = df.set_index('time')
-    max_diff = max(df['p50'].values)
-    benefit_sum = sum(df['p50'].values[np.where(df['p50'].values > 0)])
+    df_shelter = pd.DataFrame(benefit_scores)
+    df_shelter = df_shelter.set_index('time')
+    
+    max_z = max(df_shelter['p50'].values)
+
+    # Join the weather data onto the shelter scores
+    df_merged = pd.merge_asof(df_shelter, df_drought, left_index=True, right_index=True, direction='nearest')
+
+    temperature_threshold = 25
+    hot_days = np.where(df_merged['max_temp'] > temperature_threshold)
+
+    median_z = df_merged['p50'].median()
+    median_z_summer = df_merged['p50'].iloc[hot_days].median()
+        
     total_benefit = {
             "shelter_threshold":shelter_threshold,
             "sample_size":len(sheltered),
-            "max_diff":max_diff,
-            "benefit_sum":benefit_sum
+            "max_z":max_z,
+            "median_z_summer": median_z_summer,
         }
     total_benefits.append(total_benefit)
 
 print(len(total_benefits))
+pd.DataFrame(total_benefits)
 # -
 
-pd.DataFrame(total_benefits)
-
-df = pd.DataFrame(benefit_scores_dict[0.1])
+# Plotting benefits over time at different productivity percentiles
+df = pd.DataFrame(benefit_scores_dict[0])
 df = df.set_index('time')
 df = df.astype(float)
 df.index = pd.to_datetime(df.index)
 df = df[['p10', 'p25', 'p50', 'p75', 'p90']]
-df.iloc[:1]
-
-df['p50'].plot(figsize=(50,20))
+df.plot(figsize=(50,20))
 ax = plt.gca()
 ax.xaxis.set_major_locator(MaxNLocator(100))
 ax.axhline(0, color='black', linestyle='--', linewidth=1)
 plt.xticks(rotation=45)
 plt.show()
 
-stub = "MILG"
-filename_silo = os.path.join(outdir, f"{stub}_silo_daily.nc")
-ds_ozwald = xr.open_dataset(filename_ozwald)
-ds_silo = xr.open_dataset(filename_silo)
-df_ozwald_silo = merge_ozwald_silo(ds_ozwald, ds_silo)
-df_weekly = resample_weekly(df_ozwald_silo)
-visualise_temp(df_weekly, outdir, stub)
-
-# +
-# Merge the shelter benefits with the drought index.
-# df_drought = pd.DataFrame(ds_selected['spei'], index=ds_selected.time)
-# df_drought = df_drought.rename(columns={0:'drought_index'})
-environmental_variable = 'Maximum temperature'
-
-df_drought = df_weekly[[environmental_variable]]
-
-df_shelter = pd.DataFrame(benefit_scores_dict[0.1])
-df_shelter = df_shelter.set_index('time')
-df_shelter = df_shelter.rename(columns={'p50':'Shelter benefit'})
-df_shelter.index = df_shelter.index.date
-
-df_shelter.index = pd.to_datetime(df_shelter.index)
-df_drought.index = pd.to_datetime(df_drought.index)
-df_shelter = df_shelter.sort_index()
-df_drought = df_drought.sort_index()
-
-df_merged = pd.merge_asof(df_shelter, df_drought, left_index=True, right_index=True, direction='nearest')
-# -
-
-df_merged.describe()
-
-df = df_merged
-
-temperature_threshold = 25
-hot_days = np.where(df_merged['Maximum temperature'] > temperature_threshold)
-
-df['Shelter benefit'].iloc[hot_days].sum()
-
-df['Shelter benefit'].sum()
-
 # +
 df = df_merged
 fig, ax1 = plt.subplots(figsize=(10, 6))  # Create the base figure and axis
 
 # Plot Maximum temperature on the left y-axis
-ax1.plot(df.index, df['Maximum temperature'], color='tab:blue', label='Maximum temperature')
+ax1.plot(df.index, df['max_temp'], color='tab:red', label='Maximum temperature')
 ax1.set_xlabel('Date')
-ax1.set_ylabel('Maximum temperature (°C)', color='tab:blue')  # Set the y-axis label
-ax1.tick_params(axis='y', labelcolor='tab:blue')  # Change tick colors to match the line
+ax1.set_ylabel('Maximum temperature (°C)', color='tab:red')  # Set the y-axis label
+ax1.tick_params(axis='y', labelcolor='tab:red')  # Change tick colors to match the line
 
 # Create a second y-axis for Shelter benefit
 ax2 = ax1.twinx()  
-ax2.plot(df.index, df['Shelter benefit'], color='tab:red', label='Shelter benefit')
-ax2.set_ylabel('Shelter benefit', color='tab:red')  # Set the second y-axis label
-ax2.tick_params(axis='y', labelcolor='tab:red')  # Change tick colors to match the line
+ax2.plot(df.index, df['p50'], color='tab:green', label='Shelter benefit')
+ax2.set_ylabel('Shelter benefit', color='tab:green')  # Set the second y-axis label
+ax2.tick_params(axis='y', labelcolor='tab:green')  # Change tick colors to match the line
 
 # Rotate x-axis labels for readability
 plt.xticks(rotation=45)
