@@ -19,6 +19,8 @@ import scipy.ndimage
 from scipy import stats
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
+import matplotlib.patches as mpatches
+
 from matplotlib.ticker import MaxNLocator
 
 # Local imports
@@ -224,7 +226,7 @@ len(ds_drought.time.values)
 # %%time
 # Calculate the productivity score
 
-shelter_thresholds = 0.025, 0.05, 0.075, 0.1, 0.2, 0.3   # Percentage tree cover
+shelter_thresholds = 0.02, 0.05, 0.1, 0.2, 0.3   # Percentage tree cover
 
 total_benefits = []
 benefit_scores_dict = {}
@@ -236,7 +238,7 @@ for i, shelter_threshold in enumerate(shelter_thresholds):
     benefit_scores = []
 
     # I should just loop through the hot days, instead of looping through everything and filtering later
-    for i, time in enumerate(ds_drought.time.values):
+    for i, time in enumerate(ds.time.values):
         ndvi = ds.sel(time=time, method='nearest')['NDVI']
         productivity_score1 = ndvi.where(~adjacent_mask)
         s = ds['num_trees_200m'].values
@@ -267,12 +269,21 @@ for i, shelter_threshold in enumerate(shelter_thresholds):
     benefit_scores_dict[shelter_threshold] = benefit_scores
     df_shelter = pd.DataFrame(benefit_scores)
     df_shelter = df_shelter.set_index('time')
-    
-    df_merged = df_shelter
 
-    overall_median_diff = df_merged['median_diff'].median()
-    overall_median_diff_standard = df_merged['median_diff_standard'].median()
-    overall_mean_diff_standard = df_merged['mean_diff_standard'].median()
+
+    # Join the weather data onto the shelter scores
+    df_merged = pd.merge_asof(df_shelter, df_drought, left_index=True, right_index=True, direction='nearest')
+    temperature_threshold = 25
+    hot_days = np.where(df_merged['max_temp'] > temperature_threshold)
+
+    overall_median_diff = df_merged['median_diff'].iloc[hot_days].median()
+    overall_median_diff_standard = df_merged['median_diff_standard'].iloc[hot_days].median()
+    overall_mean_diff_standard = df_merged['mean_diff_standard'].iloc[hot_days].median()
+
+    # df_merged = df_shelter
+    # overall_median_diff = df_merged['median_diff'].median()
+    # overall_median_diff_standard = df_merged['median_diff_standard'].median()
+    # overall_mean_diff_standard = df_merged['mean_diff_standard'].median()
 
     total_benefit = {
             "shelter_threshold":shelter_threshold,
@@ -286,39 +297,42 @@ for i, shelter_threshold in enumerate(shelter_thresholds):
 
 print(len(total_benefits))
 pd.DataFrame(total_benefits)
-# -
 
-# Plotting benefits over time at different productivity percentiles
+# +
+# Creating dataframe of shelter_benefits alongsde max_temp
 df = pd.DataFrame(benefit_scores_dict[0.1])
 df = df.set_index('time')
 df = df.astype(float)
 df.index = pd.to_datetime(df.index)
-df = df[['p10', 'p25', 'p50', 'p75', 'p90']]
-df.plot(figsize=(50,20))
-ax = plt.gca()
-ax.xaxis.set_major_locator(MaxNLocator(100))
-ax.axhline(0, color='black', linestyle='--', linewidth=1)
-plt.xticks(rotation=45)
-plt.show()
+df = df['median_diff_standard']
+
+df_merged = pd.merge_asof(df, df_drought, left_index=True, right_index=True, direction='nearest')
 
 # +
-# Plot a comparison of max temp and shelter benefit
-df = df_merged
-fig, ax1 = plt.subplots(figsize=(50, 20))  # Create the base figure and axis
+# Plot median_diff_standard
+df_merged['median_diff_standard'].plot(figsize=(20,10))
 
-# Maximum temperature
-ax1.plot(df.index, df['max_temp'], color='tab:red', label='Maximum temperature')
-ax1.set_xlabel('Date')
-ax1.set_ylabel('Maximum temperature (°C)', color='tab:red')  # Set the y-axis label
-ax1.tick_params(axis='y', labelcolor='tab:red')  # Change tick colors to match the line
+# Add horizontal line at y=0
+ax = plt.gca()
+ax.axhline(0, color='black', linestyle='--', linewidth=1)
 
-# Shelter benefit
-ax2 = ax1.twinx()  
-ax2.plot(df.index, df['p50'], color='tab:green', label='Shelter benefit')
-ax2.set_ylabel('Shelter benefit', color='tab:green')  # Set the second y-axis label
-ax2.tick_params(axis='y', labelcolor='tab:green')  # Change tick colors to match the line
+# Colour in dates where max temp > temp_threshold
+temperature_threshold = 25
+above_25 = df_merged['max_temp'] > temperature_threshold
+start = None
+for i, (date, above) in enumerate(above_25.items()):
+    if above and start is None:
+        start = date
+    elif not above and start is not None:
+        ax.axvspan(start, date, color='red', alpha=0.1)
+        start = None
 
-plt.xticks(rotation=45)
-ax1.legend(loc='upper left')
-ax2.legend(loc='upper right')
+# Key
+patch = mpatches.Patch(color='red', alpha=0.1, label='max_temp > 25°C')
+ax.legend(handles=[patch], loc='upper left')
+
+plt.ylabel("Shelter benefit")
+plt.xlabel("")
+plt.title(stub)
+
 plt.show()
