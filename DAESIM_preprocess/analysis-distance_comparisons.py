@@ -20,8 +20,8 @@ from scipy import stats
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import matplotlib.patches as mpatches
-
 from matplotlib.ticker import MaxNLocator
+import seaborn as sns
 
 # Local imports
 os.chdir(os.path.join(os.path.expanduser('~'), "Projects/PaddockTS"))
@@ -88,12 +88,15 @@ ds_trimmed = ds.isel(
 ds_original = ds.copy()
 ds = ds_trimmed
 
+from scipy.signal import fftconvolve
+
+
 # +
 # %%time
 # Shelterscore showing the number of trees 
 pixel_size = 10  # metres
-# distance = 20  # This corresponds to a 200m radius if the pixel size is 10m
-distances = 5, 10, 20, 30, 50, 100
+distances = 5, 10, 20, 30, 50, 100, 500 # A distance of 20 would correspond to a 200m radius if the pixel size is 10m
+# distances = 20, # A distance of 20 would correspond to a 200m radius if the pixel size is 10m
 
 # Classify anything with a height greater than 1 as a tree
 tree_threshold = 1
@@ -104,11 +107,15 @@ structuring_element = np.ones((3, 3))  # This defines adjacency (including diago
 adjacent_mask = scipy.ndimage.binary_dilation(tree_mask, structure=structuring_element)
 
 for distance in distances:
+    layer_name = f"num_trees_{pixel_size * distance}m"
+    print(f"Adding layer: {layer_name}")
+    
     # Calculate the number of trees within a given distance for each pixel
     y, x = np.ogrid[-distance:distance+1, -distance:distance+1]
     kernel = x**2 + y**2 <= distance**2
     kernel = kernel.astype(float)
-    shelter_score = scipy.ndimage.convolve(tree_mask.astype(float), kernel, mode='constant', cval=0.0)
+    # shelter_score = scipy.ndimage.convolve(tree_mask.astype(float), kernel, mode='constant', cval=0.0)
+    shelter_score = fftconvolve(tree_mask.astype(float), kernel, mode='same')
     
     # Mask out trees and adjacent pixels
     shelter_score[np.where(adjacent_mask)] = np.nan
@@ -120,13 +127,11 @@ for distance in distances:
         coords={"y": ds.coords["y"], "x": ds.coords["x"]}, 
         name="shelter_score" 
     )
-    layer_name = f"num_trees_{pixel_size * distance}m"
     ds[layer_name] = shelter_score_da
-    print("Added layer: {layer_name}")
 
 
 # +
-layer_name = "num_trees_200m"
+layer_name = "num_trees_5000m"
 filename = os.path.join(scratch_dir, f'{stub}_{layer_name}.tif')
 ds[layer_name].rio.to_raster(filename)
 print(filename)
@@ -198,11 +203,11 @@ print("Number of unsheltered pixels: ", len(unsheltered))
 plt.show()
 # -
 
-# This is a thing
+# An actual effect size
 standardized_mean_difference = (np.mean(sheltered) - np.mean(unsheltered))/np.std(y_values)
 standardized_mean_difference
 
-# Is this a thing?
+# I made up this effect size 
 standardized_median_difference = (np.median(sheltered) - np.median(unsheltered)) / stats.median_abs_deviation(y_values)
 standardized_median_difference
 
@@ -216,91 +221,112 @@ nearest_df_times = df_drought.index[nearest_times_indices]
 temp_threshold = 25
 selected_times = nearest_df_times[df_drought['max_temp'].iloc[nearest_times_indices] > temp_threshold]
 ds_drought = ds.sel(time=selected_times, method='nearest')
-# -
-
-len(ds.time.values)
-
-len(ds_drought.time.values)
 
 # +
 # %%time
 # Calculate the productivity score
 
-shelter_thresholds = 0.02, 0.05, 0.1, 0.2, 0.3   # Percentage tree cover
+shelter_thresholds = 0.01, 0.02, 0.05, 0.1, 0.2, 0.3   # Percentage tree cover
 
 total_benefits = []
 benefit_scores_dict = {}
 
-for i, shelter_threshold in enumerate(shelter_thresholds):
-    print(f"Working on {i}/{len(shelter_thresholds)}", shelter_threshold)
-    num_trees_threshold = ((distance * 2) ** 2) * shelter_threshold # Number of tree pixels
+for i, distance in enumerate(distances):
+    print(f"\nDistance threshold {i}/{len(distances)}", distance)
+    layer_name = f"num_trees_{distance * pixel_size}m"
 
-    benefit_scores = []
-
-    # I should just loop through the hot days, instead of looping through everything and filtering later
-    for i, time in enumerate(ds.time.values):
-        ndvi = ds.sel(time=time, method='nearest')['NDVI']
-        productivity_score1 = ndvi.where(~adjacent_mask)
-        s = ds['num_trees_200m'].values
-        
-        # Flatten the arrays for plotting
-        y = productivity_score1.values.flatten()
-        y_values = y[~np.isnan(y)]   # Remove all pixels that are trees or adjacent to trees
-        x = s.flatten()
-        x_values = x[~np.isnan(y)]   # Match the shape of the x_values
+    for i, shelter_threshold in enumerate(shelter_thresholds):
+        print(f"Shelter threshold {i}/{len(shelter_thresholds)}", shelter_threshold)
+        num_trees_threshold = ((distance * 2) ** 2) * shelter_threshold # Number of tree pixels
     
-        # Select sheltered pixels and calculate z scores for NDVI at each pixel
-        sheltered = y_values[np.where(x_values >= num_trees_threshold)]
-        unsheltered = y_values[np.where(x_values < num_trees_threshold)]
-
-        median_diff = np.median(sheltered) - np.median(unsheltered)
-        median_diff_standard = (np.median(sheltered) - np.median(unsheltered)) / stats.median_abs_deviation(y_values)
-        mean_diff_standard = (np.mean(sheltered) - np.mean(unsheltered))/np.std(y_values)
-
-        benefit_score = {
-            "time":time,
-            "median_diff":median_diff,
-            "median_diff_standard": median_diff_standard,
-            "mean_diff_standard": mean_diff_standard,
-        }
-        benefit_score = benefit_score
-        benefit_scores.append(benefit_score)
-
-    benefit_scores_dict[shelter_threshold] = benefit_scores
-    df_shelter = pd.DataFrame(benefit_scores)
-    df_shelter = df_shelter.set_index('time')
-
-
-    # Join the weather data onto the shelter scores
-    df_merged = pd.merge_asof(df_shelter, df_drought, left_index=True, right_index=True, direction='nearest')
-    temperature_threshold = 25
-    hot_days = np.where(df_merged['max_temp'] > temperature_threshold)
-
-    overall_median_diff = df_merged['median_diff'].iloc[hot_days].median()
-    overall_median_diff_standard = df_merged['median_diff_standard'].iloc[hot_days].median()
-    overall_mean_diff_standard = df_merged['mean_diff_standard'].iloc[hot_days].median()
-
-    # df_merged = df_shelter
-    # overall_median_diff = df_merged['median_diff'].median()
-    # overall_median_diff_standard = df_merged['median_diff_standard'].median()
-    # overall_mean_diff_standard = df_merged['mean_diff_standard'].median()
-
-    total_benefit = {
-            "shelter_threshold":shelter_threshold,
-            "sheltered_pixels":len(sheltered),
-            "unsheltered_pixels":len(y_values) - len(sheltered),
-            "median_difference": overall_median_diff,
-            "standardized_median_difference": overall_median_diff_standard,
-            "standardized_mean_difference": overall_mean_diff_standard,
-        }
-    total_benefits.append(total_benefit)
-
+        benefit_scores = []
+    
+        # If we only care about the benefit matrix and not the time series, then replace this with ds_drought.time.values
+        for i, time in enumerate(ds.time.values):
+            ndvi = ds.sel(time=time, method='nearest')['NDVI']
+            productivity_score1 = ndvi.where(~adjacent_mask)
+            s = ds[layer_name].values
+            
+            # Flatten the arrays for plotting
+            y = productivity_score1.values.flatten()
+            y_values = y[~np.isnan(y)]   # Remove all pixels that are trees or adjacent to trees
+            x = s.flatten()
+            x_values = x[~np.isnan(y)]   # Match the shape of the x_values
+        
+            # Select sheltered pixels and calculate z scores for NDVI at each pixel
+            sheltered = y_values[np.where(x_values >= num_trees_threshold)]
+            unsheltered = y_values[np.where(x_values < num_trees_threshold)]
+    
+            # Calculate the effect sizes
+            median_diff = np.median(sheltered) - np.median(unsheltered)
+            median_diff_standard = (np.median(sheltered) - np.median(unsheltered)) / stats.median_abs_deviation(y_values)
+            mean_diff_standard = (np.mean(sheltered) - np.mean(unsheltered))/np.std(y_values)
+    
+            # Store the results
+            benefit_score = {
+                "time":time,
+                "median_diff":median_diff,
+                "median_diff_standard": median_diff_standard,
+                "mean_diff_standard": mean_diff_standard,
+            }
+            benefit_score = benefit_score
+            benefit_scores.append(benefit_score)
+    
+        # Create a dataframe
+        key = f"d:{distance}, s:{shelter_threshold}"
+        benefit_scores_dict[key] = benefit_scores
+        df_shelter = pd.DataFrame(benefit_scores)
+        df_shelter = df_shelter.set_index('time')
+    
+        # Join the weather data onto the shelter scores
+        df_merged = pd.merge_asof(df_shelter, df_drought, left_index=True, right_index=True, direction='nearest')
+        temperature_threshold = 25
+        hot_days = np.where(df_merged['max_temp'] > temperature_threshold)
+    
+        # Aggregate results over all hot timepoints
+        overall_median_diff = df_merged['median_diff'].iloc[hot_days].median()
+        overall_median_diff_standard = df_merged['median_diff_standard'].iloc[hot_days].median()
+        overall_mean_diff_standard = df_merged['mean_diff_standard'].iloc[hot_days].median()
+    
+        # Store the aggregated results
+        total_benefit = {
+                "distance_threshold":distance,
+                "shelter_threshold":shelter_threshold,
+                "sheltered_pixels":len(sheltered),
+                "unsheltered_pixels":len(y_values) - len(sheltered),
+                "median_difference": overall_median_diff,
+                "standardized_median_difference": overall_median_diff_standard,
+                "standardized_mean_difference": overall_mean_diff_standard,
+            }
+        total_benefits.append(total_benefit)
+    
 print(len(total_benefits))
 pd.DataFrame(total_benefits)
+# -
+
+df = pd.DataFrame(total_benefits)
+df['distance'] = df['distance_threshold'] * pixel_size
+df['percentage_trees'] = df['shelter_threshold'] * 100
+df.head()
+
+# +
+# Heatmap comparison
+heatmap_data = df.pivot(index='distance', columns='percentage_trees', values='standardized_median_difference')
+ax = sns.heatmap(heatmap_data, annot=True, cmap="YlGn", cbar=True)
+ax.invert_yaxis()
+
+plt.title('Sheltered vs Unsheltered')
+plt.xlabel('Tree Cover (%)')
+plt.ylabel('Distance (m)')
+cbar = ax.collections[0].colorbar
+cbar.set_label('NDVI Standardized Median Difference')
+
+plt.show()
 
 # +
 # Creating dataframe of shelter_benefits alongsde max_temp
-df = pd.DataFrame(benefit_scores_dict[0.1])
+df = pd.DataFrame(benefit_scores_dict['d:20, s:0.1'])
+# df = pd.DataFrame(benefit_scores_dict['d:100, s:0.02'])
 df = df.set_index('time')
 df = df.astype(float)
 df.index = pd.to_datetime(df.index)
@@ -336,3 +362,6 @@ plt.xlabel("")
 plt.title(stub)
 
 plt.show()
+# -
+
+
