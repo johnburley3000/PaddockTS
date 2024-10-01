@@ -140,17 +140,25 @@ temp_threshold = 25
 selected_times = nearest_df_times[df_drought['max_temp'].iloc[nearest_times_indices] > temp_threshold]
 ds_drought = ds.sel(time=selected_times, method='nearest')
 
-# +
+ds_drought
+
 total_ndvi_summed = ds_drought['NDVI'].median(dim='time')
 plt.imshow(total_ndvi_summed)
 plt.show()
 
 total_ndvi_flattened = total_ndvi_summed.values.flatten()
+plt.figure(figsize=(50, 10))
 plt.hist(total_ndvi_flattened, bins=1000)
+ax = plt.gca()
+ax.xaxis.set_major_locator(MaxNLocator(30))
 plt.show()
-# -
 
+# Save a tif file of the median summer NDVI
+filepath = os.path.join(scratch_dir, "MILG_median_summer_NDVI.tif")
+total_ndvi_summed.rio.to_raster(filepath)
+print(filepath)
 
+mean_NDVI_thresholds = 0.4, 0.44, 0.48
 
 
 
