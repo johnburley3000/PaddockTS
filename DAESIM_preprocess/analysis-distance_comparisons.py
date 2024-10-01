@@ -194,12 +194,38 @@ print("Number of sheltered pixels: ", len(sheltered))
 print("Number of unsheltered pixels: ", len(unsheltered))
 
 plt.show()
+# -
+
+# This is a thing
+standardized_mean_difference = (np.mean(sheltered) - np.mean(unsheltered))/np.std(y_values)
+standardized_mean_difference
+
+# Is this a thing?
+standardized_median_difference = (np.median(sheltered) - np.median(unsheltered)) / stats.median_abs_deviation(y_values)
+standardized_median_difference
+
+# +
+# Find the max_temp for each date with satellite imagery 
+xarray_times = ds['time'].values
+nearest_times_indices = df_drought.index.get_indexer(xarray_times, method='nearest')
+nearest_df_times = df_drought.index[nearest_times_indices]
+
+# Find the timepoints where the temp is greater than 25 degrees
+temp_threshold = 25
+selected_times = nearest_df_times[df_drought['max_temp'].iloc[nearest_times_indices] > temp_threshold]
+ds_drought = ds.sel(time=selected_times, method='nearest')
+# -
+
+len(ds.time.values)
+
+len(ds_drought.time.values)
 
 # +
 # %%time
 # Calculate the productivity score
 
-shelter_thresholds = 0, 0.05, 0.1, 0.2, 0.3   # Percentage tree cover
+shelter_thresholds = 0.025, 0.05, 0.075, 0.1, 0.2, 0.3   # Percentage tree cover
+
 total_benefits = []
 benefit_scores_dict = {}
 
@@ -208,7 +234,9 @@ for i, shelter_threshold in enumerate(shelter_thresholds):
     num_trees_threshold = ((distance * 2) ** 2) * shelter_threshold # Number of tree pixels
 
     benefit_scores = []
-    for i, time in enumerate(ds.time.values):
+
+    # I should just loop through the hot days, instead of looping through everything and filtering later
+    for i, time in enumerate(ds_drought.time.values):
         ndvi = ds.sel(time=time, method='nearest')['NDVI']
         productivity_score1 = ndvi.where(~adjacent_mask)
         s = ds['num_trees_200m'].values
@@ -221,40 +249,38 @@ for i, shelter_threshold in enumerate(shelter_thresholds):
     
         # Select sheltered pixels and calculate z scores for NDVI at each pixel
         sheltered = y_values[np.where(x_values >= num_trees_threshold)]
-        sheltered_z = (sheltered - np.mean(y_values))/np.std(y_values)
-        all_z = (y_values - np.mean(y_values))/np.std(y_values)
-        
-        percentiles = 10, 25, 50, 75, 90
-        percentile_benefits = {}
-        for percentile in percentiles:
-            percentile_benefits[f"p{percentile}"] = np.percentile(sheltered_z, percentile) - np.percentile(all_z, percentile)
+        unsheltered = y_values[np.where(x_values < num_trees_threshold)]
+
+        median_diff = np.median(sheltered) - np.median(unsheltered)
+        median_diff_standard = (np.median(sheltered) - np.median(unsheltered)) / stats.median_abs_deviation(y_values)
+        mean_diff_standard = (np.mean(sheltered) - np.mean(unsheltered))/np.std(y_values)
 
         benefit_score = {
             "time":time,
+            "median_diff":median_diff,
+            "median_diff_standard": median_diff_standard,
+            "mean_diff_standard": mean_diff_standard,
         }
-        benefit_score = benefit_score | percentile_benefits
+        benefit_score = benefit_score
         benefit_scores.append(benefit_score)
 
     benefit_scores_dict[shelter_threshold] = benefit_scores
     df_shelter = pd.DataFrame(benefit_scores)
     df_shelter = df_shelter.set_index('time')
     
-    max_z = max(df_shelter['p50'].values)
+    df_merged = df_shelter
 
-    # Join the weather data onto the shelter scores
-    df_merged = pd.merge_asof(df_shelter, df_drought, left_index=True, right_index=True, direction='nearest')
+    overall_median_diff = df_merged['median_diff'].median()
+    overall_median_diff_standard = df_merged['median_diff_standard'].median()
+    overall_mean_diff_standard = df_merged['mean_diff_standard'].median()
 
-    temperature_threshold = 25
-    hot_days = np.where(df_merged['max_temp'] > temperature_threshold)
-
-    median_z = df_merged['p50'].median()
-    median_z_summer = df_merged['p50'].iloc[hot_days].median()
-        
     total_benefit = {
             "shelter_threshold":shelter_threshold,
             "sheltered_pixels":len(sheltered),
             "unsheltered_pixels":len(y_values) - len(sheltered),
-            "median_z_summer": median_z_summer,
+            "median_difference": overall_median_diff,
+            "standardized_median_difference": overall_median_diff_standard,
+            "standardized_mean_difference": overall_mean_diff_standard,
         }
     total_benefits.append(total_benefit)
 
