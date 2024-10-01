@@ -129,6 +129,7 @@ for distance in distances:
 
 
 # +
+# Visualise the shelter score
 layer_name = "num_trees_2000m"
 filename = os.path.join(scratch_dir, f'{stub}_{layer_name}.tif')
 ds[layer_name].rio.to_raster(filename)
@@ -313,7 +314,9 @@ df = pd.DataFrame(total_benefits)
 df['distance'] = df['distance_threshold'] * pixel_size
 df['percentage_trees'] = df['shelter_threshold'] * 100
 df['percentage_benefit'] = 100 * df['median_difference']/df['median_ndvi']
-df = df[df['distance'] > 40]
+df['min_sample_size'] = df['median_difference']/df['median_ndvi']
+df['min_sample_size'] = df[['sheltered_pixels', 'unsheltered_pixels']].min(axis=1)
+df
 
 # +
 # Heatmap comparison
@@ -325,14 +328,31 @@ plt.title('Sheltered vs Unsheltered')
 plt.xlabel('Tree Cover (%)')
 plt.ylabel('Distance (m)')
 cbar = ax.collections[0].colorbar
-cbar.set_label('median NDVI boost (%)')
+cbar.set_label('median NDVI increase (%)')
+
+plt.show()
+
+# +
+# Visualise the sample sizes
+heatmap_data = df.pivot(index='distance', columns='percentage_trees', values='min_sample_size')
+
+threshold = 30000
+annotations = np.where(heatmap_data < threshold, heatmap_data.astype(int).astype(str), "")
+ax = sns.heatmap(heatmap_data, annot=annotations, fmt='', cbar=True)
+ax.invert_yaxis()
+
+plt.title('Sheltered vs Unsheltered')
+plt.xlabel('Tree Cover (%)')
+plt.ylabel('Distance (m)')
+cbar = ax.collections[0].colorbar
+cbar.set_label('Sample size')
 
 plt.show()
 
 # +
 # Creating dataframe of shelter_benefits alongsde max_temp
-# variable = 'median_diff_standard'
-variable = 'percentage_benefit'
+# variable = 'median_diff_standard' # The median diff standard shows the strongest benefits in 2020 because of the normalisation
+variable = 'percentage_benefit'     # The percentage benefit is more interpretable like a productivity boost
 
 df = pd.DataFrame(benefit_scores_dict['d:20, s:0.1'])
 # df = pd.DataFrame(benefit_scores_dict['d:100, s:0.02'])
@@ -346,7 +366,7 @@ df = df[variable]
 df_merged = pd.merge_asof(df, df_drought, left_index=True, right_index=True, direction='nearest')
 
 # +
-# Plot median_diff_standard
+# Time series plot
 df_merged[variable].plot(figsize=(20,10))
 
 # Add horizontal line at y=0
@@ -374,7 +394,13 @@ plt.title(stub)
 
 plt.show()
 # -
+# Visualise the summer productivity
+ds_drought_median = ds_drought['NDVI'].median(dim='time')
+ds_drought_masked = ds_drought_median.where(~adjacent_mask)
 
+# +
+filename = os.path.join(scratch_dir, f'{stub}_summer_ndvi.tif')
+ds_drought_masked.rio.to_raster(filename)
+print(filename)
 
-
-
+ds_drought_masked.plot()
