@@ -121,6 +121,50 @@ ds_original = ds.copy()
 ds = ds_trimmed
 
 # +
+# Visualise the distribution of all summed (or mean) NDVI's (both trees and grasses)
+total_ndvi_summed = ds['NDVI'].mean(dim='time')
+plt.imshow(total_ndvi_summed)
+plt.show()
+
+total_ndvi_flattened = total_ndvi_summed.values.flatten()
+plt.hist(total_ndvi_flattened, bins=1000)
+plt.show()
+# -
+# Find the max_temp for each date with satellite imagery 
+xarray_times = ds['time'].values
+nearest_times_indices = df_drought.index.get_indexer(xarray_times, method='nearest')
+nearest_df_times = df_drought.index[nearest_times_indices]
+
+# Find the timepoints where the temp is greater than 25 degrees
+temp_threshold = 25
+selected_times = nearest_df_times[df_drought['max_temp'].iloc[nearest_times_indices] > temp_threshold]
+ds_drought = ds.sel(time=selected_times, method='nearest')
+
+# +
+total_ndvi_summed = ds_drought['NDVI'].median(dim='time')
+plt.imshow(total_ndvi_summed)
+plt.show()
+
+total_ndvi_flattened = total_ndvi_summed.values.flatten()
+plt.hist(total_ndvi_flattened, bins=1000)
+plt.show()
+# -
+
+
+
+
+
+# +
+# Visualise the distribution of the mean NDVI in summer (when max temp > 25 degrees)
+total_ndvi_summed = ds['NDVI'].mean(dim='time')
+plt.imshow(total_ndvi_summed)
+plt.show()
+
+total_ndvi_flattened = total_ndvi_summed.values.flatten()
+plt.hist(total_ndvi_flattened, bins=1000)
+plt.show()
+
+# +
 # Better shelterscore showing the number of trees 
 pixel_size = 10  # metres
 distance = 20  # This corresponds to a 200m radius if the pixel size is 10m
@@ -176,16 +220,16 @@ paddock_mask = features.geometry_mask(
 )
 # Some of the pixels in my manually selected area are in the mask of tree + buffer pixels
 paddock_mask = paddock_mask & ~adjacent_mask
-# -
 
-plt.imshow(paddock_mask)
+# +
+# plt.imshow(paddock_mask)
 
 # +
 # Calculate the productivity score
 time = '2020-01-01'
 ndvi = ds.sel(time=time, method='nearest')['NDVI']
-# productivity_score1 = ndvi.where(~adjacent_mask)
-productivity_score1 = ndvi.where(paddock_mask)
+productivity_score1 = ndvi.where(~adjacent_mask)
+# productivity_score1 = ndvi.where(paddock_mask)
 
 s = ds['num_trees_200m'].values
 
@@ -213,11 +257,11 @@ sheltered_productivities_da = xr.DataArray(
 ds["sheltered_productivities"] = sheltered_productivities_da
 ds["sheltered_productivities"].plot()
 
-filename = os.path.join(scratch_dir, f'{stub}_sheltered_productivities_2020-01-01_manual_paddocks.tif')
+filename = os.path.join(scratch_dir, f'{stub}_sheltered_productivities_2020-01-01.tif')
 ds["sheltered_productivities"].rio.to_raster(filename)
 print(filename)
 
-filename = os.path.join(scratch_dir, f'{stub}_num_trees_200m_manual_paddocks.tif')
+filename = os.path.join(scratch_dir, f'{stub}_num_trees_200m.tif')
 ds["num_trees_200m"].rio.to_raster(filename)
 print(filename)
 
@@ -266,8 +310,8 @@ for i, shelter_threshold in enumerate(shelter_thresholds):
     benefit_scores = []
     for i, time in enumerate(ds.time.values):
         ndvi = ds.sel(time=time, method='nearest')['NDVI']
-        # productivity_score1 = ndvi.where(~adjacent_mask)
-        productivity_score1 = ndvi.where(paddock_mask)
+        productivity_score1 = ndvi.where(~adjacent_mask)
+        # productivity_score1 = ndvi.where(paddock_mask)
         # productivity_score1 = ndvi.where(new_mask)
         s = ds['num_trees_200m'].values
         
@@ -353,7 +397,7 @@ plt.show()
 # +
 # Plot a comparison of max temp and shelter benefit
 df = df_merged
-fig, ax1 = plt.subplots(figsize=(10, 6))  # Create the base figure and axis
+fig, ax1 = plt.subplots(figsize=(50, 20))  # Create the base figure and axis
 
 # Maximum temperature
 ax1.plot(df.index, df['max_temp'], color='tab:red', label='Maximum temperature')
