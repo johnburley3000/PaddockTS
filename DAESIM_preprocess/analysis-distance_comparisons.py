@@ -44,7 +44,7 @@ stubs = {
 
 # Filepaths
 outdir = os.path.join(gdata_dir, "Data/PadSeg/")
-stub = "MILG"
+stub = "MULL"
 
 # %%time
 # Sentinel imagery
@@ -129,20 +129,94 @@ for distance in distances:
 
 
 # +
-# Visualise the shelter score
+# Example shelter score
 layer_name = "num_trees_2000m"
 filename = os.path.join(scratch_dir, f'{stub}_{layer_name}.tif')
 ds[layer_name].rio.to_raster(filename)
 print(filename)
 
-ds[layer_name].plot()
+ds[layer_name].plot(cmap='viridis')
+plt.title(f"{stub} Shelter Score")
+filename = filename = os.path.join(scratch_dir, f'{stub}_{layer_name}.png')
+plt.savefig(filename)
+print(filename)
+
+# +
+# Additional vegetation indices
+ds['NIRV'] = ds['NDVI'] * ds['nbart_nir_1']
+
+B8 = ds['nbart_nir_1']
+B4 = ds['nbart_red']
+B2 = ds['nbart_blue']
+ds['EVI'] = 2.5 * ((B8 - B4) / (B8 + 6 * B4 - 7.5 * B2 + 1))
+
+# +
+# # Fractional Cover
+# import tensorflow as tf
+# from fractionalcover3 import unmix_fractional_cover
+# from fractionalcover3 import data 
+
+# def calculate_fractional_cover(ds, band_names, i=3):
+#     # Check if the number of band names is exactly 6
+#     if len(band_names) != 6:
+#         raise ValueError("Exactly 6 band names must be provided")
+    
+#     # Extract the specified bands and stack them into a numpy array with shape (time, bands, x, y)
+#     inref = np.stack([ds[band].values for band in band_names], axis=1)
+#     print(inref.shape)  # This should now be (time, bands, x, y)
+
+#     #inref = inref * 0.0001 # if not applying the correcion factors below
+
+#     # Array for correction factors 
+#     # This is taken from here: https://github.com/petescarth/fractionalcover/blob/main/notebooks/ApplyModel.ipynb
+#     # and described in a paper by Neil Floodfor taking Landsat to Sentinel 2 reflectance (and visa versa).
+#     correction_factors = np.array([0.9551, 1.0582, 0.9871, 1.0187, 0.9528, 0.9688]) + \
+#                          np.array([-0.0022, 0.0031, 0.0064, 0.012, 0.0079, -0.0042])
+
+#     # Apply correction factors using broadcasting
+#     inref = inref * correction_factors[:, np.newaxis, np.newaxis]
+
+#     # Initialize an array to store the fractional cover results
+#     fractions = np.empty((inref.shape[0], 3, inref.shape[2], inref.shape[3]))
+
+#     # Loop over each time slice and apply the unmix_fractional_cover function
+#     for t in range(inref.shape[0]):
+#         fractions[t] = unmix_fractional_cover(inref[t], fc_model=data.get_model(n=i))
+    
+#     return fractions
+
+# def add_fractional_cover_to_ds(ds, fractions):
+#     """
+#     Add the fractional cover bands to the original xarray.Dataset.
+
+#     Parameters:
+#     ds (xarray.Dataset): The original xarray Dataset containing the satellite data.
+#     fractions (numpy.ndarray): The output array with fractional cover (time, bands, x, y).
+
+#     Returns:
+#     xarray.Dataset: The updated xarray Dataset with the new fractional cover bands.
+#     """
+#     # Create DataArray for each vegetation fraction
+#     bg = xr.DataArray(fractions[:, 0, :, :], coords=[ds.coords['time'], ds.coords['y'], ds.coords['x']], dims=['time', 'y', 'x'])
+#     pv = xr.DataArray(fractions[:, 1, :, :], coords=[ds.coords['time'], ds.coords['y'], ds.coords['x']], dims=['time', 'y', 'x'])
+#     npv = xr.DataArray(fractions[:, 2, :, :], coords=[ds.coords['time'], ds.coords['y'], ds.coords['x']], dims=['time', 'y', 'x'])
+    
+#     # Assign new DataArrays to the original Dataset
+#     ds_updated = ds.assign(bg=bg, pv=pv, npv=npv)
+    
+#     return ds_updated
+
+# # band_names = ['nbart_blue', 'nbart_green', 'nbart_red', 'nbart_nir_1', 'nbart_swir_2', 'nbart_swir_3']
+# # # fractions = calculate_fractional_cover(ds, band_names)
+# # ds = add_fractional_cover_to_ds(ds, fractions)
 
 # +
 # Example shelter vs productivity score
 time = '2020-01-01'
-ndvi = ds.sel(time=time, method='nearest')['NDVI']
+productivity_variable = 'EVI'
+ndvi = ds.sel(time=time, method='nearest')[productivity_variable]
 productivity_score1 = ndvi.where(~adjacent_mask)
-distance = 200
+distance = 20
 layer_name = f"num_trees_{pixel_size * distance}m"
 s = ds[layer_name].values
 
@@ -151,34 +225,51 @@ y = productivity_score1.values.flatten()
 y_values = y[~np.isnan(y)]   # Remove all pixels that are trees or adjacent to trees
 x = s.flatten()
 x_values = x[~np.isnan(y)]   # Match the shape of the x_values
+
+# # Remove infinity values from the fractional cover (I haven't looked into what these mean)
+# not_infinity = np.where(y_values != np.inf)[0]
+# y_values = y_values[not_infinity]
+# x_values = x_values[not_infinity]
+
 len(y_values)
-# -
 
 
+# +
 # Example 2d histogram
 plt.hist2d(x_values, y_values, bins=100, norm=mcolors.PowerNorm(0.1))
-plt.ylabel('NDVI', fontsize=12)
+plt.ylabel(productivity_variable, fontsize=12)
 pixel_size = 10
 plt.xlabel(f'Number of tree pixels within {distance * pixel_size}m', fontsize=12)
 plt.title(stub + ": " + str(time)[:10], fontsize=14)
-plt.show()
+
+filename = os.path.join(scratch_dir, f"{stub}_{productivity_variable}_2dhist_{time}.png")
+plt.savefig(filename)
+print(filename)
 
 # +
 # Example linear regression
-res = stats.linregress(x_values, y_values)
+
+# Min max normalisation for the shelter and productivity scores to make the slope more meaningful
+x_values_normalised = (x_values - min(x_values)) / (max(x_values) - min(x_values))
+y_values_normalised = (y_values - min(y_values)) / (max(y_values) - min(y_values))
+
+res = stats.linregress(x_values_normalised, y_values_normalised)
 print(f"Sample size: {len(x_values)}")
 print(f"R-squared: {res.rvalue**2:.6f}")
 print(f"Slope: {res.slope:.6f}")
-plt.plot(x_values, y_values, 'o', label='original data')
-plt.plot(x_values, res.intercept + res.slope*x_values, 'r', label='fitted line')
+plt.plot(x_values_normalised, y_values_normalised, 'o', label='original data')
+plt.plot(x_values_normalised, res.intercept + res.slope*x_values_normalised, 'r', label='fitted line')
 
-plt.ylabel('NDVI', fontsize=12)
+plt.ylabel('Productivity Score', fontsize=12)
 pixel_size = 10
-plt.xlabel(f'Number of tree pixels within {distance * pixel_size}m', fontsize=12)
+plt.xlabel(f'Shelter Score', fontsize=12)
 plt.title(stub + ": " + str(time)[:10], fontsize=14)
 
 plt.legend()
-plt.show()
+
+filename = os.path.join(scratch_dir, f"{stub}_{productivity_variable}_lineplot_{time}.png")
+plt.savefig(filename)
+print(filename)
 # -
 
 # Example sheltered vs unsheltered threshold
@@ -189,19 +280,23 @@ num_trees_threshold
 
 # +
 # Example box plot
+# y_values = (y_values - min(y_values)) / (max(y_values) - min(y_values)) # Normalisation for the fractional cover
+
 sheltered = y_values[np.where(x_values >= num_trees_threshold)]
 unsheltered = y_values[np.where(x_values < num_trees_threshold)]
 
 plt.boxplot([unsheltered, sheltered], labels=['Unsheltered', 'Sheltered'], showfliers=False)
 
 plt.title(stub + ": " + str(time)[:10], fontsize=14)
-plt.ylabel('NDVI', fontsize=12)
+plt.ylabel(productivity_variable, fontsize=12)
 
 print(f"Shelter threshold = {int(num_trees_threshold)} tree pixels within {distance * pixel_size}m")
 print("Number of sheltered pixels: ", len(sheltered))
 print("Number of unsheltered pixels: ", len(unsheltered))
 
-plt.show()
+filename = os.path.join(scratch_dir, f"{stub}_{productivity_variable}_boxplot_{time}.png")
+plt.savefig(filename)
+print(filename)
 # -
 
 # 6% increase in NDVI at this timepoint in sheltered pixels compared to unsheltered
@@ -246,7 +341,7 @@ for i, distance in enumerate(distances):
         benefit_scores = []
     
         for i, time in enumerate(ds.time.values):
-            ndvi = ds.sel(time=time, method='nearest')['NDVI']
+            ndvi = ds.sel(time=time, method='nearest')[productivity_variable]
             productivity_score1 = ndvi.where(~adjacent_mask)
             s = ds[layer_name].values
             
@@ -255,6 +350,9 @@ for i, distance in enumerate(distances):
             y_values = y[~np.isnan(y)]   # Remove all pixels that are trees or adjacent to trees
             x = s.flatten()
             x_values = x[~np.isnan(y)]   # Match the shape of the x_values
+
+            # Normalise the y values (for bare ground and non-photosynethetic vegetation comparison)
+            # y_values = (y_values - min(y_values)) / (max(y_values) - min(y_values))
         
             # Select sheltered pixels and calculate z scores for NDVI at each pixel
             sheltered = y_values[np.where(x_values >= num_trees_threshold)]
@@ -268,7 +366,7 @@ for i, distance in enumerate(distances):
             # Store the results
             benefit_score = {
                 "time":time,
-                "median_ndvi":np.median(y_values),
+                f"median_{productivity_variable}":np.median(y_values),
                 "median_diff":median_diff,
                 "median_diff_standard": median_diff_standard,
                 "mean_diff_standard": mean_diff_standard,
@@ -288,7 +386,7 @@ for i, distance in enumerate(distances):
         hot_days = np.where(df_merged['max_temp'] > temperature_threshold)
     
         # Aggregate results over all hot timepoints
-        overall_median_ndvi = df_merged['median_ndvi'].iloc[hot_days].median()
+        overall_median_ndvi = df_merged[f'median_{productivity_variable}'].iloc[hot_days].median()
         overall_median_diff = df_merged['median_diff'].iloc[hot_days].median()
         overall_median_diff_standard = df_merged['median_diff_standard'].iloc[hot_days].median()
         overall_mean_diff_standard = df_merged['mean_diff_standard'].iloc[hot_days].median()
@@ -299,7 +397,7 @@ for i, distance in enumerate(distances):
                 "shelter_threshold":shelter_threshold,
                 "sheltered_pixels":len(sheltered),
                 "unsheltered_pixels":len(y_values) - len(sheltered),
-                "median_ndvi":overall_median_ndvi,
+                f"median_{productivity_variable}":overall_median_ndvi,
                 "median_difference": overall_median_diff,
                 "standardized_median_difference": overall_median_diff_standard,
                 "standardized_mean_difference": overall_mean_diff_standard,
@@ -307,50 +405,10 @@ for i, distance in enumerate(distances):
         total_benefits.append(total_benefit)
     
 print(len(total_benefits))
-pd.DataFrame(total_benefits).head()
-# -
-
-df = pd.DataFrame(total_benefits)
-df['distance'] = df['distance_threshold'] * pixel_size
-df['percentage_trees'] = df['shelter_threshold'] * 100
-df['percentage_benefit'] = 100 * df['median_difference']/df['median_ndvi']
-df['min_sample_size'] = df['median_difference']/df['median_ndvi']
-df['min_sample_size'] = df[['sheltered_pixels', 'unsheltered_pixels']].min(axis=1)
-df
+# pd.DataFrame(total_benefits).head()
 
 # +
-# Heatmap comparison
-heatmap_data = df.pivot(index='distance', columns='percentage_trees', values='percentage_benefit')
-ax = sns.heatmap(heatmap_data, annot=True, cmap="YlGn", cbar=True)
-ax.invert_yaxis()
-
-plt.title('Sheltered vs Unsheltered')
-plt.xlabel('Tree Cover (%)')
-plt.ylabel('Distance (m)')
-cbar = ax.collections[0].colorbar
-cbar.set_label('median NDVI increase (%)')
-
-plt.show()
-
-# +
-# Visualise the sample sizes
-heatmap_data = df.pivot(index='distance', columns='percentage_trees', values='min_sample_size')
-
-threshold = 30000
-annotations = np.where(heatmap_data < threshold, heatmap_data.astype(int).astype(str), "")
-ax = sns.heatmap(heatmap_data, annot=annotations, fmt='', cbar=True)
-ax.invert_yaxis()
-
-plt.title('Sheltered vs Unsheltered')
-plt.xlabel('Tree Cover (%)')
-plt.ylabel('Distance (m)')
-cbar = ax.collections[0].colorbar
-cbar.set_label('Sample size')
-
-plt.show()
-
-# +
-# Creating dataframe of shelter_benefits alongsde max_temp
+# Creating time series dataframe of shelter_benefits alongsde max_temp
 # variable = 'median_diff_standard' # The median diff standard shows the strongest benefits in 2020 because of the normalisation
 variable = 'percentage_benefit'     # The percentage benefit is more interpretable like a productivity boost
 
@@ -359,13 +417,10 @@ df = pd.DataFrame(benefit_scores_dict['d:20, s:0.1'])
 df = df.set_index('time')
 df = df.astype(float)
 df.index = pd.to_datetime(df.index)
-df['percentage_benefit'] = 100 * df['median_diff']/df['median_ndvi']
-
+df['percentage_benefit'] = 100 * df['median_diff']/df[f'median_{productivity_variable}']
 df = df[variable]
-
 df_merged = pd.merge_asof(df, df_drought, left_index=True, right_index=True, direction='nearest')
 
-# +
 # Time series plot
 df_merged[variable].plot(figsize=(20,10))
 
@@ -385,22 +440,75 @@ for i, (date, above) in enumerate(above_25.items()):
         start = None
 
 # Key
-patch = mpatches.Patch(color='red', alpha=0.1, label='max_temp > 25°C')
+patch = mpatches.Patch(color='red', alpha=0.1, label=f'max_temp > {temperature_threshold}°C')
 ax.legend(handles=[patch], loc='upper left')
 
-plt.ylabel("Shelter benefit")
+plt.ylabel(f"median {productivity_variable} increase (%)")
 plt.xlabel("")
-plt.title(stub)
+plt.title(f'{stub}: Shelter Benefit Time Series')
 
-plt.show()
+filename = os.path.join(scratch_dir, f"{stub}_{productivity_variable}_time_series.png")
+plt.savefig(filename)
+print(filename)
 # -
-# Visualise the summer productivity
-ds_drought_median = ds_drought['NDVI'].median(dim='time')
-ds_drought_masked = ds_drought_median.where(~adjacent_mask)
+
+df = pd.DataFrame(total_benefits)
+df['distance'] = df['distance_threshold'] * pixel_size
+df['percentage_trees'] = df['shelter_threshold'] * 100
+df['percentage_benefit'] = 100 * df['median_difference']/df[f'median_{productivity_variable}']
+df['min_sample_size'] = df['median_difference']/df[f'median_{productivity_variable}']
+df['min_sample_size'] = df[['sheltered_pixels', 'unsheltered_pixels']].min(axis=1)
+df
 
 # +
-filename = os.path.join(scratch_dir, f'{stub}_summer_ndvi.tif')
+# Visualise the sample sizes
+heatmap_data = df.pivot(index='distance', columns='percentage_trees', values='min_sample_size')
+
+threshold = 30000
+annotations = np.where(heatmap_data < threshold, heatmap_data.astype(int).astype(str), "")
+ax = sns.heatmap(heatmap_data, annot=annotations, fmt='', cbar=True)
+ax.invert_yaxis()
+
+plt.title(f'{stub}: Sheltered vs Unsheltered')
+plt.xlabel('Tree Cover (%)')
+plt.ylabel('Distance (m)')
+cbar = ax.collections[0].colorbar
+cbar.set_label('Sample size')
+
+filename = os.path.join(scratch_dir, f"{stub}_{productivity_variable}_sample_sizes.png")
+plt.savefig(filename)
+print(filename)
+
+# +
+# Heatmap comparison
+heatmap_data = df.pivot(index='distance', columns='percentage_trees', values='percentage_benefit')
+ax = sns.heatmap(heatmap_data, annot=True, cmap="YlGn", cbar=True)
+ax.invert_yaxis()
+
+plt.title(f'{stub}: Sheltered vs Unsheltered')
+plt.xlabel('Tree Cover (%)')
+plt.ylabel('Distance (m)')
+cbar = ax.collections[0].colorbar
+cbar.set_label(f'median {productivity_variable} increase (%)')
+
+filename = os.path.join(scratch_dir, f"{stub}_{productivity_variable}_shelter_benefits.png")
+plt.savefig(filename)
+print(filename)
+
+# +
+# Visualise the summer productivity
+ds_drought_median = ds_drought[productivity_variable].median(dim='time')
+ds_drought_masked = ds_drought_median.where(~adjacent_mask)
+
+filename = os.path.join(scratch_dir, f'{stub}_summer_{productivity_variable}.tif')
 ds_drought_masked.rio.to_raster(filename)
 print(filename)
 
-ds_drought_masked.plot()
+ds_drought_masked.plot(cbar_kwargs={'label': f'Median {productivity_variable} when max_temp > {temperature_threshold}°C'})
+plt.title(f"{stub} Productivity Score")
+filename = os.path.join(scratch_dir, f'{stub}_summer_{productivity_variable}.png')
+plt.savefig(filename)
+print(filename)
+# -
+
+
