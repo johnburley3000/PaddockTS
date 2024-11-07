@@ -71,20 +71,34 @@ def add_tiff_band(ds, variable, resampling_method, outdir, stub):
     ds[variable] = reprojected.isel(band=0).drop_vars('band')
     return ds
 
-# Add worldcover to the xarray
 
+world_cover_layers = {
+    "Tree cover": 10, # Green
+    "Shrubland": 20, # Orange
+    "Grassland": 30, # Yellow
+    "Cropland": 40, # pink
+    "Built-up": 50, # red
+    "Permanent water bodies": 80, # blue
+}
 
+# %%time
 worldcover_path = os.path.join("/g/data/xe2/cb8590/WORLDCOVER/ESA_WORLDCOVER_10M_2021_V200/MAP/")
 MILG_id = "S36E147"
 filename = os.path.join(worldcover_path, f"ESA_WorldCover_10m_2021_v200_{MILG_id}_Map", f"ESA_WorldCover_10m_2021_v200_{MILG_id}_Map.tif")
-
 array = rxr.open_rasterio(filename)
 reprojected = array.rio.reproject_match(ds)
-# ds[variable] = reprojected.isel(band=0).drop_vars('band')
+ds["worldcover"] = reprojected.isel(band=0).drop_vars('band')
 
-reprojected
+cropland = ds["worldcover"].values == world_cover_layers["Cropland"]
+grassland = ds["worldcover"].values == world_cover_layers["Grassland"]
+crop_or_grass = cropland | grassland
 
-reprojected.plot()
+
+
+
+
+plt.imshow(cropland)
+
 
 ds = add_tiff_band(ds, "canopy_height", Resampling.max, outdir, stub)
 
@@ -140,7 +154,10 @@ for distance in distances:
         name="shelter_score" 
     )
     ds[layer_name] = shelter_score_da
+# -
 
+
+plt.imshow(adjacent_mask)
 
 # +
 # Example shelter score
@@ -223,13 +240,16 @@ ds['EVI'] = 2.5 * ((B8 - B4) / (B8 + 6 * B4 - 7.5 * B2 + 1))
 # # band_names = ['nbart_blue', 'nbart_green', 'nbart_red', 'nbart_nir_1', 'nbart_swir_2', 'nbart_swir_3']
 # # # fractions = calculate_fractional_cover(ds, band_names)
 # # ds = add_fractional_cover_to_ds(ds, fractions)
+# -
+
+plt.imshow(~adjacent_mask & cropland)
 
 # +
 # Example shelter vs productivity score
 time = '2020-01-01'
 productivity_variable = 'EVI'
 ndvi = ds.sel(time=time, method='nearest')[productivity_variable]
-productivity_score1 = ndvi.where(~adjacent_mask)
+productivity_score1 = ndvi.where(~adjacent_mask & (grassland | cropland))
 distance = 20
 layer_name = f"num_trees_{pixel_size * distance}m"
 s = ds[layer_name].values
@@ -356,7 +376,7 @@ for i, distance in enumerate(distances):
     
         for i, time in enumerate(ds.time.values):
             ndvi = ds.sel(time=time, method='nearest')[productivity_variable]
-            productivity_score1 = ndvi.where(~adjacent_mask)
+            productivity_score1 = ndvi.where(~adjacent_mask & (grassland | cropland))
             s = ds[layer_name].values
             
             # Flatten the arrays for plotting
@@ -510,19 +530,19 @@ plt.savefig(filename)
 print(filename)
 
 # +
-# Visualise the summer productivity
-ds_drought_median = ds_drought[productivity_variable].median(dim='time')
-ds_drought_masked = ds_drought_median.where(~adjacent_mask)
+# # Visualise the summer productivity
+# ds_drought_median = ds_drought[productivity_variable].median(dim='time')
+# ds_drought_masked = ds_drought_median.where(~adjacent_mask)
 
-filename = os.path.join(scratch_dir, f'{stub}_summer_{productivity_variable}.tif')
-ds_drought_masked.rio.to_raster(filename)
-print(filename)
+# filename = os.path.join(scratch_dir, f'{stub}_summer_{productivity_variable}.tif')
+# ds_drought_masked.rio.to_raster(filename)
+# print(filename)
 
-ds_drought_masked.plot(cbar_kwargs={'label': f'Median {productivity_variable} when max_temp > {temperature_threshold}°C'})
-plt.title(f"{stub} Productivity Score")
-filename = os.path.join(scratch_dir, f'{stub}_summer_{productivity_variable}.png')
-plt.savefig(filename)
-print(filename)
+# ds_drought_masked.plot(cbar_kwargs={'label': f'Median {productivity_variable} when max_temp > {temperature_threshold}°C'})
+# plt.title(f"{stub} Productivity Score")
+# filename = os.path.join(scratch_dir, f'{stub}_summer_{productivity_variable}.png')
+# plt.savefig(filename)
+# print(filename)
 # -
 
 
