@@ -44,7 +44,7 @@ stubs = {
 
 # Filepaths
 outdir = os.path.join(gdata_dir, "Data/PadSeg/")
-stub = "MULL"
+stub = "MILG"
 
 # %%time
 # Sentinel imagery
@@ -71,6 +71,20 @@ def add_tiff_band(ds, variable, resampling_method, outdir, stub):
     ds[variable] = reprojected.isel(band=0).drop_vars('band')
     return ds
 
+# Add worldcover to the xarray
+
+
+worldcover_path = os.path.join("/g/data/xe2/cb8590/WORLDCOVER/ESA_WORLDCOVER_10M_2021_V200/MAP/")
+MILG_id = "S36E147"
+filename = os.path.join(worldcover_path, f"ESA_WorldCover_10m_2021_v200_{MILG_id}_Map", f"ESA_WorldCover_10m_2021_v200_{MILG_id}_Map.tif")
+
+array = rxr.open_rasterio(filename)
+reprojected = array.rio.reproject_match(ds)
+# ds[variable] = reprojected.isel(band=0).drop_vars('band')
+
+reprojected
+
+reprojected.plot()
 
 ds = add_tiff_band(ds, "canopy_height", Resampling.max, outdir, stub)
 
