@@ -81,26 +81,16 @@ world_cover_layers = {
     "Permanent water bodies": 80, # blue
 }
 
-# %%time
-worldcover_path = os.path.join("/g/data/xe2/cb8590/WORLDCOVER/ESA_WORLDCOVER_10M_2021_V200/MAP/")
-MILG_id = "S36E147"
-filename = os.path.join(worldcover_path, f"ESA_WorldCover_10m_2021_v200_{MILG_id}_Map", f"ESA_WorldCover_10m_2021_v200_{MILG_id}_Map.tif")
+# Calculate the percentage of tree cover in each sentinel pixel, based on the global canopy height map
+variable = "canopy_height"
+filename = os.path.join(outdir, f"{stub}_{variable}.tif")
 array = rxr.open_rasterio(filename)
-reprojected = array.rio.reproject_match(ds)
-ds["worldcover"] = reprojected.isel(band=0).drop_vars('band')
+binary_mask = (array >= 1).astype(float)
+tree_percent = binary_mask.rio.reproject_match(ds, resampling=Resampling.average)
+ds['tree_percent'] = tree_percent
+tree_percent = ds['tree_percent'].isel(band=0).values
 
-cropland = ds["worldcover"].values == world_cover_layers["Cropland"]
-grassland = ds["worldcover"].values == world_cover_layers["Grassland"]
-crop_or_grass = cropland | grassland
-
-
-
-
-
-plt.imshow(cropland)
-
-
-ds = add_tiff_band(ds, "canopy_height", Resampling.max, outdir, stub)
+ds = add_tiff_band(ds, "canopy_height", Resampling.max, outdir, stub)   # Maximum canopy height in each sentinel pixel
 
 # The resampling often messes up the boundary, so we trim the outside pixels after adding all the resampled bounds
 ds_trimmed = ds.isel(
@@ -120,31 +110,51 @@ ds = ds_trimmed
 
 # +
 # %%time
+# Add worldcover classes to the xarray
+worldcover_path = os.path.join("/g/data/xe2/cb8590/WORLDCOVER/ESA_WORLDCOVER_10M_2021_V200/MAP/")
+MILG_id = "S36E147"
+filename = os.path.join(worldcover_path, f"ESA_WorldCover_10m_2021_v200_{MILG_id}_Map", f"ESA_WorldCover_10m_2021_v200_{MILG_id}_Map.tif")
+array = rxr.open_rasterio(filename)
+reprojected = array.rio.reproject_match(ds)
+ds["worldcover"] = reprojected.isel(band=0).drop_vars('band')
+
+cropland = ds["worldcover"].values == world_cover_layers["Cropland"]
+grassland = ds["worldcover"].values == world_cover_layers["Grassland"]
+crop_or_grass = cropland | grassland
+
+# +
+# %%time
 # Shelterscore showing the number of trees 
 pixel_size = 10  # metres
-distances = 5, 10, 20, 50, 100, 200 # A distance of 20 would correspond to a 200m radius if the pixel size is 10m
+# distances = 5, 10, 20, 50, 100, 200 # A distance of 20 would correspond to a 200m radius if the pixel size is 10m
+
+distances = 4, 6, 8, 10, 20, 30, 40, 50   # A distance of 20 would correspond to a 200m radius if the pixel size is 10m
 
 # Classify anything with a height greater than 1 as a tree
-tree_threshold = 1
-tree_mask = ds['canopy_height'] >= tree_threshold
+# tree_threshold = 1
+# tree_mask = ds['canopy_height'] >= tree_threshold
 
 # # Find the pixels adjacent to trees
 structuring_element = np.ones((3, 3))  # This defines adjacency (including diagonals)
 adjacent_mask = scipy.ndimage.binary_dilation(tree_mask, structure=structuring_element)
 
 for distance in distances:
-    layer_name = f"num_trees_{pixel_size * distance}m"
-    print(f"Adding layer: {layer_name}")
     
     # Calculate the number of trees within a given distance for each pixel
     y, x = np.ogrid[-distance:distance+1, -distance:distance+1]
     kernel = x**2 + y**2 <= distance**2
     kernel = kernel.astype(float)
-    # shelter_score = scipy.ndimage.convolve(tree_mask.astype(float), kernel, mode='constant', cval=0.0)
-    shelter_score = fftconvolve(tree_mask.astype(float), kernel, mode='same')
+
+    # This method will overeestimate the tree cover percent
+    # shelter_score = fftconvolve(tree_mask.astype(float), kernel, mode='same')
+
+    # More accurate tree cover percent calculation
+    total_tree_cover = fftconvolve(tree_percent, kernel, mode='same')
+    shelter_score = (total_tree_cover / kernel.sum()) * 100
     
     # Mask out trees and adjacent pixels
     shelter_score[np.where(adjacent_mask)] = np.nan
+    shelter_score[shelter_score < 1] = 0
     
     # Add the shelter_score to the xarray
     shelter_score_da = xr.DataArray(
@@ -153,15 +163,15 @@ for distance in distances:
         coords={"y": ds.coords["y"], "x": ds.coords["x"]}, 
         name="shelter_score" 
     )
+
+    layer_name = f"percent_trees_{pixel_size * distance}m"
     ds[layer_name] = shelter_score_da
-# -
+    print(f"Added layer: {layer_name}")
 
-
-plt.imshow(adjacent_mask)
 
 # +
 # Example shelter score
-layer_name = "num_trees_2000m"
+layer_name = "percent_trees_200m"
 filename = os.path.join(scratch_dir, f'{stub}_{layer_name}.tif')
 ds[layer_name].rio.to_raster(filename)
 print(filename)
@@ -249,7 +259,7 @@ plt.imshow(~adjacent_mask & cropland)
 time = '2020-01-01'
 productivity_variable = 'EVI'
 ndvi = ds.sel(time=time, method='nearest')[productivity_variable]
-productivity_score1 = ndvi.where(~adjacent_mask & (grassland | cropland))
+productivity_score1 = ndvi.where(~adjacent_mask) #  & (grassland | cropland))
 distance = 20
 layer_name = f"num_trees_{pixel_size * distance}m"
 s = ds[layer_name].values
@@ -264,8 +274,6 @@ x_values = x[~np.isnan(y)]   # Match the shape of the x_values
 # not_infinity = np.where(y_values != np.inf)[0]
 # y_values = y_values[not_infinity]
 # x_values = x_values[not_infinity]
-
-len(y_values)
 
 
 # +
@@ -304,27 +312,28 @@ plt.legend()
 filename = os.path.join(scratch_dir, f"{stub}_{productivity_variable}_lineplot_{time}.png")
 plt.savefig(filename)
 print(filename)
-# -
 
-# Example sheltered vs unsheltered threshold
-distance = 20
-shelter_threshold = 0.1  # Percentage tree cover
-num_trees_threshold = ((distance * 2) ** 2) * shelter_threshold # Number of tree pixels
-num_trees_threshold
+# +
+# # Example sheltered vs unsheltered threshold
+# distance = 20
+# shelter_threshold = 0.1  # Percentage tree cover
+# num_trees_threshold = ((distance * 2) ** 2) * shelter_threshold # Number of tree pixels
+# num_trees_threshold
 
 # +
 # Example box plot
 # y_values = (y_values - min(y_values)) / (max(y_values) - min(y_values)) # Normalisation for the fractional cover
+percent_tree_threshold = 10
 
-sheltered = y_values[np.where(x_values >= num_trees_threshold)]
-unsheltered = y_values[np.where(x_values < num_trees_threshold)]
+sheltered = y_values[np.where(x_values >= percent_tree_threshold)]
+unsheltered = y_values[np.where(x_values < percent_tree_threshold)]
 
 plt.boxplot([unsheltered, sheltered], labels=['Unsheltered', 'Sheltered'], showfliers=False)
 
 plt.title(stub + ": " + str(time)[:10], fontsize=14)
 plt.ylabel(productivity_variable, fontsize=12)
 
-print(f"Shelter threshold = {int(num_trees_threshold)} tree pixels within {distance * pixel_size}m")
+print(f"Shelter threshold = {int(percent_tree_threshold)}% tree cover within {distance * pixel_size}m")
 print("Number of sheltered pixels: ", len(sheltered))
 print("Number of unsheltered pixels: ", len(unsheltered))
 
@@ -333,7 +342,7 @@ plt.savefig(filename)
 print(filename)
 # -
 
-# 6% increase in NDVI at this timepoint in sheltered pixels compared to unsheltered
+# 11% increase in EVI at this timepoint in sheltered pixels compared to unsheltered
 (np.median(sheltered) - np.median(unsheltered))/np.median(y_values)
 
 # An actual effect size
@@ -359,14 +368,15 @@ ds_drought = ds.sel(time=selected_times, method='nearest')
 # %%time
 # Calculate the productivity score
 
-shelter_thresholds = 0.01, 0.02, 0.05, 0.1, 0.2, 0.3   # Percentage tree cover
+# shelter_thresholds = 0.01, 0.02, 0.05, 0.1, 0.2, 0.3   # Percentage tree cover
+shelter_thresholds = 0.005, 0.01, 0.02, 0.05, 0.1   # Percentage tree cover
 
 total_benefits = []
 benefit_scores_dict = {}
 
 for i, distance in enumerate(distances):
     print(f"\nDistance threshold {i}/{len(distances)}", distance)
-    layer_name = f"num_trees_{distance * pixel_size}m"
+    layer_name = f"percent_trees_{distance * pixel_size}m"
 
     for i, shelter_threshold in enumerate(shelter_thresholds):
         print(f"Shelter threshold {i}/{len(shelter_thresholds)}", shelter_threshold)
@@ -446,7 +456,7 @@ print(len(total_benefits))
 # variable = 'median_diff_standard' # The median diff standard shows the strongest benefits in 2020 because of the normalisation
 variable = 'percentage_benefit'     # The percentage benefit is more interpretable like a productivity boost
 
-df = pd.DataFrame(benefit_scores_dict['d:20, s:0.1'])
+df = pd.DataFrame(benefit_scores_dict['d:10, s:0.02'])
 # df = pd.DataFrame(benefit_scores_dict['d:100, s:0.02'])
 df = df.set_index('time')
 df = df.astype(float)
@@ -512,6 +522,11 @@ cbar.set_label('Sample size')
 filename = os.path.join(scratch_dir, f"{stub}_{productivity_variable}_sample_sizes.png")
 plt.savefig(filename)
 print(filename)
+
+# +
+
+
+
 
 # +
 # Heatmap comparison
