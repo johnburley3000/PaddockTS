@@ -44,7 +44,7 @@ stubs = {
 
 # Filepaths
 outdir = os.path.join(gdata_dir, "Data/PadSeg/")
-stub = "MILG"
+stub = "ADAM"
 
 # %%time
 # Sentinel imagery
@@ -343,6 +343,21 @@ plt.savefig(filename)
 print(filename)
 # -
 
+
+
+# +
+# Make sure the sample size is greater than some value, e.g. 10k
+sample_size = min(len(unsheltered), len(sheltered))
+
+random_values = np.random.choice(np.arange(0, len(sheltered)), size=1000, replace=False)
+sheltered_sample = sheltered[random_values]
+
+random_values = np.random.choice(np.arange(0, len(unsheltered)), size=1000, replace=False)
+unsheltered_sample = unsheltered[random_values]
+# -
+
+
+
 # 11% increase in EVI at this timepoint in sheltered pixels compared to unsheltered
 (np.median(sheltered) - np.median(unsheltered))/np.median(y_values)
 
@@ -404,6 +419,22 @@ for i, distance in enumerate(distances):
             # Select sheltered pixels and calculate z scores for NDVI at each pixel
             sheltered = y_values[np.where(x_values >= num_trees_threshold)]
             unsheltered = y_values[np.where(x_values < num_trees_threshold)]
+
+            # Take a random sample to keep the sample sizes consistent across experiments
+            random_sample_size = 1000
+            sample_size = min(len(unsheltered), len(sheltered))
+
+            
+            if sample_size < random_sample_size:
+                sheltered = []
+                unsheltered = []
+            else:
+                random_values = np.random.choice(np.arange(0, len(sheltered)), size=random_sample_size, replace=False)
+                sheltered = sheltered[random_values]
+                
+                random_values = np.random.choice(np.arange(0, len(unsheltered)), size=random_sample_size, replace=False)
+                unsheltered = unsheltered[random_values]
+
     
             # Calculate the effect sizes
             median_diff = np.median(sheltered) - np.median(unsheltered)
