@@ -88,7 +88,6 @@ array = rxr.open_rasterio(filename)
 binary_mask = (array >= 1).astype(float)
 tree_percent = binary_mask.rio.reproject_match(ds, resampling=Resampling.average)
 ds['tree_percent'] = tree_percent
-tree_percent = ds['tree_percent'].isel(band=0).values
 
 ds = add_tiff_band(ds, "canopy_height", Resampling.max, outdir, stub)   # Maximum canopy height in each sentinel pixel
 
@@ -122,17 +121,19 @@ cropland = ds["worldcover"].values == world_cover_layers["Cropland"]
 grassland = ds["worldcover"].values == world_cover_layers["Grassland"]
 crop_or_grass = cropland | grassland
 
+tree_percent = ds['tree_percent'].isel(band=0).values
+
 # +
 # %%time
 # Shelterscore showing the number of trees 
 pixel_size = 10  # metres
 # distances = 5, 10, 20, 50, 100, 200 # A distance of 20 would correspond to a 200m radius if the pixel size is 10m
-
-distances = 4, 6, 8, 10, 20, 30, 40, 50   # A distance of 20 would correspond to a 200m radius if the pixel size is 10m
+distances = 4, 6, 8, 10, 12   # A distance of 20 would correspond to a 200m radius if the pixel size is 10m
+# distances = 5, 10, 15, 20, 25   # A distance of 20 would correspond to a 200m radius if the pixel size is 10m
 
 # Classify anything with a height greater than 1 as a tree
-# tree_threshold = 1
-# tree_mask = ds['canopy_height'] >= tree_threshold
+tree_threshold = 1
+tree_mask = ds['canopy_height'] >= tree_threshold
 
 # # Find the pixels adjacent to trees
 structuring_element = np.ones((3, 3))  # This defines adjacency (including diagonals)
@@ -171,7 +172,7 @@ for distance in distances:
 
 # +
 # Example shelter score
-layer_name = "percent_trees_200m"
+layer_name = "percent_trees_100m"
 filename = os.path.join(scratch_dir, f'{stub}_{layer_name}.tif')
 ds[layer_name].rio.to_raster(filename)
 print(filename)
@@ -260,8 +261,8 @@ time = '2020-01-01'
 productivity_variable = 'EVI'
 ndvi = ds.sel(time=time, method='nearest')[productivity_variable]
 productivity_score1 = ndvi.where(~adjacent_mask) #  & (grassland | cropland))
-distance = 20
-layer_name = f"num_trees_{pixel_size * distance}m"
+distance = 10
+layer_name = f"percent_trees_{pixel_size * distance}m"
 s = ds[layer_name].values
 
 # Flatten the arrays for plotting
@@ -369,7 +370,8 @@ ds_drought = ds.sel(time=selected_times, method='nearest')
 # Calculate the productivity score
 
 # shelter_thresholds = 0.01, 0.02, 0.05, 0.1, 0.2, 0.3   # Percentage tree cover
-shelter_thresholds = 0.005, 0.01, 0.02, 0.05, 0.1   # Percentage tree cover
+shelter_thresholds = 0.005, 0.01, 0.03, 0.05, 0.1   # Percentage tree cover
+# shelter_thresholds = 0.02, 0.04, 0.06, 0.08, 0.1   # Percentage tree cover
 
 total_benefits = []
 benefit_scores_dict = {}
@@ -386,7 +388,8 @@ for i, distance in enumerate(distances):
     
         for i, time in enumerate(ds.time.values):
             ndvi = ds.sel(time=time, method='nearest')[productivity_variable]
-            productivity_score1 = ndvi.where(~adjacent_mask & (grassland | cropland))
+            # productivity_score1 = ndvi.where(~adjacent_mask & (grassland | cropland))
+            productivity_score1 = ndvi.where(~adjacent_mask) #  & (grassland | cropland))
             s = ds[layer_name].values
             
             # Flatten the arrays for plotting
@@ -456,7 +459,7 @@ print(len(total_benefits))
 # variable = 'median_diff_standard' # The median diff standard shows the strongest benefits in 2020 because of the normalisation
 variable = 'percentage_benefit'     # The percentage benefit is more interpretable like a productivity boost
 
-df = pd.DataFrame(benefit_scores_dict['d:10, s:0.02'])
+df = pd.DataFrame(benefit_scores_dict['d:10, s:0.01'])
 # df = pd.DataFrame(benefit_scores_dict['d:100, s:0.02'])
 df = df.set_index('time')
 df = df.astype(float)
@@ -522,12 +525,6 @@ cbar.set_label('Sample size')
 filename = os.path.join(scratch_dir, f"{stub}_{productivity_variable}_sample_sizes.png")
 plt.savefig(filename)
 print(filename)
-
-# +
-
-
-
-
 # +
 # Heatmap comparison
 heatmap_data = df.pivot(index='distance', columns='percentage_trees', values='percentage_benefit')
@@ -559,5 +556,9 @@ print(filename)
 # plt.savefig(filename)
 # print(filename)
 # -
+
+
+
+
 
 
