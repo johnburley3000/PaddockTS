@@ -257,7 +257,7 @@ plt.imshow(~adjacent_mask & cropland)
 
 # +
 # Example shelter vs productivity score
-time = '2020-01-01'
+time = '2020-05-17'
 productivity_variable = 'EVI'
 ndvi = ds.sel(time=time, method='nearest')[productivity_variable]
 productivity_score1 = ndvi.where(~adjacent_mask) #  & (grassland | cropland))
@@ -342,22 +342,6 @@ filename = os.path.join(scratch_dir, f"{stub}_{productivity_variable}_boxplot_{t
 plt.savefig(filename)
 print(filename)
 # -
-
-
-
-# +
-# Make sure the sample size is greater than some value, e.g. 10k
-sample_size = min(len(unsheltered), len(sheltered))
-
-random_values = np.random.choice(np.arange(0, len(sheltered)), size=1000, replace=False)
-sheltered_sample = sheltered[random_values]
-
-random_values = np.random.choice(np.arange(0, len(unsheltered)), size=1000, replace=False)
-unsheltered_sample = unsheltered[random_values]
-# -
-
-
-
 # 11% increase in EVI at this timepoint in sheltered pixels compared to unsheltered
 (np.median(sheltered) - np.median(unsheltered))/np.median(y_values)
 
@@ -388,8 +372,8 @@ ds_drought = ds.sel(time=selected_times, method='nearest')
 shelter_thresholds = 0.005, 0.01, 0.03, 0.05, 0.1   # Percentage tree cover
 # shelter_thresholds = 0.02, 0.04, 0.06, 0.08, 0.1   # Percentage tree cover
 
-total_benefits = []
 benefit_scores_dict = {}
+sample_sizes_dict = {}
 
 for i, distance in enumerate(distances):
     print(f"\nDistance threshold {i}/{len(distances)}", distance)
@@ -421,21 +405,18 @@ for i, distance in enumerate(distances):
             unsheltered = y_values[np.where(x_values < num_trees_threshold)]
 
             # Take a random sample to keep the sample sizes consistent across experiments
-            random_sample_size = 1000
-            sample_size = min(len(unsheltered), len(sheltered))
-
-            
-            if sample_size < random_sample_size:
-                sheltered = []
-                unsheltered = []
-            else:
-                random_values = np.random.choice(np.arange(0, len(sheltered)), size=random_sample_size, replace=False)
-                sheltered = sheltered[random_values]
+            # random_sample_size = 1000
+            # sample_size = min(len(unsheltered), len(sheltered))
+            # if sample_size < random_sample_size:
+            #     sheltered = []
+            #     unsheltered = []
+            # else:
+            #     random_values = np.random.choice(np.arange(0, len(sheltered)), size=random_sample_size, replace=False)
+            #     sheltered = sheltered[random_values]
                 
-                random_values = np.random.choice(np.arange(0, len(unsheltered)), size=random_sample_size, replace=False)
-                unsheltered = unsheltered[random_values]
+            #     random_values = np.random.choice(np.arange(0, len(unsheltered)), size=random_sample_size, replace=False)
+            #     unsheltered = unsheltered[random_values]
 
-    
             # Calculate the effect sizes
             median_diff = np.median(sheltered) - np.median(unsheltered)
             median_diff_standard = (np.median(sheltered) - np.median(unsheltered)) / stats.median_abs_deviation(y_values)
@@ -445,6 +426,8 @@ for i, distance in enumerate(distances):
             benefit_score = {
                 "time":time,
                 f"median_{productivity_variable}":np.median(y_values),
+                "median_sheltered": np.median(sheltered), 
+                "median_unsheltered": np.median(unsheltered),
                 "median_diff":median_diff,
                 "median_diff_standard": median_diff_standard,
                 "mean_diff_standard": mean_diff_standard,
@@ -452,38 +435,52 @@ for i, distance in enumerate(distances):
             benefit_score = benefit_score
             benefit_scores.append(benefit_score)
     
-        # Create a dataframe
+        # Save the results in a dictionary
         key = f"d:{distance}, s:{shelter_threshold}"
         benefit_scores_dict[key] = benefit_scores
-        df_shelter = pd.DataFrame(benefit_scores)
-        df_shelter = df_shelter.set_index('time')
-    
-        # Join the weather data onto the shelter scores
-        df_merged = pd.merge_asof(df_shelter, df_drought, left_index=True, right_index=True, direction='nearest')
-        temperature_threshold = 25
-        hot_days = np.where(df_merged['max_temp'] > temperature_threshold)
-    
-        # Aggregate results over all hot timepoints
-        overall_median_ndvi = df_merged[f'median_{productivity_variable}'].iloc[hot_days].median()
-        overall_median_diff = df_merged['median_diff'].iloc[hot_days].median()
-        overall_median_diff_standard = df_merged['median_diff_standard'].iloc[hot_days].median()
-        overall_mean_diff_standard = df_merged['mean_diff_standard'].iloc[hot_days].median()
-    
-        # Store the aggregated results
-        total_benefit = {
-                "distance_threshold":distance,
-                "shelter_threshold":shelter_threshold,
-                "sheltered_pixels":len(sheltered),
-                "unsheltered_pixels":len(y_values) - len(sheltered),
-                f"median_{productivity_variable}":overall_median_ndvi,
-                "median_difference": overall_median_diff,
-                "standardized_median_difference": overall_median_diff_standard,
-                "standardized_mean_difference": overall_mean_diff_standard,
-            }
-        total_benefits.append(total_benefit)
+        sample_sizes_dict[key] = {"sheltered": len(sheltered), "unsheltered": len(unsheltered)}
     
 print(len(total_benefits))
 # pd.DataFrame(total_benefits).head()
+
+# +
+# Comparing the median sheltered and unsheltered EVI
+df = pd.DataFrame(benefit_scores_dict['d:10, s:0.01'])
+df = df.set_index('time')
+df = df.astype(float)
+df.index = pd.to_datetime(df.index)
+df = df[['median_sheltered', 'median_unsheltered']]
+df_merged = pd.merge_asof(df, df_drought, left_index=True, right_index=True, direction='nearest')
+
+# Time series plot
+df_merged[['median_sheltered', 'median_unsheltered']].plot(figsize=(20,10))
+
+# Add horizontal line at y=0
+ax = plt.gca()
+ax.axhline(0, color='black', linestyle='--', linewidth=1)
+
+# Colour in dates where max temp > temp_threshold
+temperature_threshold = 25
+above_25 = df_merged['max_temp'] > temperature_threshold
+start = None
+for i, (date, above) in enumerate(above_25.items()):
+    if above and start is None:
+        start = date
+    elif not above and start is not None:
+        ax.axvspan(start, date, color='red', alpha=0.1)
+        start = None
+
+# Key
+patch = mpatches.Patch(color='red', alpha=0.1, label=f'max_temp > {temperature_threshold}°C')
+ax.legend(handles=[patch] + ax.get_legend().legendHandles, loc='upper left')
+
+plt.ylabel(f"median EVI")
+plt.xlabel("")
+plt.title(f'{stub}: Shelter Benefit Time Series')
+
+filename = os.path.join(scratch_dir, f"{stub}_{productivity_variable}_time_series.png")
+plt.savefig(filename)
+print(filename)
 
 # +
 # Creating time series dataframe of shelter_benefits alongsde max_temp
@@ -528,6 +525,92 @@ plt.title(f'{stub}: Shelter Benefit Time Series')
 filename = os.path.join(scratch_dir, f"{stub}_{productivity_variable}_time_series.png")
 plt.savefig(filename)
 print(filename)
+
+# +
+# Creating time series dataframe of shelter_benefits alongsde max_temp
+
+df = pd.DataFrame(benefit_scores_dict['d:10, s:0.01'])
+# df = pd.DataFrame(benefit_scores_dict['d:100, s:0.02'])
+df = df.set_index('time')
+df = df.astype(float)
+df.index = pd.to_datetime(df.index)
+
+df['cumulative_benefit'] = df['median_diff'].cumsum()
+df = df['cumulative_benefit']
+df_merged = pd.merge_asof(df, df_drought, left_index=True, right_index=True, direction='nearest')
+
+# Time series plot
+df_merged['cumulative_benefit'].plot(figsize=(20,10))
+
+# Add horizontal line at y=0
+ax = plt.gca()
+ax.axhline(0, color='black', linestyle='--', linewidth=1)
+
+# Colour in dates where max temp > temp_threshold
+temperature_threshold = 25
+above_25 = df_merged['max_temp'] > temperature_threshold
+start = None
+for i, (date, above) in enumerate(above_25.items()):
+    if above and start is None:
+        start = date
+    elif not above and start is not None:
+        ax.axvspan(start, date, color='red', alpha=0.1)
+        start = None
+
+# Key
+patch = mpatches.Patch(color='red', alpha=0.1, label=f'max_temp > {temperature_threshold}°C')
+ax.legend(handles=[patch], loc='upper left')
+
+plt.ylabel(f"cumulative {productivity_variable} increase")
+plt.xlabel("")
+plt.title(f'{stub}: Shelter Benefit Time Series')
+
+filename = os.path.join(scratch_dir, f"{stub}_{productivity_variable}_time_series.png")
+plt.savefig(filename)
+print(filename)
+
+# +
+total_benefits = []
+
+for key in benefit_scores_dict.keys():
+    
+    # Parse the distance and shelter thresholds
+    distance_shelter = key.split(',')
+    distance = int(distance_shelter[0].split(':')[1])
+    shelter_threshold = float(distance_shelter[1].split(':')[1])
+    layer_name = f"percent_trees_{distance * pixel_size}m"
+    num_trees_threshold = ((distance * 2) ** 2) * shelter_threshold
+
+    # Create a dataframe
+    benefit_scores = benefit_scores_dict[key]
+    df_shelter = pd.DataFrame(benefit_scores)
+    df_shelter = df_shelter.set_index('time')
+    
+    # Join the weather data onto the shelter scores
+    df_merged = pd.merge_asof(df_shelter, df_drought, left_index=True, right_index=True, direction='nearest')
+    temperature_threshold = 25
+    hot_days = np.where(df_merged['max_temp'] > temperature_threshold)
+    
+    # Aggregate results over all hot timepoints
+    overall_median_ndvi = df_merged[f'median_{productivity_variable}'].iloc[hot_days].median()
+    overall_median_diff = df_merged['median_diff'].iloc[hot_days].median()
+    overall_median_diff_standard = df_merged['median_diff_standard'].iloc[hot_days].median()
+    overall_mean_diff_standard = df_merged['mean_diff_standard'].iloc[hot_days].median()
+    
+    # Store the aggregated results
+    total_benefit = {
+            "distance_threshold":distance,
+            "shelter_threshold":shelter_threshold,
+            "sheltered_pixels":sample_sizes_dict[key]['sheltered'],
+            "unsheltered_pixels":sample_sizes_dict[key]['unsheltered'],
+            f"median_{productivity_variable}":overall_median_ndvi,
+            "median_difference": overall_median_diff,
+            "standardized_median_difference": overall_median_diff_standard,
+            "standardized_mean_difference": overall_mean_diff_standard,
+        }
+    total_benefits.append(total_benefit)
+
+len(total_benefits)
 # -
 
 df = pd.DataFrame(total_benefits)
@@ -574,18 +657,18 @@ print(filename)
 
 # +
 # # Visualise the summer productivity
-# ds_drought_median = ds_drought[productivity_variable].median(dim='time')
-# ds_drought_masked = ds_drought_median.where(~adjacent_mask)
+ds_drought_median = ds_drought[productivity_variable].median(dim='time')
+ds_drought_masked = ds_drought_median.where(~adjacent_mask)
 
-# filename = os.path.join(scratch_dir, f'{stub}_summer_{productivity_variable}.tif')
-# ds_drought_masked.rio.to_raster(filename)
-# print(filename)
+filename = os.path.join(scratch_dir, f'{stub}_summer_{productivity_variable}.tif')
+ds_drought_masked.rio.to_raster(filename)
+print(filename)
 
-# ds_drought_masked.plot(cbar_kwargs={'label': f'Median {productivity_variable} when max_temp > {temperature_threshold}°C'})
-# plt.title(f"{stub} Productivity Score")
-# filename = os.path.join(scratch_dir, f'{stub}_summer_{productivity_variable}.png')
-# plt.savefig(filename)
-# print(filename)
+ds_drought_masked.plot(cbar_kwargs={'label': f'Median {productivity_variable} when max_temp > {temperature_threshold}°C'})
+plt.title(f"{stub} Productivity Score")
+filename = os.path.join(scratch_dir, f'{stub}_summer_{productivity_variable}.png')
+plt.savefig(filename)
+print(filename)
 # -
 
 
