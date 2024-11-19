@@ -243,12 +243,112 @@ ds['EVI'] = 2.5 * ((B8 - B4) / (B8 + 6 * B4 - 7.5 * B2 + 1))
 # # band_names = ['nbart_blue', 'nbart_green', 'nbart_red', 'nbart_nir_1', 'nbart_swir_2', 'nbart_swir_3']
 # # # fractions = calculate_fractional_cover(ds, band_names)
 # # ds = add_fractional_cover_to_ds(ds, fractions)
-# -
 
+# +
 time = '2020-01-01'
 productivity_variable = 'EVI'
 ndvi = ds.sel(time=time, method='nearest')[productivity_variable]
 productivity_score1 = ndvi.where(~adjacent_mask) #  & (grassland | cropland))
+
+# Visualise a linear regression for this timepoint
+layer_name = f"percent_trees_200m-210m"
+s = ds[layer_name].values
+
+y = productivity_score1.values.flatten()
+y_values = y[~np.isnan(y)]   # Remove all pixels that are trees or adjacent to trees
+x = s.flatten()
+x_values = x[~np.isnan(y)]   # Match the shape of the x_values
+x_values_normalised = (x_values - min(x_values)) / (max(x_values) - min(x_values))
+y_values_normalised = (y_values - min(y_values)) / (max(y_values) - min(y_values))
+# -
+
+
+
+len(x_values)
+
+# +
+print("Sample size =", len(x_values))
+
+# 2D histogram
+plt.hist2d(x_values, y_values, bins=100, norm=mcolors.PowerNorm(0.1))
+plt.ylabel(productivity_variable, fontsize=12)
+pixel_size = 10
+plt.xlabel(f'Number of tree pixels within {distance * pixel_size}m', fontsize=12)
+plt.title(stub + ": " + str(time)[:10], fontsize=14)
+
+# Linear regression line
+res = stats.linregress(x_values, y_values)
+x_fit = np.linspace(min(x_values), max(x_values), 500)
+y_fit = res.intercept + res.slope * x_fit
+line_handle, = plt.plot(x_fit, y_fit, 'r-', label=f"$R^2$ = {res.rvalue**2:.2f}")
+plt.legend(fontsize=10)
+plt.show()
+
+filename = os.path.join(scratch_dir, f"{stub}_{productivity_variable}_histregression_{time}.png")
+plt.savefig(filename)
+print(filename)
+# -
+
+
+
+
+
+# +
+plt.hist2d(x_values, y_values, bins=100, norm=mcolors.PowerNorm(0.1))
+plt.ylabel(productivity_variable, fontsize=12)
+pixel_size = 10
+plt.xlabel(f'Number of tree pixels within {distance * pixel_size}m', fontsize=12)
+plt.title(stub + ": " + str(time)[:10], fontsize=14)
+
+filename = os.path.join(scratch_dir, f"{stub}_{productivity_variable}_2dhist_{time}.png")
+plt.savefig(filename)
+print(filename)
+# -
+
+res = stats.linregress(x_values_normalised, y_values_normalised)
+print(f"Sample size: {len(x_values)}")
+print(f"R-squared: {res.rvalue**2:.6f}")
+print(f"Slope: {res.slope:.6f}")
+plt.plot(x_values_normalised, y_values_normalised, 'o')
+plt.plot(x_values_normalised, res.intercept + res.slope*x_values_normalised, 'r')
+plt.ylabel(productivity_variable, fontsize=12)
+plt.xlabel(layer_name, fontsize=12)
+plt.title(stub + ": " + time, fontsize=14)
+
+
+
+
+
+
+
+# +
+# %%time
+r2_results = []
+layer_name = f"percent_trees_100m-110m"
+s = ds[layer_name].where(~adjacent_mask).values
+
+for time in ds.time.values:
+    p = ds.sel(time=time, method='nearest')[productivity_variable]
+    y = p.values.flatten()
+    y_values = y[~np.isnan(y)]   # Remove all pixels that are trees or adjacent to trees
+    y_values_normalised = (y_values - min(y_values)) / (max(y_values) - min(y_values))
+
+    x = s.flatten()
+    x_values = x[~np.isnan(y)]   # Match the shape of the y_values (because some time points have cloud cover)
+    x_values_normalised = (x_values - min(x_values)) / (max(x_values) - min(x_values))
+    
+    res = stats.linregress(x_values_normalised, y_values_normalised)
+    r2_result = {
+        "time": time,
+        "r2": res.rvalue**2
+    }
+    r2_results.append(r2_result)
+
+df = pd.DataFrame(r2_results)
+df = df.set_index('time')
+df = df.astype(float)
+df.index = pd.to_datetime(df.index)
+df.plot(title=f"{stub}: {layer_name}")
 
 # +
 # %%time
