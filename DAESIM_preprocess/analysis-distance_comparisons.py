@@ -173,67 +173,6 @@ for i in range(len(distances) - 1):
     layer_name = f"percent_trees_{pixel_size * min_distance}m-{pixel_size * max_distance}m"
     ds[layer_name] = shelter_score_da
     print(f"Added layer: {layer_name}")
-
-# +
-# # %%time
-# # Shelterscore showing the number of trees within a circle around the crop/pasture pixel
-# pixel_size = 10  # metres
-# # distances = 5, 10, 20, 50, 100, 200 # A distance of 20 would correspond to a 200m radius if the pixel size is 10m
-# distances = 4, 6, 8, 10, 12   # A distance of 20 would correspond to a 200m radius if the pixel size is 10m
-# # distances = 5, 10, 15, 20, 25   # A distance of 20 would correspond to a 200m radius if the pixel size is 10m
-
-# # Classify anything with a height greater than 1 as a tree
-# tree_threshold = 1
-# tree_mask = ds['canopy_height'] >= tree_threshold
-
-# # # Find the pixels adjacent to trees
-# structuring_element = np.ones((3, 3))  # This defines adjacency (including diagonals)
-# adjacent_mask = scipy.ndimage.binary_dilation(tree_mask, structure=structuring_element)
-
-# for distance in distances:
-    
-#     # Calculate the number of trees within a given distance for each pixel
-#     y, x = np.ogrid[-distance:distance+1, -distance:distance+1]
-#     kernel = x**2 + y**2 <= distance**2
-#     kernel = kernel.astype(float)
-
-#     # This method will overeestimate the tree cover percent
-#     # shelter_score = fftconvolve(tree_mask.astype(float), kernel, mode='same')
-
-#     # More accurate tree cover percent calculation
-#     total_tree_cover = fftconvolve(tree_percent, kernel, mode='same')
-#     shelter_score = (total_tree_cover / kernel.sum()) * 100
-    
-#     # Mask out trees and adjacent pixels
-#     shelter_score[np.where(adjacent_mask)] = np.nan
-#     shelter_score[shelter_score < 1] = 0
-    
-#     # Add the shelter_score to the xarray
-#     # shelter_score_da = xr.DataArray(
-#         shelter_score, 
-#         dims=("y", "x"),  
-#         coords={"y": ds.coords["y"], "x": ds.coords["x"]}, 
-#         name="shelter_score" 
-#     )
-
-#     layer_name = f"percent_trees_{pixel_size * distance}m"
-#     ds[layer_name] = shelter_score_da
-#     print(f"Added layer: {layer_name}")
-
-
-# +
-# Example shelter score
-layer_name = "percent_trees_100m-120m"
-filename = os.path.join(scratch_dir, f'{stub}_{layer_name}.tif')
-ds[layer_name].rio.to_raster(filename)
-print(filename)
-
-ds[layer_name].plot(cmap='viridis')
-plt.title(f"{stub} Shelter Score")
-filename = filename = os.path.join(scratch_dir, f'{stub}_{layer_name}.png')
-plt.savefig(filename)
-print(filename)
-
 # +
 # Additional vegetation indices
 ds['NIRV'] = ds['NDVI'] * ds['nbart_nir_1']
@@ -306,18 +245,15 @@ ds['EVI'] = 2.5 * ((B8 - B4) / (B8 + 6 * B4 - 7.5 * B2 + 1))
 # # ds = add_fractional_cover_to_ds(ds, fractions)
 # -
 
-plt.imshow(~adjacent_mask & cropland)
-
 time = '2020-01-01'
 productivity_variable = 'EVI'
 ndvi = ds.sel(time=time, method='nearest')[productivity_variable]
 productivity_score1 = ndvi.where(~adjacent_mask) #  & (grassland | cropland))
-distance = 10
 
 # +
 # %%time
+# r2 benefits at specific distances
 single_timepoint_results = []
-
 for i in range(len(distances) - 1):
 
     min_distance = distances[i]
@@ -347,15 +283,307 @@ for i in range(len(distances) - 1):
 
     single_timepoint_results.append(single_timepoint_result)
     
-len(single_timepoint_results)
-# -
-
 df_distances = pd.DataFrame(single_timepoint_results)
 plt.plot(df_distances["distance"], df_distances["r2"])
 plt.xlabel("distance (m)")
 plt.ylabel("r2: shelter score & EVI")
 plt.title(f"{stub}: Shelter benefit at specific distances, at {time}")
 plt.show()
+
+# +
+# %%time
+# Median benefits at different tree thresholds when distance = 200m
+distance = 20 # 20 pixels x 10m per pixel = 200m
+single_timepoint_results = []
+
+min_distance = 15
+max_distance = 20
+layer_name = f"percent_trees_{pixel_size * min_distance}m-{pixel_size * max_distance}m"
+
+# Shelter score 
+s = ds[layer_name].values
+
+# Flatten the arrays for plotting
+y = productivity_score1.values.flatten()
+y_values = y[~np.isnan(y)]   # Remove all pixels that are trees or adjacent to trees
+x = s.flatten()
+x_values = x[~np.isnan(y)]   # Match the shape of the x_values
+
+# median sheltered and median unsheltered
+percentage_tree_thresholds = 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30
+percentage_tree_thresholds = 5, 10, 15, 20, 25
+
+
+benefits = []
+for percentage_tree_threshold in percentage_tree_thresholds:
+    sheltered = y_values[np.where(x_values >= percentage_tree_threshold)]
+    unsheltered = y_values[np.where(x_values < percentage_tree_threshold)]
+    
+    # Calculate the effect sizes
+    median_diff = np.median(sheltered) - np.median(unsheltered)
+    median_diff_percentage = median_diff/np.median(y_values)
+    sample_size = min(len(sheltered), len(unsheltered))
+    benefit = {
+        "distance": max_distance,
+        "percentage_tree_threshold": percentage_tree_threshold,
+        "median_diff_percentage": median_diff_percentage,
+        "sample_size": sample_size
+    }
+    benefits.append(benefit)
+
+df_benefits = pd.DataFrame(benefits)
+df_benefits
+# -
+
+plt.plot(df_benefits["percentage_tree_threshold"], df_benefits["median_diff_percentage"])
+plt.xlabel(f"Percentage tree cover at distance = {distance}")
+plt.ylabel("median EVI increase (%)")
+plt.title(f"{stub}: Shelter benefit at specific distances, at {time}")
+plt.show()
+
+# # Matrix of benefits at specific distances at a single timepoint
+
+# +
+# %%time
+# Shelterscore showing the number of trees within a donut at a given distance away from the crop/pasture pixel
+
+# distances = 0, 4, 6, 8, 10, 12   # A distance of 20 would correspond to a 200m radius if the pixel size is 10m
+# distances = 0, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40    # A distance of 20 would correspond to a 200m radius if the pixel size is 10m
+# distances = 0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100
+# distances = 1,2,3,4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50
+
+# distances = list(range(10, 32, 4))
+distances = list(range(0, 30, 1))
+
+# Classify anything with a height greater than 1 as a tree
+tree_threshold = 1
+tree_mask = ds['canopy_height'] >= tree_threshold
+
+distance = 6
+min_distance = 4
+max_distance = 6
+pixel_size = 10  # metres
+
+# Find all the pixels directly adjacent to trees
+structuring_element = np.ones((3, 3))  # This defines adjacency (including diagonals)
+adjacent_mask = scipy.ndimage.binary_dilation(tree_mask, structure=structuring_element)
+
+for i in range(len(distances) - 1):
+
+    min_distance = distances[i]
+    max_distance = distances[i+1]
+    
+    # Calculate the number of trees in a donut between the inner and outer circle
+    y, x = np.ogrid[-max_distance:max_distance+1, -max_distance:max_distance+1]
+    kernel = (x**2 + y**2 <= max_distance**2) & (x**2 + y**2 >= min_distance**2)
+    kernel = kernel.astype(float)
+    
+    total_tree_cover = fftconvolve(tree_percent, kernel, mode='same')
+    shelter_score = (total_tree_cover / kernel.sum()) * 100
+    
+    # Mask out trees and adjacent pixels
+    shelter_score[np.where(adjacent_mask)] = np.nan
+    shelter_score[shelter_score < 1] = 0
+    
+    # Add the shelter_score to the xarray
+    shelter_score_da = xr.DataArray(
+        shelter_score, 
+        dims=("y", "x"),  
+        coords={"y": ds.coords["y"], "x": ds.coords["x"]}, 
+        name="shelter_score" 
+    )
+
+    layer_name = f"percent_trees_{pixel_size * min_distance}m-{pixel_size * max_distance}m"
+    ds[layer_name] = shelter_score_da
+    # print(f"Added layer: {layer_name}")
+
+# +
+# %%time
+benefits = []
+percentage_tree_thresholds = list(range(0, 30, 1))
+
+
+for i in range(len(distances) - 1):
+
+    # Shelter score 
+    min_distance = distances[i]
+    max_distance = distances[i+1]
+    layer_name = f"percent_trees_{pixel_size * min_distance}m-{pixel_size * max_distance}m"
+    s = ds[layer_name].values
+    
+    # Flatten the arrays for plotting
+    y = productivity_score1.values.flatten()
+    y_values = y[~np.isnan(y)]   # Remove all pixels that are trees or adjacent to trees
+    x = s.flatten()
+    x_values = x[~np.isnan(y)]   # Match the shape of the x_values
+
+    # Sheltered vs unsheltered pixels
+   for percentage_tree_threshold in percentage_tree_thresholds:
+        sheltered = y_values[np.where(x_values >= percentage_tree_threshold)]
+        unsheltered = y_values[np.where(x_values < percentage_tree_threshold)]
+        median_diff = np.median(sheltered) - np.median(unsheltered)
+        median_diff_percentage = median_diff/np.median(y_values)
+        sample_size = min(len(sheltered), len(unsheltered))
+        benefit = {
+            "distance": max_distance * 10,
+            "percentage_tree_threshold": percentage_tree_threshold,
+            "median_diff_percentage": 100 * np.round(median_diff_percentage, 2),
+            "sample_size": sample_size
+        }
+        benefits.append(benefit)
+
+df = pd.DataFrame(benefits)
+# +
+# Visualise the benefits matrix
+heatmap_data = df.pivot(index='percentage_tree_threshold', columns='distance', values='median_diff_percentage')
+
+plt.figure(figsize=(20, 10))  # Width = 12, Height = 8
+
+ax = sns.heatmap(heatmap_data, annot=True, cmap="YlGn", cbar=True)
+ax.invert_yaxis()
+
+plt.title(f'{stub}: Sheltered vs Unsheltered, at {time}')
+plt.ylabel('Tree Cover (%)')
+plt.xlabel('Distance (m)')
+cbar = ax.collections[0].colorbar
+cbar.set_label(f'median {productivity_variable} increase (%)')
+plt.show()
+
+# Visualise the sample sizes
+heatmap_data = df.pivot(index='percentage_tree_threshold', columns='distance', values='sample_size')
+
+threshold = 10000
+annotations = np.where(heatmap_data < threshold, heatmap_data.astype(int).astype(str), "")
+
+plt.figure(figsize=(20, 10))  # Width = 12, Height = 8
+ax = sns.heatmap(heatmap_data, annot=annotations, fmt='', cbar=True)
+ax.invert_yaxis()
+
+plt.title(f'{stub}: Sample Sizes')
+plt.ylabel('Tree Cover (%)')
+plt.xlabel('Distance (m)')
+cbar = ax.collections[0].colorbar
+cbar.set_label('Sample size')
+plt.show()
+
+# +
+# %%time
+# Shelterscore showing the number of trees within a donut at a given distance away from the crop/pasture pixel
+# percentage_tree_thresholds = np.arange(5, 30, 2.5)
+# distances = np.arange(5, 30, 2.5)
+
+percentage_tree_thresholds = list(range(1, 30, 1))
+distances = list(range(5, 30, 1))
+donut_size = 1
+
+# Classify anything with a height greater than 1 as a tree
+tree_threshold = 1
+tree_mask = ds['canopy_height'] >= tree_threshold
+
+distance = 6
+min_distance = 4
+max_distance = 6
+pixel_size = 10  # metres
+
+# Find all the pixels directly adjacent to trees
+structuring_element = np.ones((3, 3))  # This defines adjacency (including diagonals)
+adjacent_mask = scipy.ndimage.binary_dilation(tree_mask, structure=structuring_element)
+
+for i in range(len(distances)):
+
+    max_distance = distances[i]
+    min_distance = distances[i]-donut_size
+
+    # Calculate the number of trees in a donut between the inner and outer circle
+    y, x = np.ogrid[-max_distance:max_distance+1, -max_distance:max_distance+1]
+    kernel = (x**2 + y**2 <= max_distance**2) & (x**2 + y**2 >= min_distance**2)
+    kernel = kernel.astype(float)
+    
+    total_tree_cover = fftconvolve(tree_percent, kernel, mode='same')
+    shelter_score = (total_tree_cover / kernel.sum()) * 100
+    
+    # Mask out trees and adjacent pixels
+    shelter_score[np.where(adjacent_mask)] = np.nan
+    shelter_score[shelter_score < 1] = 0
+    
+    # Add the shelter_score to the xarray
+    shelter_score_da = xr.DataArray(
+        shelter_score, 
+        dims=("y", "x"),  
+        coords={"y": ds.coords["y"], "x": ds.coords["x"]}, 
+        name="shelter_score" 
+    )
+
+    layer_name = f"percent_trees_{pixel_size * min_distance}m-{pixel_size * max_distance}m"
+    ds[layer_name] = shelter_score_da
+
+benefits = []
+for i in range(len(distances)):
+
+    # Shelter score 
+    max_distance = distances[i]
+    min_distance = distances[i] - donut_size
+    layer_name = f"percent_trees_{pixel_size * min_distance}m-{pixel_size * max_distance}m"
+    s = ds[layer_name].values
+    
+    # Flatten the arrays for plotting
+    y = productivity_score1.values.flatten()
+    y_values = y[~np.isnan(y)]   # Remove all pixels that are trees or adjacent to trees
+    x = s.flatten()
+    x_values = x[~np.isnan(y)]   # Match the shape of the x_values
+
+    # Sheltered vs unsheltered pixels
+    for percentage_tree_threshold in percentage_tree_thresholds:
+        sheltered = y_values[np.where(x_values >= percentage_tree_threshold)]
+        unsheltered = y_values[np.where(x_values < percentage_tree_threshold)]
+        median_diff = np.median(sheltered) - np.median(unsheltered)
+        median_diff_percentage = median_diff/np.median(y_values)
+        sample_size = min(len(sheltered), len(unsheltered))
+        benefit = {
+            "distance": round(max_distance * 10),
+            "percentage_tree_threshold": percentage_tree_threshold,
+            "median_diff_percentage": 100 * np.round(median_diff_percentage, 2),
+            "sample_size": sample_size
+        }
+        benefits.append(benefit)
+
+df = pd.DataFrame(benefits)
+
+# +
+# Visualise the benefits matrix
+heatmap_data = df.pivot(index='percentage_tree_threshold', columns='distance', values='median_diff_percentage')
+
+plt.figure(figsize=(20, 10))  # Width = 12, Height = 8
+ax = sns.heatmap(heatmap_data, annot=True, cmap="YlGn", cbar=True)
+ax.invert_yaxis()
+
+plt.title(f'{stub}: Sheltered vs Unsheltered, at {time}')
+plt.ylabel('Tree Cover (%)')
+plt.xlabel('Distance (m)')
+cbar = ax.collections[0].colorbar
+cbar.set_label(f'median {productivity_variable} increase (%)')
+plt.show()
+
+# Visualise the sample sizes
+heatmap_data = df.pivot(index='percentage_tree_threshold', columns='distance', values='sample_size')
+
+threshold = 10000
+annotations = np.where(heatmap_data < threshold, heatmap_data.astype(int).astype(str), "")
+
+plt.figure(figsize=(20, 10))
+ax = sns.heatmap(heatmap_data, annot=annotations, fmt='', cbar=True)
+ax.invert_yaxis()
+
+plt.title(f'{stub}: Sample Sizes')
+plt.ylabel('Tree Cover (%)')
+plt.xlabel('Distance (m)')
+cbar = ax.collections[0].colorbar
+cbar.set_label('Sample size')
+plt.show()
+# -
+
+
+
 
 
 
