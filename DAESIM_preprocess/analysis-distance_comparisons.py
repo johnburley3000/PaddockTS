@@ -44,7 +44,7 @@ stubs = {
 
 # Filepaths
 outdir = os.path.join(gdata_dir, "Data/PadSeg/")
-stub = "MULL"
+stub = "MILG"
 
 # %%time
 # Sentinel imagery
@@ -130,8 +130,11 @@ tree_percent = ds['tree_percent'].isel(band=0).values
 # distances = 0, 4, 6, 8, 10, 12   # A distance of 20 would correspond to a 200m radius if the pixel size is 10m
 # distances = 0, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40    # A distance of 20 would correspond to a 200m radius if the pixel size is 10m
 distances = 0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100
-distances = 1,2,3,4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50
-distances=0,10
+distances = 1,2,3,4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30 # , 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50
+# distances=0,10
+distances = 5, 30
+# distances = 1,2,3,4
+
 
 # Classify anything with a height greater than 1 as a tree
 tree_threshold = 1
@@ -255,7 +258,8 @@ ndvi = ds.sel(time=time, method='nearest')[productivity_variable]
 productivity_score1 = ndvi.where(~adjacent_mask) #  & (grassland | cropland))
 
 # Visualise a linear regression for this timepoint
-layer_name = f"percent_trees_0m-100m"
+# layer_name = f"percent_trees_0m-100m"
+layer_name = f"percent_trees_50m-300m"
 s = ds[layer_name].values
 
 y = productivity_score1.values.flatten()
@@ -473,6 +477,81 @@ plt.show()
 # -
 
 # # Time Series
+
+# +
+# %%time
+# Look at how the r2, slope and median difference between EVI and shelter threshold compares over time, using a donut of 40m-200m (and each different thresholds)
+layer_name = f"percent_trees_50m-300m"
+tree_cover_threshold = 10
+
+benefits = []
+
+distances = 1,2,3,4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50
+
+for i in range(len(distances) - 1):
+    min_distance = distances[i]
+    max_distance = distances[i+1]
+    layer_name = f"percent_trees_{pixel_size * min_distance}m-{pixel_size * max_distance}m"
+    shelter_score = ds[layer_name]
+    x = shelter_score.values.flatten()
+
+    for i, time in enumerate(ds.time.values):
+        ndvi = ds.sel(time=time, method='nearest')[productivity_variable]
+        productivity_score = ndvi.where(~adjacent_mask)
+        y = productivity_score.values.flatten()
+        y_values = y[~np.isnan(y)]   # Remove all pixels that are trees, adjacent to trees, or masked by cloud cover
+        x_values = x[~np.isnan(y)]   # Match the shape of the y_values
+        
+        # sheltered = y_values[np.where(x_values >= tree_cover_threshold)]
+        # unsheltered = y_values[np.where(x_values < tree_cover_threshold)]
+        # percentage_benefit = (np.median(sheltered) - np.median(unsheltered))/np.median(y_values)
+        
+        res = stats.linregress(x_values, y_values)
+    
+        benefit = {
+            "distance":max_distance,
+            "time": time,
+            "r2": res.rvalue**2,
+            "slope": res.slope
+            # "percentage_benefit": percentage_benefit,
+            # "smd": standardized_mean_difference,
+            # "smd_robust": standardized_median_difference
+        }
+        benefits.append(benefit)
+
+len(benefits)
+# -
+
+# Construct a benefits dataframe
+df = pd.DataFrame(benefits)
+df = df.set_index('time')
+df.index = pd.to_datetime(df.index)
+
+# Find the distance with the highest r2 across all timepoints
+max_r2s = []
+for distance in df['distance'].unique():
+    max_r2 = df[df['distance'] == distance]['r2'].max()
+    max_r2s.append({
+     "distance":distance,
+        "max_r2":max_r2
+    })
+df_distance = pd.DataFrame(max_r2s)
+df_distance = df_distance.set_index('distance')
+df_distance.plot()
+
+# Find the timepoint with the highest r2, at the best distance
+df[df['r2'] == df['r2'].max()]
+
+distance = 20
+df[df['distance'] == distance][['r2']].plot(figsize=(10,5), title=f"distance: {distance}")
+plt.show()
+
+
+
+
+
+
+
 
 # +
 # Find the max_temp for each date with satellite imagery 
