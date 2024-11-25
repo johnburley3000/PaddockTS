@@ -33,12 +33,10 @@ asris_urls = {
     "Total_Phosphorus": "https://www.asris.csiro.au/arcgis/services/TERN/PTO_ACLEP_AU_NAT_C/MapServer/WCSServer"
 }
 identifiers = {
-    "0-5cm": '0',
     "5-15cm": '4',
     "15-30cm":'8',
     "30-60cm":'12',
     "60-100cm":'16',
-    "100-200cm":'20'
 }
 
 def download_tif(bbox=[148.46449900000002, -34.3940427, 148.474499, -34.384042699999995], 
@@ -65,27 +63,28 @@ def download_tif(bbox=[148.46449900000002, -34.3940427, 148.474499, -34.38404269
 
     # Make sure to time.sleep(1) if running this multiple times to avoid throttling
 
-def slga_soils(variables=["Clay", "Sand", "Silt", "pH_CaCl2"], lat=-34.3890427, lon=148.469499, buffer=0.005, outdir=scratch_dir, stub="Test"):
+def slga_soils(variables=["Clay", "Sand", "Silt", "pH_CaCl2"], lat=-34.3890427, lon=148.469499, buffer=0.005, outdir=scratch_dir, stub="Test",  depths=["5-15cm"]):
     """Download soil variables from CSIRO"""
     bbox = create_bbox(lat, lon, buffer)
-    identifier = identifiers["5-15cm"]
-    for variable in variables:
-        filename = os.path.join(outdir, f"{stub}_{variable}.tif")
-        url = asris_urls[variable]
-        
-        # The SLGA server is a bit temperamental, so sometimes you have to try again
-        attempt = 0
-        delay = 10
-        max_retries = 3
-        while attempt < max_retries:
-            time.sleep(delay)
-            try:
-                download_tif(bbox, url, identifier, filename)
-                print(f"Downloaded {filename}")
-                attempt = max_retries
-            except:
-                print(f"Failed to download {variable}")
-                attempt+=1
+    for depth in depths:
+        identifier = identifiers[depth]
+        for variable in variables:
+            filename = os.path.join(outdir, f"{stub}_{variable}_{depth}.tif")
+            url = asris_urls[variable]
+            
+            # The SLGA server is a bit temperamental, so sometimes you have to try again
+            attempt = 0
+            delay = 10
+            max_retries = 3
+            while attempt < max_retries:
+                time.sleep(delay)
+                try:
+                    download_tif(bbox, url, identifier, filename)
+                    print(f"Downloaded {filename}")
+                    attempt = max_retries
+                except:
+                    print(f"Failed to download {variable}")
+                    attempt+=1
 
 
 def visualise_soil_texture(outdir, visuals_dir=scratch_dir, stub="Test"):
@@ -160,11 +159,41 @@ def visualise_soil_pH(outdir, visuals_dir=scratch_dir, stub="Test"):
     plt.show()
 
 if __name__ == '__main__':
-    # slga_soils()
-    from DAESIM_preprocess.util import gdata_dir
-    outdir = os.path.join(gdata_dir, "Data/PadSeg/")
-    visuals_dir = os.path.join(scratch_dir, "Visuals")
-    stub = "MULL"
-    visualise_soil_texture(outdir, visuals_dir, stub)
 
-
+    # Download all the soil layers for a single location
+    stub = "Harden"
+    variables = ['Clay', 'Silt', 'Sand', 'pH_CaCl2', 'Bulk_Density', 'Available_Water_Capacity', 'Effective_Cation_Exchange_Capacity', 'Total_Nitrogen', 'Total_Phosphorus']
+    depths=['5-15cm', '15-30cm', '30-60cm', '60-100cm']
+    buffer=0.0003
+    latitude = -34.52194
+    longitude=148.30472
+    slga_soils(variables=variables, latitude=latitude, longitude=longitude, buffer=buffer, stub=stub, depths=depths)
+    
+    # Load the tiff files we just downloaded (each should just have a single pixel)
+    values = []
+    stub = "Harden"
+    depths=['5-15cm', '15-30cm', '30-60cm', '60-100cm']
+    for variable in variables:
+        for depth in depths:
+            filename = os.path.join(scratch_dir, f"{stub}_{variable}_{depth}.tif")
+            ds = rxr.open_rasterio(filename)
+            value = float(ds.isel(band=0, x=0, y=0).values)
+            values.append({
+                "variable":variable,
+                "depth":depth,
+                "value":value
+            })
+    
+    # Pivot
+    df = pd.DataFrame(values)
+    pivot_df = df.pivot(index='depth', columns='variable', values='value')
+    pivot_df = pivot_df.reset_index() 
+    
+    # Sort by depth
+    df = pivot_df
+    depth_order = ['5-15cm', '15-30cm', '30-60cm', '60-100cm']
+    df['depth'] = pd.Categorical(df['depth'], categories=depth_order, ordered=True)
+    sorted_df = df.sort_values(by='depth')
+    
+    # Save
+    sorted_df.to_csv("Harden_Soils_sorted.csv", index=False)
