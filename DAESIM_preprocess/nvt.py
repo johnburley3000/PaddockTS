@@ -90,6 +90,7 @@ interesting_columns = [ 'METADom_GERMINATION.RAIN.DATE',
  'PHENDom_Pins_Site_Mean_Yield'
             ]
 
+# +
 most_interesting_columns = [
  'BOMDom_Trial_ID',
  'BOMDom_Sowing_date_numeric',
@@ -100,12 +101,51 @@ most_interesting_columns = [
  'PHENDom_Crop',
             ]
 
-df = df_canola[most_interesting_columns]
-df.drop_duplicates(inplace=True)
-df = df.dropna(axis=0, how='all')
-df['Sowing_Date'] = df['BOMDom_Sowing_date_numeric'].apply(lambda x: base_date + timedelta(days=x))
-df[(df['PHENDom_Crop'] == 'Canola') & (df['Sowing_Date'] > date_threshold) & df['PHENDom_MEAN.YIELD'].notna()]
+date_threshold = datetime(2016, 1, 1)
 
+
+# +
+# df = df_canola[most_interesting_columns]
+# df.drop_duplicates(inplace=True)
+# df = df.dropna(axis=0, how='all')
+# df['Sowing_Date'] = df['BOMDom_Sowing_date_numeric'].apply(lambda x: base_date + timedelta(days=x))
+# df = df[(df['PHENDom_Crop'] == 'Canola') & (df['Sowing_Date'] > date_threshold) & df['PHENDom_MEAN.YIELD'].notna()]
+# -
+
+df_site_frame['PHENDom_Crop'].unique()
+
+# +
 df = df_site_frame[most_interesting_columns]
 df['Sowing_Date'] = df['BOMDom_Sowing_date_numeric'].apply(lambda x: base_date + timedelta(days=x))
-df[(df['PHENDom_Crop'] == 'Canola') & (df['Sowing_Date'] > date_threshold) & df['PHENDom_MEAN.YIELD'].notna()]
+df = df[(df['PHENDom_Crop'] == 'Canola') & (df['Sowing_Date'] > date_threshold) & df['PHENDom_MEAN.YIELD'].notna()]
+
+filename = os.path.join(scratch_dir, "Canola_2016-2018.csv")
+df.to_csv(filename, index=False)
+print(filename)
+
+# +
+df = df_site_frame[most_interesting_columns]
+df['Sowing_Date'] = df['BOMDom_Sowing_date_numeric'].apply(lambda x: base_date + timedelta(days=x))
+df = df[(df['PHENDom_Crop'] == 'Wheat') & (df['Sowing_Date'] > date_threshold) & df['PHENDom_Days_to_Harvest'].notna()]
+
+filename = os.path.join(scratch_dir, "Wheat_2016-2018.csv")
+df.to_csv(filename, index=False)
+print(filename)
+
+# +
+valid_counts = df_canola.replace(np.nan).count(axis=1)
+len(df_canola.columns), valid_counts.max()
+
+df = df_canola.loc[valid_counts.argmax()]
+df = pd.DataFrame([df])
+
+filename = os.path.join(scratch_dir, "single_row_all_columns.csv")
+df.to_csv(filename, index=False)
+print(filename)
+# -
+
+print(os.path.join(scratch_dir, "Canola_2016-2018.csv"))
+print(os.path.join(scratch_dir, "Wheat_2016-2018.csv"))
+print(os.path.join(scratch_dir, "single_row_all_columns.csv"))
+
+
