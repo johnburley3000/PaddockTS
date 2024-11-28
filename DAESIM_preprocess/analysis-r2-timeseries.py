@@ -44,7 +44,7 @@ stubs = {
 
 # Filepaths
 outdir = os.path.join(gdata_dir, "Data/PadSeg/")
-stub = "MILG"
+stub = "ADAM"
 
 # %%time
 # Sentinel imagery
@@ -129,11 +129,11 @@ tree_percent = ds['tree_percent'].isel(band=0).values
 
 # distances = 0, 4, 6, 8, 10, 12   # A distance of 20 would correspond to a 200m radius if the pixel size is 10m
 # distances = 0, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40    # A distance of 20 would correspond to a 200m radius if the pixel size is 10m
-distances = 0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100
+# distances = 0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100
 # distances = 1,2,3,4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30 # , 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50
 # distances = 1,2,3,4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50
 # distances=0,10
-# distances = 5, 30
+distances = 5, 30
 # distances = 1,2,3,4
 
 
@@ -256,6 +256,8 @@ ds['EVI'] = 2.5 * ((B8 - B4) / (B8 + 6 * B4 - 7.5 * B2 + 1))
 time = '2020-01-08'
 # time = '2024-03-07'
 # time = '2021-02-06'
+# time = '2022-06-01'
+
 
 
 productivity_variable = 'EVI'
@@ -276,21 +278,26 @@ y = productivity_score1.values.flatten()
 y_values_outliers = y[~np.isnan(y)]   
 
 # Remove outliers
-q1 = np.percentile(y_values, 25)
-q3 = np.percentile(y_values, 75)
+q1 = np.percentile(y_values_outliers, 25)
+q3 = np.percentile(y_values_outliers, 75)
 iqr = q3 - q1
 lower_bound = q1 - 1.5 * iqr
 upper_bound = q3 + 1.5 * iqr
 
 # Find the shelter scores not obstructed by cloud cover or outliers
 y_values = y_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]
+# y_values = y_values_outliers
+
 x = s.flatten()
 x_values_outliers = x[~np.isnan(y)]
 x_values = x_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]
+# x_values = x_values_outliers
 
 # Normalise
 x_values_normalised = (x_values - min(x_values)) / (max(x_values) - min(x_values))
 y_values_normalised = (y_values - min(y_values)) / (max(y_values) - min(y_values))
+
+lower_bound, upper_bound
 
 # +
 # 2D histogram with logarithmic normalization
@@ -510,8 +517,8 @@ tree_cover_threshold = 10
 benefits = []
 
 # distances = 1,2,3,4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50
-distances = 0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100
-
+# distances = 0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100
+distances = 5, 30
 
 for i in range(len(distances) - 1):
     min_distance = distances[i]
@@ -542,259 +549,23 @@ for i in range(len(distances) - 1):
             "r2": res.rvalue**2,
             "slope": res.slope,
             "percentage_benefit": percentage_benefit
-            # "smd": standardized_mean_difference,
-            # "smd_robust": standardized_median_difference
         }
         benefits.append(benefit)
 
 len(benefits)
 # -
 
-distance = 20
+# Plot the benefits over time
 df = pd.DataFrame(benefits)
 df['date'] = df['time'].dt.date
-df[df['distance'] == distance][['r2', 'percentage_benefit']].plot(figsize=(10,5), title=f"distance: {distance}")
+df = df.set_index('date')
+df.index = pd.to_datetime(df.index)
+df[['r2', 'percentage_benefit']].plot()
 plt.show()
 
-# +
-# Construct a benefits dataframe
-# df = df.set_index('time')
-# df.index = pd.to_datetime(df.index)
-
-# +
-# Find dates with an r2 above 0.05 (arbitrary threshold)
-significant_dates = df[df['r2'] > 0.05]['date'].unique()
-print(len(significant_dates))
-
-# Plot the r2 at these timepoint
-for date in significant_dates:
-    df_date = df[df['date'] == date][['distance', 'r2']]
-    df_date = df_date.set_index('distance')
-    df_date.plot(title=date)
-# -
-
-# Find the timepoint with the highest r2, at the best distance
-df[df['r2'] == df['r2'].max()]
-
-
-
-# +
-# # Find the max_temp for each date with satellite imagery 
-# xarray_times = ds['time'].values
-# nearest_times_indices = df_drought.index.get_indexer(xarray_times, method='nearest')
-# nearest_df_times = df_drought.index[nearest_times_indices]
-
-# # Find the timepoints where the temp is greater than 25 degrees
-# temp_threshold = 25
-# selected_times = nearest_df_times[df_drought['max_temp'].iloc[nearest_times_indices] > temp_threshold]
-# ds_drought = ds.sel(time=selected_times, method='nearest')
-
-# +
-# # %%time
-# # Calculate the productivity score
-
-# # shelter_thresholds = 0.01, 0.02, 0.05, 0.1, 0.2, 0.3   # Percentage tree cover
-# shelter_thresholds = 0.005, 0.01, 0.03, 0.05, 0.1   # Percentage tree cover
-# # shelter_thresholds = 0.02, 0.04, 0.06, 0.08, 0.1   # Percentage tree cover
-
-# benefit_scores_dict = {}
-# sample_sizes_dict = {}
-
-# for i, distance in enumerate(distances):
-#     print(f"\nDistance threshold {i}/{len(distances)}", distance)
-#     layer_name = f"percent_trees_{distance * pixel_size}m"
-
-#     for i, shelter_threshold in enumerate(shelter_thresholds):
-#         print(f"Shelter threshold {i}/{len(shelter_thresholds)}", shelter_threshold)
-#         num_trees_threshold = ((distance * 2) ** 2) * shelter_threshold # Number of tree pixels
-    
-#         benefit_scores = []
-    
-#         for i, time in enumerate(ds.time.values):
-#             ndvi = ds.sel(time=time, method='nearest')[productivity_variable]
-#             productivity_score1 = ndvi.where(~adjacent_mask)
-#             # productivity_score1 = ndvi.where(~adjacent_mask & grassland)
-#             # productivity_score1 = ndvi.where(~adjacent_mask & cropland)
-#             # productivity_score1 = ndvi.where(~adjacent_mask) #  & (grassland | cropland))
-#             s = ds[layer_name].values
-            
-#             # Flatten the arrays for plotting
-#             y = productivity_score1.values.flatten()
-#             y_values = y[~np.isnan(y)]   # Remove all pixels that are trees or adjacent to trees
-#             x = s.flatten()
-#             x_values = x[~np.isnan(y)]   # Match the shape of the x_values
-
-#             # Normalise the y values (for bare ground and non-photosynethetic vegetation comparison)
-#             # y_values = (y_values - min(y_values)) / (max(y_values) - min(y_values))
-        
-#             # Select sheltered pixels and calculate z scores for NDVI at each pixel
-#             sheltered = y_values[np.where(x_values >= num_trees_threshold)]
-#             unsheltered = y_values[np.where(x_values < num_trees_threshold)]
-
-#             # Take a random sample to keep the sample sizes consistent across experiments
-#             # random_sample_size = 1000
-#             # sample_size = min(len(unsheltered), len(sheltered))
-#             # if sample_size < random_sample_size:
-#             #     sheltered = []
-#             #     unsheltered = []
-#             # else:
-#             #     random_values = np.random.choice(np.arange(0, len(sheltered)), size=random_sample_size, replace=False)
-#             #     sheltered = sheltered[random_values]
-                
-#             #     random_values = np.random.choice(np.arange(0, len(unsheltered)), size=random_sample_size, replace=False)
-#             #     unsheltered = unsheltered[random_values]
-
-#             # Calculate the effect sizes
-#             median_diff = np.median(sheltered) - np.median(unsheltered)
-#             median_diff_standard = (np.median(sheltered) - np.median(unsheltered)) / stats.median_abs_deviation(y_values)
-#             mean_diff_standard = (np.mean(sheltered) - np.mean(unsheltered))/np.std(y_values)
-    
-#             # Store the results
-#             benefit_score = {
-#                 "time":time,
-#                 f"median_{productivity_variable}":np.median(y_values),
-#                 "median_sheltered": np.median(sheltered), 
-#                 "median_unsheltered": np.median(unsheltered),
-#                 "median_diff":median_diff,
-#                 "median_diff_standard": median_diff_standard,
-#                 "mean_diff_standard": mean_diff_standard,
-#             }
-#             benefit_score = benefit_score
-#             benefit_scores.append(benefit_score)
-    
-#         # Save the results in a dictionary
-#         key = f"d:{distance}, s:{shelter_threshold}"
-#         benefit_scores_dict[key] = benefit_scores
-#         sample_sizes_dict[key] = {"sheltered": len(sheltered), "unsheltered": len(unsheltered)}
-    
-# len(benefit_scores_dict)
-
-# +
-# # Comparing the median sheltered and unsheltered EVI
-# df = pd.DataFrame(benefit_scores_dict['d:10, s:0.01'])
-# df = df.set_index('time')
-# df = df.astype(float)
-# df.index = pd.to_datetime(df.index)
-# df = df[['median_sheltered', 'median_unsheltered']]
-# df_merged = pd.merge_asof(df, df_drought, left_index=True, right_index=True, direction='nearest')
-
-# # Time series plot
-# df_merged[['median_sheltered', 'median_unsheltered']].plot(figsize=(20,10))
-
-# # Add horizontal line at y=0
-# ax = plt.gca()
-# ax.axhline(0, color='black', linestyle='--', linewidth=1)
-
-# # Colour in dates where max temp > temp_threshold
-# temperature_threshold = 25
-# above_25 = df_merged['max_temp'] > temperature_threshold
-# start = None
-# for i, (date, above) in enumerate(above_25.items()):
-#     if above and start is None:
-#         start = date
-#     elif not above and start is not None:
-#         ax.axvspan(start, date, color='red', alpha=0.1)
-#         start = None
-
-# # Key
-# patch = mpatches.Patch(color='red', alpha=0.1, label=f'max_temp > {temperature_threshold}°C')
-# ax.legend(handles=[patch] + ax.get_legend().legendHandles, loc='upper left')
-
-# plt.ylabel(f"median {productivity_variable}")
-# plt.xlabel("")
-# plt.title(f'{stub}: Shelter Benefit Time Series')
-
-# filename = os.path.join(scratch_dir, f"{stub}_{productivity_variable}_time_series.png")
-# plt.savefig(filename)
-# print(filename)
-
-# +
-# # Creating time series dataframe of shelter_benefits alongsde max_temp
-# # variable = 'median_diff_standard' # The median diff standard shows the strongest benefits in 2020 because of the normalisation
-# variable = 'percentage_benefit'     # The percentage benefit is more interpretable like a productivity boost
-
-# df = pd.DataFrame(benefit_scores_dict['d:10, s:0.01'])
-# # df = pd.DataFrame(benefit_scores_dict['d:100, s:0.02'])
-# df = df.set_index('time')
-# df = df.astype(float)
-# df.index = pd.to_datetime(df.index)
-# df['percentage_benefit'] = 100 * df['median_diff']/df[f'median_{productivity_variable}']
-# df = df[variable]
-# df_merged = pd.merge_asof(df, df_drought, left_index=True, right_index=True, direction='nearest')
-
-# # Time series plot
-# df_merged[variable].plot(figsize=(20,10))
-
-# # Add horizontal line at y=0
-# ax = plt.gca()
-# ax.axhline(0, color='black', linestyle='--', linewidth=1)
-
-# # Colour in dates where max temp > temp_threshold
-# temperature_threshold = 25
-# above_25 = df_merged['max_temp'] > temperature_threshold
-# start = None
-# for i, (date, above) in enumerate(above_25.items()):
-#     if above and start is None:
-#         start = date
-#     elif not above and start is not None:
-#         ax.axvspan(start, date, color='red', alpha=0.1)
-#         start = None
-
-# # Key
-# patch = mpatches.Patch(color='red', alpha=0.1, label=f'max_temp > {temperature_threshold}°C')
-# ax.legend(handles=[patch], loc='upper left')
-
-# plt.ylabel(f"median {productivity_variable} increase (%)")
-# plt.xlabel("")
-# plt.title(f'{stub}: Shelter Benefit Time Series')
-
-# filename = os.path.join(scratch_dir, f"{stub}_{productivity_variable}_time_series.png")
-# plt.savefig(filename)
-# print(filename)
-
-# +
-# # Creating time series dataframe of shelter_benefits alongsde max_temp
-
-# df = pd.DataFrame(benefit_scores_dict['d:10, s:0.01'])
-# # df = pd.DataFrame(benefit_scores_dict['d:100, s:0.02'])
-# df = df.set_index('time')
-# df = df.astype(float)
-# df.index = pd.to_datetime(df.index)
-
-# df['cumulative_benefit'] = df['median_diff'].cumsum()
-# df = df['cumulative_benefit']
-# df_merged = pd.merge_asof(df, df_drought, left_index=True, right_index=True, direction='nearest')
-
-# # Time series plot
-# df_merged['cumulative_benefit'].plot(figsize=(20,10))
-
-# # Add horizontal line at y=0
-# ax = plt.gca()
-# ax.axhline(0, color='black', linestyle='--', linewidth=1)
-
-# # Colour in dates where max temp > temp_threshold
-# temperature_threshold = 25
-# above_25 = df_merged['max_temp'] > temperature_threshold
-# start = None
-# for i, (date, above) in enumerate(above_25.items()):
-#     if above and start is None:
-#         start = date
-#     elif not above and start is not None:
-#         ax.axvspan(start, date, color='red', alpha=0.1)
-#         start = None
-
-# # Key
-# patch = mpatches.Patch(color='red', alpha=0.1, label=f'max_temp > {temperature_threshold}°C')
-# ax.legend(handles=[patch], loc='upper left')
-
-# plt.ylabel(f"cumulative {productivity_variable} increase")
-# plt.xlabel("")
-# plt.title(f'{stub}: Shelter Benefit Time Series')
-
-# filename = os.path.join(scratch_dir, f"{stub}_{productivity_variable}_time_series.png")
-# plt.savefig(filename)
-# print(filename)
-# -
+# df_significant = df[df['r2'] > 0.05]
+df_top10 = df.nlargest(10, 'r2')
+df_top10[['r2', 'slope', 'percentage_benefit']]
 
 # # Spatial Variation
 
@@ -804,8 +575,8 @@ df[df['r2'] == df['r2'].max()]
 
 # time = '2020-01-08'
 # time = '2024-03-07'
-time = '2021-02-06'
-for date in significant_dates:
+# time = '2021-02-06'
+for date in df_top10.index:
     time = date
 
     productivity_variable = 'EVI'
