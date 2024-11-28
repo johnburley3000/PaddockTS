@@ -44,7 +44,7 @@ stubs = {
 
 # Filepaths
 outdir = os.path.join(gdata_dir, "Data/PadSeg/")
-stub = "ADAM"
+stub = "MULL"
 
 # %%time
 # Sentinel imagery
@@ -253,11 +253,12 @@ ds['EVI'] = 2.5 * ((B8 - B4) / (B8 + 6 * B4 - 7.5 * B2 + 1))
 # # Linear Regression and 2D Histogram
 
 # +
-time = '2020-01-08'
+# time = '2019-12-31'
+# time = '2020-01-08'
 # time = '2024-03-07'
 # time = '2021-02-06'
 # time = '2022-06-01'
-
+time = '2020-03-20'
 
 
 productivity_variable = 'EVI'
@@ -540,6 +541,7 @@ for i in range(len(distances) - 1):
         sheltered = y_values[np.where(x_values >= tree_cover_threshold)]
         unsheltered = y_values[np.where(x_values < tree_cover_threshold)]
         percentage_benefit = (np.median(sheltered) - np.median(unsheltered))/np.median(y_values)
+        sample_size = min(len(sheltered), len(unsheltered))
         
         res = stats.linregress(x_values, y_values)
     
@@ -548,24 +550,51 @@ for i in range(len(distances) - 1):
             "time": time,
             "r2": res.rvalue**2,
             "slope": res.slope,
-            "percentage_benefit": percentage_benefit
+            "percentage_benefit": percentage_benefit,
+            "sample_size": sample_size
         }
         benefits.append(benefit)
 
 len(benefits)
-# -
 
+# +
 # Plot the benefits over time
 df = pd.DataFrame(benefits)
 df['date'] = df['time'].dt.date
 df = df.set_index('date')
 df.index = pd.to_datetime(df.index)
-df[['r2', 'percentage_benefit']].plot()
+
+df_top10 = df.nlargest(10, 'r2')
+df_top10[['r2', 'slope', 'percentage_benefit', 'sample_size']]
+# -
+
+df['r2'].plot()
 plt.show()
 
-# df_significant = df[df['r2'] > 0.05]
-df_top10 = df.nlargest(10, 'r2')
-df_top10[['r2', 'slope', 'percentage_benefit']]
+df['percentage_benefit'].plot()
+plt.show()
+
+# +
+# Global drought index at 50km spatial resolution from 1901 to 2023
+filepath = "/g/data/xe2/datasets/Climate_SILO/spei01.nc"
+ds_drought = xr.load_dataset(filepath)
+lat_lons = {
+    "MULL":(-35.262540, 149.606003)
+}
+lat_point = lat_lons[stub][0]
+lon_point = lat_lons[stub][1]
+ds_closest = ds_drought.sel(lat=lat_point, lon=lon_point, method='nearest')
+ds_selected = ds_closest.sel(time=slice('2017-01-01', '2024-12-31'))
+
+# Merge the drought index with the shelter benefit dataframe
+df_drought = pd.DataFrame(ds_selected['spei'], index=ds_selected.time)
+df_drought = df_drought.rename(columns={0:'drought_index'})
+df['r2_scaled'] = df['r2'] / df['r2'].max(skipna=True)
+df_merged = pd.merge_asof(df, df_drought, left_index=True, right_index=True, direction='nearest')
+df_merged
+# -
+
+df_merged[['r2_scaled', 'drought_index']].plot()
 
 # # Spatial Variation
 
@@ -582,26 +611,42 @@ for date in df_top10.index:
     productivity_variable = 'EVI'
     ds_productivity = ds.sel(time=time, method='nearest')[productivity_variable]
     ds_masked = ds_productivity.where(~adjacent_mask)
-    ds_masked = ds_masked.where(ds_masked >= 0)
-    ds_masked = ds_masked.where(ds_masked <= 1)
-    
+
     # Calculate the median of the data (ignoring NaNs)
-    median_value = ds_masked.median().values
+    # median_value = ds_masked.median().values
+    layer_name = f"percent_trees_50m-300m"
+    s = ds[layer_name].values
+    y = ds_masked.values.flatten()
+    y_values_outliers = y[~np.isnan(y)]  
+    x = s.flatten()
+    x_values_outliers = x[~np.isnan(y)]  
+
+    # Remove outliers from list
+    q1 = np.percentile(y_values_outliers, 25)
+    q3 = np.percentile(y_values_outliers, 75)
+    iqr = q3 - q1
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
+    y_values = y_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]    
+    x = s.flatten()
+    x_values_outliers = x[~np.isnan(y)]
+    x_values = x_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]
+
+    unsheltered = y_values[np.where(x_values < percent_tree_threshold)]
+    median_value = np.median(unsheltered)
     
     # Define color map and set the "bad" (NaN) values color
     cmap = plt.cm.coolwarm  
     cmap.set_bad(color='green')  # Set NaN pixels to green
-    
-    # Plot with vmin and vmax centered around the median
     ax = ds_masked.plot(
         cmap=cmap,
-        vmin=median_value - (ds_masked.max() - ds_masked.min()) / 2,
-        vmax=median_value + (ds_masked.max() - ds_masked.min()) / 2,
+        vmin=median_value - (upper_bound - lower_bound) / 2,
+        vmax=median_value + (upper_bound - lower_bound) / 2,
     )
     
     # Clean up the edges and remove labels
     ax = plt.gca() 
-    ax.set_title(f'Productivity at Mulloon on {time}', fontsize=22) 
+    ax.set_title(f'Productivity at {stubs[stub]} on {time}', fontsize=22) 
     ax.set_xlabel('')
     ax.set_ylabel('')
     ax.set_xticks([]) 
@@ -614,9 +659,17 @@ for date in df_top10.index:
     print(filename)
     plt.show()
 
-# +
-# Visualise some RGB images to see what's going on
+# Should visualise some RGB images too
 # -
+
+
+
+
+
+
+
+
+
 
 
 
