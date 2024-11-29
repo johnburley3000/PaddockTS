@@ -30,6 +30,7 @@ os.chdir(os.path.join(os.path.expanduser('~'), "Projects/PaddockTS"))
 from DAESIM_preprocess.util import gdata_dir, scratch_dir, transform_bbox
 from DAESIM_preprocess.topography import pysheds_accumulation, calculate_slope
 from DAESIM_preprocess.silo_daily import merge_ozwald_silo, resample_weekly, visualise_water, visualise_temp
+from DAESIM_preprocess.ozwald_daily import ozwald_daily, ozwald_daily_abbreviations
 # -
 
 stubs = {
@@ -587,14 +588,27 @@ ds_closest = ds_drought.sel(lat=lat_point, lon=lon_point, method='nearest')
 ds_selected = ds_closest.sel(time=slice('2017-01-01', '2024-12-31'))
 
 # Merge the drought index with the shelter benefit dataframe
-df_drought = pd.DataFrame(ds_selected['spei'], index=ds_selected.time)
-df_drought = df_drought.rename(columns={0:'drought_index'})
+df_drought = pd.DataFrame(ds_selected['spei'], index=ds_selected.time, columns=['drought_index'])
 df['r2_scaled'] = df['r2'] / df['r2'].max(skipna=True)
 df_merged = pd.merge_asof(df, df_drought, left_index=True, right_index=True, direction='nearest')
 df_merged
 # -
 
 df_merged[['r2_scaled', 'drought_index']].plot()
+
+# +
+# Load wind data
+ds = ozwald_daily(variables=["Uavg"], lat=lat_point, lon=lon_point, buffer=0.0001, start_year="2017", end_year="2023")
+df_wind = pd.DataFrame(ds['Uavg'], index=ds.time, columns=["Uavg"])
+
+# Find the max windspeed per week
+df_wind['week'] = df_wind.index.to_period('W')
+df_wind_weekly = df_wind.groupby('week')['Uavg'].max().reset_index()
+df_merged['week'] = df_merged.index.to_period('W')
+df_merged2 = pd.merge(df_merged, df_wind_weekly, on='week', how='left')
+# -
+
+df_merged2[['r2_scaled','Uavg']].plot()
 
 # # Spatial Variation
 

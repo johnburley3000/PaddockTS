@@ -15,6 +15,8 @@ import pandas as pd
 os.chdir(os.path.join(os.path.expanduser('~'), "Projects/PaddockTS"))
 from DAESIM_preprocess.util import create_bbox, scratch_dir
 
+# !ls /g/data/ub8
+
 ozwald_daily_abbreviations = {
     "Pg" : "Gross precipitation",
     "Tmax" : "Maximum temperature",
@@ -27,7 +29,7 @@ ozwald_daily_abbreviations = {
 }
 
 
-def ozwald_daily_singleyear_thredds(var="VPeff", latitude=-34.3890427, longitude=148.469499, buffer=0.1, year="2021", stub="", tmp_dir=""):
+def ozwald_daily_singleyear_thredds(var="VPeff", latitude=-34.3890427, longitude=148.469499, buffer=0.1, year="2021", stub="Test", tmp_dir="scratch_dir"):
     
     # buffer = 0.0000000001    # Using a buffer less than the grid size of 5km (0.05 degrees), so you get a single point
     
@@ -55,13 +57,15 @@ def ozwald_daily_singleyear_thredds(var="VPeff", latitude=-34.3890427, longitude
     return ds
 
 
-def ozwald_daily_singleyear(var="VPeff", latitude=-34.3890427, longitude=148.469499, buffer=0.1, year="2021", stub="", tmp_dir=""):
+def ozwald_daily_singleyear(var="VPeff", latitude=-34.3890427, longitude=148.469499, buffer=0.1, year="2021", stub="Test", tmp_dir="scratch_dir"):
     
-    buffer = 0.0000000001    # Using a buffer less than the grid size of 5km (0.05 degrees), so you get a single point
-
     prefix = ".daily" if var == "Pg" else ""
     filename = os.path.join(f"/g/data/ub8/au/OzWALD/daily/meteo/{var}/OzWALD{prefix}.{var}.{year}.nc")
 
+    # OzWald doesn't have 2024 data in this folder yet.
+    if not os.path.exists(filename):
+        return None
+        
     ds = xr.open_dataset(filename)
     bbox = create_bbox(latitude, longitude, buffer)
     ds_region = ds.sel(latitude=slice(bbox[3], bbox[1]), longitude=slice(bbox[0], bbox[2]))
@@ -73,7 +77,7 @@ def ozwald_daily_singleyear(var="VPeff", latitude=-34.3890427, longitude=148.469
     return ds_region
 
 
-def ozwald_daily_multiyear(var="VPeff", latitude=-34.3890427, longitude=148.469499, buffer=0.1, years=["2020", "2021"], stub="", tmp_dir=""):
+def ozwald_daily_multiyear(var="VPeff", latitude=-34.3890427, longitude=148.469499, buffer=0.1, years=["2020", "2021"], stub="Test", tmp_dir="scratch_dir"):
     dss = []
     for year in years:
         ds_year = ozwald_daily_singleyear(var, latitude, longitude, buffer, year, stub, tmp_dir)
@@ -82,7 +86,7 @@ def ozwald_daily_multiyear(var="VPeff", latitude=-34.3890427, longitude=148.4694
     return ds_concat
 
 
-def ozwald_daily(variables=["VPeff", "Uavg"], lat=-34.3890427, lon=148.469499, buffer=0.1, start_year="2020", end_year="2021", outdir="", stub="", tmp_dir="", cleanup=True):
+def ozwald_daily(variables=["VPeff", "Uavg"], lat=-34.3890427, lon=148.469499, buffer=0.1, start_year="2020", end_year="2021", outdir="scratch_dir", stub="Test", tmp_dir="scratch_dir"):
     dss = []
     years = [str(year) for year in list(range(int(start_year), int(end_year) + 1))]
     for variable in variables:
@@ -90,11 +94,6 @@ def ozwald_daily(variables=["VPeff", "Uavg"], lat=-34.3890427, lon=148.469499, b
         dss.append(ds_variable)
     ds_concat = xr.merge(dss)
     
-    if cleanup:
-        nc_files = glob.glob(os.path.join(os.getcwd(), '*.nc'))
-        for file in nc_files:
-            os.remove(file)
-
     filename = os.path.join(outdir, f'{stub}_ozwald_daily.nc')
     ds_concat.to_netcdf(filename)
     print("Saved:", filename)
@@ -104,11 +103,7 @@ def ozwald_daily(variables=["VPeff", "Uavg"], lat=-34.3890427, lon=148.469499, b
 
 # %%time
 if __name__ == '__main__':
-    ds = ozwald_daily()  # Took 2 seconds (0.5 seconds per variable per year)
+    ds = ozwald_daily(["Uavg"])  # Took 2 seconds (0.5 seconds per variable per year)
     print(ds)
 
-    os.chdir(os.path.join(os.path.expanduser('~'), "Projects/PaddockTS"))
-    from DAESIM_preprocess.util import plot_time_series, plot_time_point
-    
-    plot_time_series(ds, "VPeff",  lat=-34.3890427, lon=148.469499)
-    plot_time_point(ds, "VPeff", "2020-03-11")
+
