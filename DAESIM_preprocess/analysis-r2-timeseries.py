@@ -602,6 +602,9 @@ df = df_merged
 rainfall_plot = plt.bar(df.index, df['Rainfall'], color='skyblue', width=5)
 et_potential_plot = plt.bar(df.index, df['Potential Evapotranspiration'], color='orange')
 moisture_min_plot = plt.plot(df.index, df['Minimum Soil Moisture'], color='blue')
+drought_plot = plt.plot(df.index, df['drought_index'] * 50 + 100, color='red')
+r2_plot = plt.plot(df.index, df['r2'] * 1000, color='black')
+
 
 # Adjust the size of the tick labels on the x-axis and y-axis
 plt.xticks(fontsize=20)  
@@ -609,7 +612,7 @@ plt.yticks(fontsize=20)
 
 # Reorder the legend items
 handles = [rainfall_plot, et_potential_plot[0], moisture_min_plot[0]]
-labels = ['Total Rainfall (mm)', "Potential Evapotranspiration (mm)", "Soil Moisture (mm)"]
+labels = ['Rainfall (mm)', "Evapotranspiration (mm)", "Soil Moisture (mm)"]
 plt.legend(handles=handles, labels=labels, fontsize=30, loc='upper left')
 plt.title("Weather", fontsize=50)
 plt.tight_layout()
@@ -618,7 +621,31 @@ filename = os.path.join(outdir, f"{stub}_weather.png")
 plt.savefig(filename)
 print("Saved", filename)
 plt.show()
+
+# +
+# Global drought index at 50km spatial resolution from 1901 to 2023
+filepath = "/g/data/xe2/datasets/Climate_SILO/spei01.nc"
+ds_drought = xr.load_dataset(filepath)
+lat_lons = {
+    "MULL":(-35.262540, 149.606003),
+    "MILG":(-34.391195, 148.469818)
+}
+lat_point = lat_lons[stub][0]
+lon_point = lat_lons[stub][1]
+ds_closest = ds_drought.sel(lat=lat_point, lon=lon_point, method='nearest')
+ds_selected = ds_closest.sel(time=slice('2017-01-01', '2024-12-31'))
+
+# Merge the drought index with the shelter benefit dataframe
+df_drought = pd.DataFrame(ds_selected['spei'], index=ds_selected.time, columns=['drought_index'])
 # -
+
+df_drought
+
+df_merged = pd.merge_asof(df_weekly, df_drought, left_index=True, right_index=True, direction='nearest')
+df_merged = pd.merge_asof(df_merged, df_benefits, left_index=True, right_index=True, direction='nearest')
+
+
+
 
 
 
