@@ -120,6 +120,8 @@ ds["worldcover"] = reprojected.isel(band=0).drop_vars('band')
 
 cropland = ds["worldcover"].values == world_cover_layers["Cropland"]
 grassland = ds["worldcover"].values == world_cover_layers["Grassland"]
+tree_cover = ds["worldcover"].values == world_cover_layers["Tree cover"]
+
 crop_or_grass = cropland | grassland
 
 tree_percent = ds['tree_percent'].isel(band=0).values
@@ -134,7 +136,7 @@ tree_percent = ds['tree_percent'].isel(band=0).values
 # distances = 1,2,3,4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30 # , 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50
 # distances = 1,2,3,4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50
 # distances=0,10
-distances = 5, 30
+distances = 0, 500
 # distances = 1,2,3,4
 
 
@@ -185,15 +187,15 @@ for i in range(len(distances) - 1):
     print(f"Added layer: {layer_name}")
 # +
 # Additional vegetation indices
-ds['NIRV'] = ds['NDVI'] * ds['nbart_nir_1']
-ds['kNDVI'] = np.tanh(ds['NDVI'] * ds['NDVI'])
-
-
 B8 = ds['nbart_nir_1']
 B4 = ds['nbart_red']
 B2 = ds['nbart_blue']
 ds['EVI'] = 2.5 * ((B8 - B4) / (B8 + 6 * B4 - 7.5 * B2 + 1))
-ds['EVI2'] = 2.5 * ((B8 - B4)/(1 + B8 + 2.4 * B4))
+
+
+# ds['NIRV'] = ds['NDVI'] * ds['nbart_nir_1']
+# ds['kNDVI'] = np.tanh(ds['NDVI'] * ds['NDVI'])
+# ds['EVI2'] = 2.5 * ((B8 - B4)/(1 + B8 + 2.4 * B4))
 
 # +
 # # Fractional Cover
@@ -275,9 +277,11 @@ productivity_score1 = ndvi.where(~adjacent_mask) #  & (grassland | cropland))
 # layer_name = f"percent_trees_0m-100m"
 # layer_name = f"percent_trees_490m-500m"
 # layer_name = f"percent_trees_100m-110m"
-layer_name = f"percent_trees_50m-300m"
+# layer_name = f"percent_trees_50m-300m"
 # layer_name = f"percent_trees_750m-800m"
 # layer_name = "percent_trees_950m-1000m"
+layer_name = f"percent_trees_0m-300m"
+
 s = ds[layer_name].values
 
 # Remove all pixels that are trees or adjacent to trees
@@ -293,12 +297,14 @@ upper_bound = q3 + 1.5 * iqr
 
 # Find the shelter scores not obstructed by cloud cover or outliers
 y_values = y_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]
-# y_values = y_values_outliers
 
 x = s.flatten()
 x_values_outliers = x[~np.isnan(y)]
 x_values = x_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]
+
+# Keeping outliers
 # x_values = x_values_outliers
+# y_values = y_values_outliers
 
 # Normalise
 x_values_normalised = (x_values - min(x_values)) / (max(x_values) - min(x_values))
@@ -517,7 +523,7 @@ plt.show()
 
 # +
 # %%time
-# Look at how the r2, slope and median difference between EVI and shelter threshold compares over time, using a donut of 40m-200m (and each different thresholds)
+# Look at how the r2, slope and median difference between EVI and shelter threshold compares over time, using a donut of 50m-300m (and each different thresholds)
 layer_name = f"percent_trees_50m-300m"
 tree_cover_threshold = 10
 
@@ -554,8 +560,8 @@ for i in range(len(distances) - 1):
         x_values = x_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]
 
         # Uncomment to keep outliers
-        x_values = x_values_outliers
-        y_values = y_values_outliers
+        # x_values = x_values_outliers
+        # y_values = y_values_outliers
         
         sheltered = y_values[np.where(x_values >= tree_cover_threshold)]
         unsheltered = y_values[np.where(x_values < tree_cover_threshold)]
