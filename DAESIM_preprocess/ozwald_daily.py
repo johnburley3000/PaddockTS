@@ -12,6 +12,9 @@ import xarray as xr
 import pandas as pd
 # -
 
+os.chdir(os.path.join(os.path.expanduser('~'), "Projects/PaddockTS"))
+from DAESIM_preprocess.util import create_bbox, scratch_dir
+
 ozwald_daily_abbreviations = {
     "Pg" : "Gross precipitation",
     "Tmax" : "Maximum temperature",
@@ -24,7 +27,7 @@ ozwald_daily_abbreviations = {
 }
 
 
-def ozwald_daily_singleyear(var="VPeff", latitude=-34.3890427, longitude=148.469499, buffer=0.1, year="2021", stub="", tmp_dir=""):
+def ozwald_daily_singleyear_thredds(var="VPeff", latitude=-34.3890427, longitude=148.469499, buffer=0.1, year="2021", stub="", tmp_dir=""):
     
     # buffer = 0.0000000001    # Using a buffer less than the grid size of 5km (0.05 degrees), so you get a single point
     
@@ -50,6 +53,24 @@ def ozwald_daily_singleyear(var="VPeff", latitude=-34.3890427, longitude=148.469
     ds = xr.open_dataset(filename)
     
     return ds
+
+
+def ozwald_daily_singleyear(var="VPeff", latitude=-34.3890427, longitude=148.469499, buffer=0.1, year="2021", stub="", tmp_dir=""):
+    
+    buffer = 0.0000000001    # Using a buffer less than the grid size of 5km (0.05 degrees), so you get a single point
+
+    prefix = ".daily" if var == "Pg" else ""
+    filename = os.path.join(f"/g/data/ub8/au/OzWALD/daily/meteo/{var}/OzWALD{prefix}.{var}.{year}.nc")
+
+    ds = xr.open_dataset(filename)
+    bbox = create_bbox(latitude, longitude, buffer)
+    ds_region = ds.sel(latitude=slice(bbox[3], bbox[1]), longitude=slice(bbox[0], bbox[2]))
+    
+    # If the region is too small, then just find a single point
+    if ds_region[var].shape[1] == 0:
+        ds_region = ds.sel(latitude=latitude, longitude=longitude, method="nearest")
+    
+    return ds_region
 
 
 def ozwald_daily_multiyear(var="VPeff", latitude=-34.3890427, longitude=148.469499, buffer=0.1, years=["2020", "2021"], stub="", tmp_dir=""):
