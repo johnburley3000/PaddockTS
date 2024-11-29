@@ -671,6 +671,65 @@ print("Saved", filename_benefits)
 print("Saved", filename_weather)
 # -
 
+
+
+
+
+# +
+fig, axes = plt.subplots(2, 1, figsize=(50, 30))  # Create two vertically stacked subplots
+
+# Visualise the shelter benefits
+ax = axes[0]
+ax.plot(df.index, df["r2"] * 100, color='black', label='Shelter score vs productivity index (r2 x 100)')
+ax.plot(df.index, df["percentage_benefit"] * 100, color='grey')
+opacity = 0.2
+ax.fill_between(
+    df.index, 
+    0, 
+    df["percentage_benefit"] * 100, 
+    where=(df["percentage_benefit"] > 0), 
+    color='green', 
+    alpha=opacity, 
+    interpolate=True,
+    label='Sheltered pixels vs unsheltered pixels (%)'
+)
+ax.fill_between(
+    df.index, 
+    0, 
+    df["percentage_benefit"] * 100, 
+    where=(df["percentage_benefit"] < 0), 
+    color='red', 
+    alpha=opacity, 
+    interpolate=True,
+)
+ax.set_title("Shelter Benefits", fontsize=50)
+ax.legend(fontsize=30, loc='upper left')
+ax.tick_params(axis='both', labelsize=20)
+
+# Visualise the weather data
+ax = axes[1]
+rainfall_plot = ax.bar(df.index, df['Rainfall'], color='skyblue', width=5, label='Rainfall (mm)')
+ax.bar(df.index, df['Potential Evapotranspiration'], color='orange', label="Evapotranspiration (mm)")
+ax.plot(df.index, df['Minimum Soil Moisture'], color='blue', label="Soil moisture (mm)")
+ax.plot(df.index, df["median"] * 100, color='green', label="Overall productivity x100")
+
+ax.set_title("Environmental Variables", fontsize=50)
+ax.legend(fontsize=30, loc='upper left')
+ax.tick_params(axis='both', labelsize=20)
+
+# Adjust layout to prevent overlap
+plt.tight_layout()
+
+# Save as a single image
+filename_combined = os.path.join(scratch_dir, f"{stub}_shelter_weather.png")
+plt.savefig(filename_combined)
+
+plt.show()
+
+print("Saved", filename_combined)
+
+# -
+
 # # Spatial Variation
 
 df_top10 = df_benefits.nlargest(10, 'r2')
@@ -778,5 +837,67 @@ ax.add_artist(scalebar)
 plt.show()
 # -
 
+# !ls /g/data/xe2/cb8590/Data/PadSeg/MILG_ds2_query.pkl
+
+
+filename = os.path.join(outdir, f"{stub}_ds2_query.pkl")
+with open(filename, 'rb') as file:
+    query = pickle.load(file)
+
+query
+
+# +
+# Plot the bounding box on a larger map
+
+import matplotlib.pyplot as plt
+import geopandas as gpd
+from shapely.geometry import box
+import contextily as ctx
+
+# Coordinates of the bounding box (your image region)
+image_bbox = {
+    'y': (-34.439042773032035, -34.33904277303204),
+    'x': (148.41949938279095, 148.51949938279097),
+}
+
+# Calculate the larger 100km x 100km bounding box
+buffer = 0.5  # ~0.5 degrees buffer for ~50 km each side
+region_bbox = {
+    'y': (image_bbox['y'][0] - buffer, image_bbox['y'][1] + buffer),
+    'x': (image_bbox['x'][0] - buffer, image_bbox['x'][1] + buffer),
+}
+
+# Create GeoDataFrames for the image and region
+image_gdf = gpd.GeoDataFrame(
+    {'geometry': [box(image_bbox['x'][0], image_bbox['y'][0], image_bbox['x'][1], image_bbox['y'][1])]},
+    crs='EPSG:4326',  # WGS84 Lat/Lon
+)
+
+region_gdf = gpd.GeoDataFrame(
+    {'geometry': [box(region_bbox['x'][0], region_bbox['y'][0], region_bbox['x'][1], region_bbox['y'][1])]},
+    crs='EPSG:4326',  # WGS84 Lat/Lon
+)
+
+# Plot the region with the image bounding box overlaid
+fig, ax = plt.subplots(figsize=(10, 10))
+
+# Plot the larger region
+region_gdf.boundary.plot(ax=ax, edgecolor='blue', linewidth=1, label='100km Region')
+
+# Plot the smaller image bounding box
+image_gdf.boundary.plot(ax=ax, edgecolor='red', linewidth=2, label='10km Image Box')
+
+# Add a basemap
+ctx.add_basemap(ax, source=ctx.providers.Stamen.Terrain, crs=image_gdf.crs.to_string())
+
+# Adjust plot appearance
+ax.set_xlim(region_bbox['x'][0], region_bbox['x'][1])
+ax.set_ylim(region_bbox['y'][0], region_bbox['y'][1])
+ax.set_xlabel('Longitude')
+ax.set_ylabel('Latitude')
+ax.legend()
+plt.show()
+
+# -
 
 
