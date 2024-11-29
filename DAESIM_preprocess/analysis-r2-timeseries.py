@@ -575,7 +575,8 @@ for i in range(len(distances) - 1):
             "r2": res.rvalue**2,
             "slope": res.slope,
             "percentage_benefit": percentage_benefit,
-            "sample_size": sample_size
+            "sample_size": sample_size,
+            "median": np.median(y_values)
         }
         benefits.append(benefit)
 
@@ -586,8 +587,7 @@ pd.DataFrame(benefits)
 
 # ## Weather Plot
 
-# +
-# Drought plot
+# Load weather data
 filename_ozwald = os.path.join(outdir, f"{stub}_ozwald_8day.nc")
 filename_silo = os.path.join(outdir, f"{stub}_silo_daily.nc")
 ds_ozwald = xr.open_dataset(filename_ozwald)
@@ -595,6 +595,15 @@ ds_silo = xr.open_dataset(filename_silo)
 df_daily = merge_ozwald_silo(ds_ozwald, ds_silo)
 df_weekly = resample_weekly(df_daily)
 
+# Merge shelter benefits
+df_benefits = pd.DataFrame(benefits)
+df_benefits['date'] = df_benefits['time'].dt.date
+df_benefits = df_benefits.set_index('date')
+df_benefits.index = pd.to_datetime(df_benefits.index)
+df_merged = pd.merge_asof(df_weekly, df_benefits, left_index=True, right_index=True, direction='nearest')
+
+# +
+# Visualise weather data
 plt.figure(figsize=(50, 20))
 df = df_merged
 
@@ -602,19 +611,16 @@ df = df_merged
 rainfall_plot = plt.bar(df.index, df['Rainfall'], color='skyblue', width=5)
 et_potential_plot = plt.bar(df.index, df['Potential Evapotranspiration'], color='orange')
 moisture_min_plot = plt.plot(df.index, df['Minimum Soil Moisture'], color='blue')
-drought_plot = plt.plot(df.index, df['drought_index'] * 50 + 100, color='red')
-r2_plot = plt.plot(df.index, df['r2'] * 1000, color='black')
-
-
-# Adjust the size of the tick labels on the x-axis and y-axis
-plt.xticks(fontsize=20)  
-plt.yticks(fontsize=20)  
+EVI_plot = plt.plot(df.index, df["median"] * 100, color='green')
 
 # Reorder the legend items
-handles = [rainfall_plot, et_potential_plot[0], moisture_min_plot[0]]
-labels = ['Rainfall (mm)', "Evapotranspiration (mm)", "Soil Moisture (mm)"]
+handles = [rainfall_plot, et_potential_plot[0], moisture_min_plot[0], EVI_plot[0]]
+labels = ['Rainfall (mm)', "Evapotranspiration (mm)", "Soil Moisture (mm)", "Median EVI x100"]
+
 plt.legend(handles=handles, labels=labels, fontsize=30, loc='upper left')
 plt.title("Weather", fontsize=50)
+plt.xticks(fontsize=20)  
+plt.yticks(fontsize=20)  
 plt.tight_layout()
 
 filename = os.path.join(outdir, f"{stub}_weather.png")
@@ -623,86 +629,53 @@ print("Saved", filename)
 plt.show()
 
 # +
-# Global drought index at 50km spatial resolution from 1901 to 2023
-filepath = "/g/data/xe2/datasets/Climate_SILO/spei01.nc"
-ds_drought = xr.load_dataset(filepath)
-lat_lons = {
-    "MULL":(-35.262540, 149.606003),
-    "MILG":(-34.391195, 148.469818)
-}
-lat_point = lat_lons[stub][0]
-lon_point = lat_lons[stub][1]
-ds_closest = ds_drought.sel(lat=lat_point, lon=lon_point, method='nearest')
-ds_selected = ds_closest.sel(time=slice('2017-01-01', '2024-12-31'))
+# Visualise the temperature
+df = df_merged
 
-# Merge the drought index with the shelter benefit dataframe
-df_drought = pd.DataFrame(ds_selected['spei'], index=ds_selected.time, columns=['drought_index'])
-# -
+plt.figure(figsize=(50, 10))
+maxtemp_plot = plt.plot(df.index, df["Maximum temperature"], color='red')
+mintemp_plot = plt.plot(df.index, df["Minimum temperature"], color='blue')
 
-df_drought
-
-df_merged = pd.merge_asof(df_weekly, df_drought, left_index=True, right_index=True, direction='nearest')
-df_merged = pd.merge_asof(df_merged, df_benefits, left_index=True, right_index=True, direction='nearest')
+handles = [maxtemp_plot[0], mintemp_plot[0], EVI_plot[0]]
+labels = ['Maximum Temperature (°C)', 'Minimum Temperature (°C)', 'Median EVI']
 
 
+plt.legend(handles=handles, labels=labels, fontsize=30, loc='upper left')
+plt.title("Temperature", fontsize=50)
+plt.xticks(fontsize=20)  
+plt.yticks(fontsize=20)  
+plt.tight_layout()
 
-
-
-
-df_benefits = pd.DataFrame(benefits)
-df_benefits['date'] = df_benefits['time'].dt.date
-df_benefits = df_benefits.set_index('date')
-df_benefits.index = pd.to_datetime(df_benefits.index)
-df_merged = pd.merge_asof(df_weekly, df_benefits, left_index=True, right_index=True, direction='nearest')
-
+filename = os.path.join(outdir, f"{stub}_temperature.png")
+plt.savefig(filename)
+print("Saved", filename)
+plt.show()
 
 # +
-# Plot the benefits over time
-df = pd.DataFrame(benefits)
-df['date'] = df['time'].dt.date
-df = df.set_index('date')
-df.index = pd.to_datetime(df.index)
+# Visualise the r2, percentage benefits and slope
+plt.figure(figsize=(50, 10))
+r2_plot = plt.plot(df.index, df["r2"], color='green')
+benefits_plot = plt.plot(df.index, df["percentage_benefit"], color='lawngreen')
 
-df_top10 = df.nlargest(10, 'r2')
-df_top10[['r2', 'slope', 'percentage_benefit', 'sample_size']]
+handles = [r2_plot[0], benefits_plot[0]]
+labels = ['Shelter score vs productivity index (r2)', 'Sheltered median vs unsheltered median (%)']
 
-# +
-# Global drought index at 50km spatial resolution from 1901 to 2023
-filepath = "/g/data/xe2/datasets/Climate_SILO/spei01.nc"
-ds_drought = xr.load_dataset(filepath)
-lat_lons = {
-    "MULL":(-35.262540, 149.606003),
-    "MILG":(-34.391195, 148.469818)
-}
-lat_point = lat_lons[stub][0]
-lon_point = lat_lons[stub][1]
-ds_closest = ds_drought.sel(lat=lat_point, lon=lon_point, method='nearest')
-ds_selected = ds_closest.sel(time=slice('2017-01-01', '2024-12-31'))
+plt.title("Shelter Benefits", fontsize=50)
+plt.legend(handles=handles, labels=labels, fontsize=30, loc='upper left')
+plt.xticks(fontsize=20)  
+plt.yticks(fontsize=20)  
+plt.tight_layout()
 
-# Merge the drought index with the shelter benefit dataframe
-df_drought = pd.DataFrame(ds_selected['spei'], index=ds_selected.time, columns=['drought_index'])
-df['r2_scaled'] = df['r2'] / df['r2'].max(skipna=True)
-df_merged = pd.merge_asof(df, df_drought, left_index=True, right_index=True, direction='nearest')
-df_merged
+filename = os.path.join(outdir, f"{stub}_temperature.png")
+plt.savefig(filename)
+print("Saved", filename)
+plt.show()
 # -
-
-df_merged[['r2_scaled', 'drought_index']].plot(figsize=(50,20))
-
-# +
-# Load wind data
-ds_wind = ozwald_daily(variables=["Uavg"], lat=lat_point, lon=lon_point, buffer=0.0001, start_year="2017", end_year="2023", outdir=scratch_dir, tmp_dir=scratch_dir)
-df_wind = pd.DataFrame(ds_wind['Uavg'], index=ds_wind.time, columns=["Uavg"])
-
-# Find the max windspeed per week
-df_wind['week'] = df_wind.index.to_period('W')
-df_wind_weekly = df_wind.groupby('week')['Uavg'].max().reset_index()
-df_merged['week'] = df_merged.index.to_period('W')
-df_merged2 = pd.merge(df_merged, df_wind_weekly, on='week', how='left')
-# -
-
-df_merged2[['r2_scaled','Uavg']].plot()
 
 # # Spatial Variation
+
+df_top10 = df.nlargest(10, 'slope')
+df_top10[['r2', 'slope', 'percentage_benefit', 'sample_size']]
 
 # +
 # Visualise the spatial variation in EVI
