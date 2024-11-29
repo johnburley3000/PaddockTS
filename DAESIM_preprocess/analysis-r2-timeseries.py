@@ -605,82 +605,12 @@ df_benefits.index = pd.to_datetime(df_benefits.index)
 df_merged = pd.merge_asof(df_weekly, df_benefits, left_index=True, right_index=True, direction='nearest')
 
 # +
-# Visualise the shelter benefits
 df = df_merged
-
-plt.figure(figsize=(50, 10))
-r2_plot = plt.plot(df.index, df["r2"], color='black')
-benefits_plot = plt.plot(df.index, df["percentage_benefit"], color='yellowgreen')
-opacity = 0.2
-plt.fill_between(
-    df.index, 
-    0, 
-    df["percentage_benefit"], 
-    where=(df["percentage_benefit"] > 0), 
-    color='green', 
-    alpha=opacity, 
-    interpolate=True,  # Smooth transitions
-    label='Positive Benefit'
-)
-plt.fill_between(
-    df.index, 
-    0, 
-    df["percentage_benefit"], 
-    where=(df["percentage_benefit"] < 0), 
-    color='red', 
-    alpha=opacity, 
-    interpolate=True, 
-    label='Negative Benefit'
-)
-handles = [r2_plot[0], benefits_plot[0]]
-labels = ['Shelter score vs productivity index (r2)', 'Sheltered median vs unsheltered median (%)']
-
-plt.title("Shelter Benefits", fontsize=50)
-plt.legend(handles=handles, labels=labels, fontsize=30, loc='upper left')
-plt.xticks(fontsize=20)
-plt.yticks(fontsize=20)
-plt.tight_layout()
-
-filename_benefits = os.path.join(outdir, f"{stub}_shelter_benefits_time_series.png")
-plt.savefig(filename_benefits)
-plt.show()
-
-
-# Visualise the weather data
-plt.figure(figsize=(50, 20))
-
-rainfall_plot = plt.bar(df.index, df['Rainfall'], color='skyblue', width=5)
-et_potential_plot = plt.bar(df.index, df['Potential Evapotranspiration'], color='orange')
-moisture_min_plot = plt.plot(df.index, df['Minimum Soil Moisture'], color='blue')
-EVI_plot = plt.plot(df.index, df["median"] * 100, color='green')
-
-handles = [rainfall_plot, et_potential_plot[0], moisture_min_plot[0], EVI_plot[0]]
-labels = ['Rainfall (mm)', "Evapotranspiration (mm)", "Soil moisture (mm)", "Overall productivity x100"]
-
-plt.legend(handles=handles, labels=labels, fontsize=30, loc='upper left')
-plt.title("Environmental Variables", fontsize=50)
-plt.xticks(fontsize=20)  
-plt.yticks(fontsize=20)  
-plt.tight_layout()
-
-filename_weather = os.path.join(outdir, f"{stub}_environmental_variables.png")
-plt.savefig(filename)
-plt.show()
-
-print("Saved", filename_benefits)
-print("Saved", filename_weather)
-# -
-
-
-
-
-
-# +
 fig, axes = plt.subplots(2, 1, figsize=(50, 30))  # Create two vertically stacked subplots
 
 # Visualise the shelter benefits
 ax = axes[0]
-ax.plot(df.index, df["r2"] * 100, color='black', label='Shelter score vs productivity index (r2 x 100)')
+ax.plot(df.index, df["r2"] * 100, color='black', label='Shelter score vs productivity index ($r^2 \\times 100$)')
 ax.plot(df.index, df["percentage_benefit"] * 100, color='grey')
 opacity = 0.2
 ax.fill_between(
@@ -691,7 +621,7 @@ ax.fill_between(
     color='green', 
     alpha=opacity, 
     interpolate=True,
-    label='Sheltered pixels vs unsheltered pixels (%)'
+    label='Sheltered productivty > unsheltered productivity (%)'
 )
 ax.fill_between(
     df.index, 
@@ -701,8 +631,9 @@ ax.fill_between(
     color='red', 
     alpha=opacity, 
     interpolate=True,
+    label='Sheltered productivty < unsheltered productivity (%)'
 )
-ax.set_title("Shelter Benefits", fontsize=50)
+ax.set_title(f"{stubs[stub]} Time Series of Shelter Benefits", fontsize=50)
 ax.legend(fontsize=30, loc='upper left')
 ax.tick_params(axis='both', labelsize=20)
 
@@ -713,7 +644,7 @@ ax.bar(df.index, df['Potential Evapotranspiration'], color='orange', label="Evap
 ax.plot(df.index, df['Minimum Soil Moisture'], color='blue', label="Soil moisture (mm)")
 ax.plot(df.index, df["median"] * 100, color='green', label="Overall productivity x100")
 
-ax.set_title("Environmental Variables", fontsize=50)
+ax.set_title(f"{stubs[stub]} Weather", fontsize=50)
 ax.legend(fontsize=30, loc='upper left')
 ax.tick_params(axis='both', labelsize=20)
 
@@ -765,7 +696,7 @@ unsheltered = y_values[np.where(x_values < percent_tree_threshold)]
 median_value = np.median(unsheltered)
 
 # Define color map
-plt.figure(figsize=(8, 8))  # Width=10, Height=8 (adjust as needed)
+plt.figure(figsize=(10, 8))  # Width=10, Height=8 (adjust as needed)
 
 cmap = plt.cm.coolwarm  
 cmap.set_bad(color='green')  # Set NaN pixels to green
@@ -799,8 +730,9 @@ ridges = catchment_ridges(grid, fdir, acc, full_branches)
 slope = calculate_slope(filename)
 show_ridge_gullies(dem, ridges, gullies, scratch_dir, stub)
 
-
 # +
+ds_timepoint = ds.sel(time=time, method='nearest')
+
 def normalize(arr):
     return (arr - arr.min()) / (arr.max() - arr.min())
 
@@ -846,9 +778,9 @@ with open(filename, 'rb') as file:
 
 query
 
-# +
-# Plot the bounding box on a larger map
+# !pip install contextily
 
+# +
 import matplotlib.pyplot as plt
 import geopandas as gpd
 from shapely.geometry import box
@@ -861,7 +793,7 @@ image_bbox = {
 }
 
 # Calculate the larger 100km x 100km bounding box
-buffer = 0.5  # ~0.5 degrees buffer for ~50 km each side
+buffer = 1  # ~0.5 degrees buffer for ~50 km each side
 region_bbox = {
     'y': (image_bbox['y'][0] - buffer, image_bbox['y'][1] + buffer),
     'x': (image_bbox['x'][0] - buffer, image_bbox['x'][1] + buffer),
@@ -882,13 +814,13 @@ region_gdf = gpd.GeoDataFrame(
 fig, ax = plt.subplots(figsize=(10, 10))
 
 # Plot the larger region
-region_gdf.boundary.plot(ax=ax, edgecolor='blue', linewidth=1, label='100km Region')
+region_gdf.boundary.plot(ax=ax, edgecolor='black', linewidth=1, label='200km Region')
 
 # Plot the smaller image bounding box
-image_gdf.boundary.plot(ax=ax, edgecolor='red', linewidth=2, label='10km Image Box')
+image_gdf.boundary.plot(ax=ax, edgecolor='red', linewidth=2, label='10km Bounding Box')
 
-# Add a basemap
-ctx.add_basemap(ax, source=ctx.providers.Stamen.Terrain, crs=image_gdf.crs.to_string())
+# Add a basemap using the correct contextily provider syntax
+ctx.add_basemap(ax, source=ctx.providers.OpenStreetMap.Mapnik, crs=image_gdf.crs)
 
 # Adjust plot appearance
 ax.set_xlim(region_bbox['x'][0], region_bbox['x'][1])
