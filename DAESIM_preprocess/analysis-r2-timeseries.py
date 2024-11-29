@@ -136,7 +136,7 @@ tree_percent = ds['tree_percent'].isel(band=0).values
 # distances = 1,2,3,4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30 # , 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50
 # distances = 1,2,3,4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50
 # distances=0,10
-distances = 0, 500
+distances = 0, 30
 # distances = 1,2,3,4
 
 
@@ -280,7 +280,7 @@ productivity_score1 = ndvi.where(~adjacent_mask) #  & (grassland | cropland))
 # layer_name = f"percent_trees_50m-300m"
 # layer_name = f"percent_trees_750m-800m"
 # layer_name = "percent_trees_950m-1000m"
-layer_name = f"percent_trees_0m-300m"
+layer_name = f"percent_trees_100m-300m"
 
 s = ds[layer_name].values
 
@@ -524,14 +524,13 @@ plt.show()
 # +
 # %%time
 # Look at how the r2, slope and median difference between EVI and shelter threshold compares over time, using a donut of 50m-300m (and each different thresholds)
-layer_name = f"percent_trees_50m-300m"
 tree_cover_threshold = 10
 
 benefits = []
 
 # distances = 1,2,3,4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50
 # distances = 0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100
-distances = 5, 30
+distances = 0, 30
 
 for i in range(len(distances) - 1):
     min_distance = distances[i]
@@ -585,6 +584,51 @@ len(benefits)
 
 pd.DataFrame(benefits)
 
+# ## Weather Plot
+
+# +
+# Drought plot
+filename_ozwald = os.path.join(outdir, f"{stub}_ozwald_8day.nc")
+filename_silo = os.path.join(outdir, f"{stub}_silo_daily.nc")
+ds_ozwald = xr.open_dataset(filename_ozwald)
+ds_silo = xr.open_dataset(filename_silo)
+df_daily = merge_ozwald_silo(ds_ozwald, ds_silo)
+df_weekly = resample_weekly(df_daily)
+
+plt.figure(figsize=(50, 20))
+df = df_merged
+
+# Plot the data
+rainfall_plot = plt.bar(df.index, df['Rainfall'], color='skyblue', width=5)
+et_potential_plot = plt.bar(df.index, df['Potential Evapotranspiration'], color='orange')
+moisture_min_plot = plt.plot(df.index, df['Minimum Soil Moisture'], color='blue')
+
+# Adjust the size of the tick labels on the x-axis and y-axis
+plt.xticks(fontsize=20)  
+plt.yticks(fontsize=20)  
+
+# Reorder the legend items
+handles = [rainfall_plot, et_potential_plot[0], moisture_min_plot[0]]
+labels = ['Total Rainfall (mm)', "Potential Evapotranspiration (mm)", "Soil Moisture (mm)"]
+plt.legend(handles=handles, labels=labels, fontsize=30, loc='upper left')
+plt.title("Weather", fontsize=50)
+plt.tight_layout()
+
+filename = os.path.join(outdir, f"{stub}_weather.png")
+plt.savefig(filename)
+print("Saved", filename)
+plt.show()
+# -
+
+
+
+df_benefits = pd.DataFrame(benefits)
+df_benefits['date'] = df_benefits['time'].dt.date
+df_benefits = df_benefits.set_index('date')
+df_benefits.index = pd.to_datetime(df_benefits.index)
+df_merged = pd.merge_asof(df_weekly, df_benefits, left_index=True, right_index=True, direction='nearest')
+
+
 # +
 # Plot the benefits over time
 df = pd.DataFrame(benefits)
@@ -594,13 +638,6 @@ df.index = pd.to_datetime(df.index)
 
 df_top10 = df.nlargest(10, 'r2')
 df_top10[['r2', 'slope', 'percentage_benefit', 'sample_size']]
-# -
-
-df['r2'].plot()
-plt.show()
-
-df['percentage_benefit'].plot()
-plt.show()
 
 # +
 # Global drought index at 50km spatial resolution from 1901 to 2023
