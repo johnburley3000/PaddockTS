@@ -23,6 +23,8 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import matplotlib.patches as mpatches
 from matplotlib.ticker import MaxNLocator
+from matplotlib.font_manager import FontProperties
+from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
 import seaborn as sns
 
 # Local imports
@@ -31,6 +33,8 @@ from DAESIM_preprocess.util import gdata_dir, scratch_dir, transform_bbox
 from DAESIM_preprocess.topography import pysheds_accumulation, calculate_slope
 from DAESIM_preprocess.silo_daily import merge_ozwald_silo, resample_weekly, visualise_water, visualise_temp
 from DAESIM_preprocess.ozwald_daily import ozwald_daily, ozwald_daily_abbreviations
+from DAESIM_preprocess.topography import show_acc, show_aspect, show_slope, show_ridge_gullies, pysheds_accumulation, catchment_gullies, catchment_ridges, calculate_slope
+
 # -
 
 stubs = {
@@ -280,7 +284,7 @@ productivity_score1 = ndvi.where(~adjacent_mask) #  & (grassland | cropland))
 # layer_name = f"percent_trees_50m-300m"
 # layer_name = f"percent_trees_750m-800m"
 # layer_name = "percent_trees_950m-1000m"
-layer_name = f"percent_trees_100m-300m"
+layer_name = f"percent_trees_0m-300m"
 
 s = ds[layer_name].values
 
@@ -602,6 +606,8 @@ df_merged = pd.merge_asof(df_weekly, df_benefits, left_index=True, right_index=T
 
 # +
 # Visualise the shelter benefits
+df = df_merged
+
 plt.figure(figsize=(50, 10))
 r2_plot = plt.plot(df.index, df["r2"], color='black')
 benefits_plot = plt.plot(df.index, df["percentage_benefit"], color='yellowgreen')
@@ -642,7 +648,6 @@ plt.show()
 
 # Visualise the weather data
 plt.figure(figsize=(50, 20))
-df = df_merged
 
 rainfall_plot = plt.bar(df.index, df['Rainfall'], color='skyblue', width=5)
 et_potential_plot = plt.bar(df.index, df['Potential Evapotranspiration'], color='orange')
@@ -726,16 +731,52 @@ plt.savefig(filename, bbox_inches='tight')
 print(filename)
 plt.show()
 # -
-ds['worldcover'].plot(figsize=(8,8))
+# %%time
+filename = os.path.join(outdir, f"{stub}_terrain.tif")
+grid, dem, fdir, acc = pysheds_accumulation(filename)
+num_catchments = 20
+gullies, full_branches = catchment_gullies(grid, fdir, acc, num_catchments)
+ridges = catchment_ridges(grid, fdir, acc, full_branches)
+slope = calculate_slope(filename)
+show_ridge_gullies(dem, ridges, gullies, scratch_dir, stub)
+
+
+# +
+def normalize(arr):
+    return (arr - arr.min()) / (arr.max() - arr.min())
+
+# True colour image
+red = ds_timepoint['nbart_red']
+green = ds_timepoint['nbart_green']
+blue = ds_timepoint['nbart_blue']
+red_norm = normalize(red)
+green_norm = normalize(green)
+blue_norm = normalize(blue)
+rgb = np.stack([red_norm, green_norm, blue_norm], axis=-1)
+fig, ax = plt.subplots(figsize=(10, 10))
+ax.imshow(rgb)
+ax.axis('off')
+
+# Scale bar
+width_km = 10  # 10 km
+height_km = 10  # 10 km
+pixels_per_km = ds.dims['x'] / width_km  # or ds.dims['y'] / height_km
+fontprops = FontProperties(size=12)
+scalebar = AnchoredSizeBar(
+    ax.transData,
+    pixels_per_km,  # 1 km in pixel units
+    '1 km', 
+    'lower left',
+    pad=0.5,
+    color='white',
+    frameon=False,
+    size_vertical=2,
+    fontproperties=fontprops,
+)
+ax.add_artist(scalebar)
+
 plt.show()
-
-
-
-
-
-
-
-
+# -
 
 
 
