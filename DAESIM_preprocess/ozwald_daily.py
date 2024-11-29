@@ -57,7 +57,7 @@ def ozwald_daily_singleyear_thredds(var="VPeff", latitude=-34.3890427, longitude
     return ds
 
 
-def ozwald_daily_singleyear(var="VPeff", latitude=-34.3890427, longitude=148.469499, buffer=0.1, year="2021", stub="Test", tmp_dir="scratch_dir"):
+def ozwald_daily_singleyear(var="VPeff", latitude=-34.3890427, longitude=148.469499, buffer=0.1, year="2021", stub="Test", tmp_dir=scratch_dir):
     
     prefix = ".daily" if var == "Pg" else ""
     filename = os.path.join(f"/g/data/ub8/au/OzWALD/daily/meteo/{var}/OzWALD{prefix}.{var}.{year}.nc")
@@ -77,7 +77,7 @@ def ozwald_daily_singleyear(var="VPeff", latitude=-34.3890427, longitude=148.469
     return ds_region
 
 
-def ozwald_daily_multiyear(var="VPeff", latitude=-34.3890427, longitude=148.469499, buffer=0.1, years=["2020", "2021"], stub="Test", tmp_dir="scratch_dir"):
+def ozwald_daily_multiyear(var="VPeff", latitude=-34.3890427, longitude=148.469499, buffer=0.1, years=["2020", "2021"], stub="Test", tmp_dir=scratch_dir):
     dss = []
     for year in years:
         ds_year = ozwald_daily_singleyear(var, latitude, longitude, buffer, year, stub, tmp_dir)
@@ -86,7 +86,7 @@ def ozwald_daily_multiyear(var="VPeff", latitude=-34.3890427, longitude=148.4694
     return ds_concat
 
 
-def ozwald_daily(variables=["VPeff", "Uavg"], lat=-34.3890427, lon=148.469499, buffer=0.1, start_year="2020", end_year="2021", outdir="scratch_dir", stub="Test", tmp_dir="scratch_dir"):
+def ozwald_daily(variables=["VPeff", "Uavg"], lat=-34.3890427, lon=148.469499, buffer=0.1, start_year="2020", end_year="2021", outdir=scratch_dir, stub="Test", tmp_dir=scratch_dir):
     dss = []
     years = [str(year) for year in list(range(int(start_year), int(end_year) + 1))]
     for variable in variables:

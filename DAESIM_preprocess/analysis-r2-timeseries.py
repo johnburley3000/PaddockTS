@@ -45,7 +45,7 @@ stubs = {
 
 # Filepaths
 outdir = os.path.join(gdata_dir, "Data/PadSeg/")
-stub = "MULL"
+stub = "MILG"
 
 # %%time
 # Sentinel imagery
@@ -142,6 +142,10 @@ distances = 5, 30
 tree_threshold = 1
 tree_mask = ds['canopy_height'] >= tree_threshold
 
+# Use the sentinel tree cover instead of global canopy height model
+tree_mask = tree_cover
+tree_percent = tree_cover
+
 distance = 6
 min_distance = 4
 max_distance = 6
@@ -189,6 +193,7 @@ B8 = ds['nbart_nir_1']
 B4 = ds['nbart_red']
 B2 = ds['nbart_blue']
 ds['EVI'] = 2.5 * ((B8 - B4) / (B8 + 6 * B4 - 7.5 * B2 + 1))
+ds['EVI2'] = 2.5 * ((B8 - B4)/(1 + B8 + 2.4 * B4))
 
 # +
 # # Fractional Cover
@@ -255,11 +260,11 @@ ds['EVI'] = 2.5 * ((B8 - B4) / (B8 + 6 * B4 - 7.5 * B2 + 1))
 
 # +
 # time = '2019-12-31'
-# time = '2020-01-08'
+time = '2020-01-08'
 # time = '2024-03-07'
 # time = '2021-02-06'
 # time = '2022-06-01'
-time = '2020-03-20'
+# time = '2020-03-20'
 
 
 productivity_variable = 'EVI'
@@ -313,7 +318,7 @@ plt.hist2d(
 pixel_size = 10
 plt.title("Productivity Index vs Shelter Score", fontsize=30)
 plt.xlabel(layer_name, fontsize=18)
-plt.ylabel('Enhanced Vegetation Index (EVI)', fontsize=18)
+plt.ylabel(f'Enhanced Vegetation Index ({productivity_variable})', fontsize=18)
 
 # Add color bar with custom ticks
 cbar = plt.colorbar(label='Number of pixels')
@@ -389,8 +394,8 @@ print(filename)
 distances = list(range(4, 30, 1))
 
 # Classify anything with a height greater than 1 as a tree
-tree_threshold = 1
-tree_mask = ds['canopy_height'] >= tree_threshold
+# tree_threshold = 1
+# tree_mask = ds['canopy_height'] >= tree_threshold
 
 distance = 6
 min_distance = 4
@@ -481,7 +486,7 @@ plt.title(f'Shelter benefits at Milgadara on {time}', fontsize = 30)
 plt.ylabel('Tree Cover (%)', fontsize=label_size, labelpad=pad_size)
 plt.xlabel('Distance (m)', fontsize=label_size, labelpad=pad_size)
 cbar = ax.collections[0].colorbar
-cbar.set_label(f'Sheltered vs Unsheltered difference in EVI (%)', fontsize=label_size)
+cbar.set_label(f'Sheltered vs Unsheltered difference in {productivity_variable} (%)', fontsize=label_size)
 
 filename = os.path.join(scratch_dir, f"{stub}_{productivity_variable}_bigmatrix_{time}.png")
 plt.savefig(filename, bbox_inches='tight')
@@ -532,12 +537,25 @@ for i in range(len(distances) - 1):
     for i, time in enumerate(ds.time.values):
         ndvi = ds.sel(time=time, method='nearest')[productivity_variable]
         productivity_score = ndvi.where(~adjacent_mask)
-        y = productivity_score.values.flatten()
 
-        # Should remove outliers here
+        # Remove all pixels that are trees, adjacent to trees, or masked by cloud cover
+        y = productivity_score.values.flatten()
+        y_values_outliers = y[~np.isnan(y)]   
+
+        # Remove outliers
+        q1 = np.percentile(y_values_outliers, 25)
+        q3 = np.percentile(y_values_outliers, 75)
+        iqr = q3 - q1
+        lower_bound = q1 - 1.5 * iqr
+        upper_bound = q3 + 1.5 * iqr
         
-        y_values = y[~np.isnan(y)]   # Remove all pixels that are trees, adjacent to trees, or masked by cloud cover
-        x_values = x[~np.isnan(y)]   # Match the shape of the y_values
+        y_values = y_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]
+        x_values_outliers = x[~np.isnan(y)]
+        x_values = x_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]
+
+        # Uncomment to keep outliers
+        x_values = x_values_outliers
+        y_values = y_values_outliers
         
         sheltered = y_values[np.where(x_values >= tree_cover_threshold)]
         unsheltered = y_values[np.where(x_values < tree_cover_threshold)]
@@ -557,6 +575,9 @@ for i in range(len(distances) - 1):
         benefits.append(benefit)
 
 len(benefits)
+# -
+
+pd.DataFrame(benefits)
 
 # +
 # Plot the benefits over time
@@ -580,7 +601,8 @@ plt.show()
 filepath = "/g/data/xe2/datasets/Climate_SILO/spei01.nc"
 ds_drought = xr.load_dataset(filepath)
 lat_lons = {
-    "MULL":(-35.262540, 149.606003)
+    "MULL":(-35.262540, 149.606003),
+    "MILG":(-34.391195, 148.469818)
 }
 lat_point = lat_lons[stub][0]
 lon_point = lat_lons[stub][1]
@@ -594,12 +616,12 @@ df_merged = pd.merge_asof(df, df_drought, left_index=True, right_index=True, dir
 df_merged
 # -
 
-df_merged[['r2_scaled', 'drought_index']].plot()
+df_merged[['r2_scaled', 'drought_index']].plot(figsize=(50,20))
 
 # +
 # Load wind data
-ds = ozwald_daily(variables=["Uavg"], lat=lat_point, lon=lon_point, buffer=0.0001, start_year="2017", end_year="2023")
-df_wind = pd.DataFrame(ds['Uavg'], index=ds.time, columns=["Uavg"])
+ds_wind = ozwald_daily(variables=["Uavg"], lat=lat_point, lon=lon_point, buffer=0.0001, start_year="2017", end_year="2023", outdir=scratch_dir, tmp_dir=scratch_dir)
+df_wind = pd.DataFrame(ds_wind['Uavg'], index=ds_wind.time, columns=["Uavg"])
 
 # Find the max windspeed per week
 df_wind['week'] = df_wind.index.to_period('W')
@@ -619,10 +641,10 @@ df_merged2[['r2_scaled','Uavg']].plot()
 # time = '2020-01-08'
 # time = '2024-03-07'
 # time = '2021-02-06'
+df = pd.DataFrame(benefits)
 for date in df_top10.index:
     time = date
 
-    productivity_variable = 'EVI'
     ds_productivity = ds.sel(time=time, method='nearest')[productivity_variable]
     ds_masked = ds_productivity.where(~adjacent_mask)
 
@@ -666,7 +688,7 @@ for date in df_top10.index:
     ax.set_xticks([]) 
     ax.set_yticks([])
     cbar = ax.collections[0].colorbar
-    cbar.set_label("Enhanced Vegetation Index (EVI)", fontsize=18)  # Set font size
+    cbar.set_label(f"Enhanced Vegetation Index ({productivity_variable})", fontsize=18)  # Set font size
     
     filename = os.path.join(scratch_dir, f"{stub}_{productivity_variable}_spatial_variation_{time}.png")
     plt.savefig(filename, bbox_inches='tight')
