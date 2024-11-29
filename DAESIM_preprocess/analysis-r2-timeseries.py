@@ -519,7 +519,7 @@ cbar.set_label('Sample size')
 plt.show()
 # -
 
-# # Time Series
+# # Temporal Variation
 
 # +
 # %%time
@@ -585,8 +585,6 @@ len(benefits)
 
 pd.DataFrame(benefits)
 
-# ## Weather Plot
-
 # Load weather data
 filename_ozwald = os.path.join(outdir, f"{stub}_ozwald_8day.nc")
 filename_silo = os.path.join(outdir, f"{stub}_silo_daily.nc")
@@ -603,144 +601,133 @@ df_benefits.index = pd.to_datetime(df_benefits.index)
 df_merged = pd.merge_asof(df_weekly, df_benefits, left_index=True, right_index=True, direction='nearest')
 
 # +
-# Visualise weather data
-plt.figure(figsize=(50, 20))
-df = df_merged
-
-# Plot the data
-rainfall_plot = plt.bar(df.index, df['Rainfall'], color='skyblue', width=5)
-et_potential_plot = plt.bar(df.index, df['Potential Evapotranspiration'], color='orange')
-moisture_min_plot = plt.plot(df.index, df['Minimum Soil Moisture'], color='blue')
-EVI_plot = plt.plot(df.index, df["median"] * 100, color='green')
-
-# Reorder the legend items
-handles = [rainfall_plot, et_potential_plot[0], moisture_min_plot[0], EVI_plot[0]]
-labels = ['Rainfall (mm)', "Evapotranspiration (mm)", "Soil Moisture (mm)", "Median EVI x100"]
-
-plt.legend(handles=handles, labels=labels, fontsize=30, loc='upper left')
-plt.title("Weather", fontsize=50)
-plt.xticks(fontsize=20)  
-plt.yticks(fontsize=20)  
-plt.tight_layout()
-
-filename = os.path.join(outdir, f"{stub}_weather.png")
-plt.savefig(filename)
-print("Saved", filename)
-plt.show()
-
-# +
-# Visualise the temperature
-df = df_merged
-
+# Visualise the shelter benefits
 plt.figure(figsize=(50, 10))
-maxtemp_plot = plt.plot(df.index, df["Maximum temperature"], color='red')
-mintemp_plot = plt.plot(df.index, df["Minimum temperature"], color='blue')
-
-handles = [maxtemp_plot[0], mintemp_plot[0], EVI_plot[0]]
-labels = ['Maximum Temperature (°C)', 'Minimum Temperature (°C)', 'Median EVI']
-
-
-plt.legend(handles=handles, labels=labels, fontsize=30, loc='upper left')
-plt.title("Temperature", fontsize=50)
-plt.xticks(fontsize=20)  
-plt.yticks(fontsize=20)  
-plt.tight_layout()
-
-filename = os.path.join(outdir, f"{stub}_temperature.png")
-plt.savefig(filename)
-print("Saved", filename)
-plt.show()
-
-# +
-# Visualise the r2, percentage benefits and slope
-plt.figure(figsize=(50, 10))
-r2_plot = plt.plot(df.index, df["r2"], color='green')
-benefits_plot = plt.plot(df.index, df["percentage_benefit"], color='lawngreen')
-
+r2_plot = plt.plot(df.index, df["r2"], color='black')
+benefits_plot = plt.plot(df.index, df["percentage_benefit"], color='yellowgreen')
+opacity = 0.2
+plt.fill_between(
+    df.index, 
+    0, 
+    df["percentage_benefit"], 
+    where=(df["percentage_benefit"] > 0), 
+    color='green', 
+    alpha=opacity, 
+    interpolate=True,  # Smooth transitions
+    label='Positive Benefit'
+)
+plt.fill_between(
+    df.index, 
+    0, 
+    df["percentage_benefit"], 
+    where=(df["percentage_benefit"] < 0), 
+    color='red', 
+    alpha=opacity, 
+    interpolate=True, 
+    label='Negative Benefit'
+)
 handles = [r2_plot[0], benefits_plot[0]]
 labels = ['Shelter score vs productivity index (r2)', 'Sheltered median vs unsheltered median (%)']
 
 plt.title("Shelter Benefits", fontsize=50)
 plt.legend(handles=handles, labels=labels, fontsize=30, loc='upper left')
+plt.xticks(fontsize=20)
+plt.yticks(fontsize=20)
+plt.tight_layout()
+
+filename_benefits = os.path.join(outdir, f"{stub}_shelter_benefits_time_series.png")
+plt.savefig(filename_benefits)
+plt.show()
+
+
+# Visualise the weather data
+plt.figure(figsize=(50, 20))
+df = df_merged
+
+rainfall_plot = plt.bar(df.index, df['Rainfall'], color='skyblue', width=5)
+et_potential_plot = plt.bar(df.index, df['Potential Evapotranspiration'], color='orange')
+moisture_min_plot = plt.plot(df.index, df['Minimum Soil Moisture'], color='blue')
+EVI_plot = plt.plot(df.index, df["median"] * 100, color='green')
+
+handles = [rainfall_plot, et_potential_plot[0], moisture_min_plot[0], EVI_plot[0]]
+labels = ['Rainfall (mm)', "Evapotranspiration (mm)", "Soil moisture (mm)", "Overall productivity x100"]
+
+plt.legend(handles=handles, labels=labels, fontsize=30, loc='upper left')
+plt.title("Environmental Variables", fontsize=50)
 plt.xticks(fontsize=20)  
 plt.yticks(fontsize=20)  
 plt.tight_layout()
 
-filename = os.path.join(outdir, f"{stub}_temperature.png")
+filename_weather = os.path.join(outdir, f"{stub}_environmental_variables.png")
 plt.savefig(filename)
-print("Saved", filename)
 plt.show()
+
+print("Saved", filename_benefits)
+print("Saved", filename_weather)
 # -
 
 # # Spatial Variation
 
-df_top10 = df.nlargest(10, 'slope')
+df_top10 = df_benefits.nlargest(10, 'r2')
 df_top10[['r2', 'slope', 'percentage_benefit', 'sample_size']]
 
 # +
 # Visualise the spatial variation in EVI
-# plt.figure(figsize=(10, 8))
+time = df_top10.index[0].date()
 
-# time = '2020-01-08'
-# time = '2024-03-07'
-# time = '2021-02-06'
-df = pd.DataFrame(benefits)
-for date in df_top10.index:
-    time = date
+ds_productivity = ds.sel(time=time, method='nearest')[productivity_variable]
+ds_masked = ds_productivity.where(~adjacent_mask)
 
-    ds_productivity = ds.sel(time=time, method='nearest')[productivity_variable]
-    ds_masked = ds_productivity.where(~adjacent_mask)
+# Calculate the productivity and shelter scores
+layer_name = f"percent_trees_0m-300m"
+s = ds[layer_name].values
+y = ds_masked.values.flatten()
+y_values_outliers = y[~np.isnan(y)]  
+x = s.flatten()
+x_values_outliers = x[~np.isnan(y)]  
 
-    # Calculate the median of the data (ignoring NaNs)
-    # median_value = ds_masked.median().values
-    layer_name = f"percent_trees_50m-300m"
-    s = ds[layer_name].values
-    y = ds_masked.values.flatten()
-    y_values_outliers = y[~np.isnan(y)]  
-    x = s.flatten()
-    x_values_outliers = x[~np.isnan(y)]  
+# Remove outliers from list
+q1 = np.percentile(y_values_outliers, 25)
+q3 = np.percentile(y_values_outliers, 75)
+iqr = q3 - q1
+lower_bound = q1 - 1.5 * iqr
+upper_bound = q3 + 1.5 * iqr
+y_values = y_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]    
+x = s.flatten()
+x_values_outliers = x[~np.isnan(y)]
+x_values = x_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]
 
-    # Remove outliers from list
-    q1 = np.percentile(y_values_outliers, 25)
-    q3 = np.percentile(y_values_outliers, 75)
-    iqr = q3 - q1
-    lower_bound = q1 - 1.5 * iqr
-    upper_bound = q3 + 1.5 * iqr
-    y_values = y_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]    
-    x = s.flatten()
-    x_values_outliers = x[~np.isnan(y)]
-    x_values = x_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]
+unsheltered = y_values[np.where(x_values < percent_tree_threshold)]
+median_value = np.median(unsheltered)
 
-    unsheltered = y_values[np.where(x_values < percent_tree_threshold)]
-    median_value = np.median(unsheltered)
-    
-    # Define color map and set the "bad" (NaN) values color
-    cmap = plt.cm.coolwarm  
-    cmap.set_bad(color='green')  # Set NaN pixels to green
-    ax = ds_masked.plot(
-        cmap=cmap,
-        vmin=median_value - (upper_bound - lower_bound) / 2,
-        vmax=median_value + (upper_bound - lower_bound) / 2,
-    )
-    
-    # Clean up the edges and remove labels
-    ax = plt.gca() 
-    ax.set_title(f'Productivity at {stubs[stub]} on {time}', fontsize=22) 
-    ax.set_xlabel('')
-    ax.set_ylabel('')
-    ax.set_xticks([]) 
-    ax.set_yticks([])
-    cbar = ax.collections[0].colorbar
-    cbar.set_label(f"Enhanced Vegetation Index ({productivity_variable})", fontsize=18)  # Set font size
-    
-    filename = os.path.join(scratch_dir, f"{stub}_{productivity_variable}_spatial_variation_{time}.png")
-    plt.savefig(filename, bbox_inches='tight')
-    print(filename)
-    plt.show()
+# Define color map
+plt.figure(figsize=(8, 8))  # Width=10, Height=8 (adjust as needed)
 
-# Should visualise some RGB images too
+cmap = plt.cm.coolwarm  
+cmap.set_bad(color='green')  # Set NaN pixels to green
+ax = ds_masked.plot(
+    cmap=cmap,
+    vmin=median_value - (upper_bound - lower_bound) / 2,
+    vmax=median_value + (upper_bound - lower_bound) / 2,
+)
+
+# Plot the map
+ax = plt.gca() 
+ax.set_title(f'Productivity at {stubs[stub]} on {time}', fontsize=22) 
+ax.set_xlabel('')
+ax.set_ylabel('')
+ax.set_xticks([]) 
+ax.set_yticks([])
+cbar = ax.collections[0].colorbar
+cbar.set_label(f"Enhanced Vegetation Index ({productivity_variable})", fontsize=18)  # Set font size
+
+filename = os.path.join(scratch_dir, f"{stub}_{productivity_variable}_spatial_variation_{time}.png")
+plt.savefig(filename, bbox_inches='tight')
+print(filename)
+plt.show()
 # -
-
+ds['worldcover'].plot(figsize=(8,8))
+plt.show()
 
 
 
