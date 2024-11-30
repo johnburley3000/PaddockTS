@@ -587,7 +587,11 @@ for i, time in enumerate(ds.time.values):
         "slope": res.slope,
         "percentage_benefit": percentage_benefit,
         "sample_size": sample_size,
-        "median": np.median(y_values)
+        "median": np.median(y_values),
+        "q1": np.percentile(y_values, 25),
+        "q3": np.percentile(y_values, 75),
+        "p05": np.percentile(y_values, 5),
+        "p95": np.percentile(y_values, 95)
     }
     benefits.append(benefit)
 
@@ -601,7 +605,7 @@ df_benefits.index = pd.to_datetime(df_benefits.index)
 df_top10 = df_benefits.nlargest(10, 'r2')
 time = df_top10.index[0].date()
 ds_timepoint = ds.sel(time=time, method='nearest')
-df_top10[['r2', 'slope', 'percentage_benefit', 'sample_size']]
+df_top10
 
 # # Max r2 timepoint
 
@@ -625,6 +629,7 @@ y_values_outliers = y[~np.isnan(y)]
 # lower_bound = q1 - 1.5 * iqr
 # upper_bound = q3 + 1.5 * iqr
 
+# lower_bound = max(np.percentile(y_values_outliers, 0.1), 0)
 lower_bound = 0
 upper_bound = max(np.percentile(y_values_outliers, 99.9), 1)
 
@@ -726,6 +731,46 @@ df_weekly = resample_weekly(df_daily)
 
 # Merge shelter benefits
 df_merged = pd.merge_asof(df_weekly, df_benefits, left_index=True, right_index=True, direction='nearest')
+df = df_merged
+
+
+
+
+
+# +
+fig, axes = plt.subplots(2, 1, figsize=(50, 30))  # Create two vertically stacked subplots
+
+ax = axes[1]
+rainfall_plot = ax.bar(df.index, df['Rainfall'], color='skyblue', width=5, label='Rainfall (mm)')
+ax.bar(df.index, df['Potential Evapotranspiration'], color='orange', label="Evapotranspiration (mm)")
+ax.plot(df.index, df['Minimum Soil Moisture'], color='blue', label="Soil moisture (mm)")
+ax.plot(df.index, df["q1"] * 100, color='grey')
+ax.plot(df.index, df["q3"] * 100, color='grey')
+
+# Plot the confidence interval
+ci_lower = df["q1"] * 100 
+ci_upper = df["q3"] * 100
+ax.fill_between(df.index, ci_lower, ci_upper, color='green', alpha=0.3, label="Overall productivity x100")
+
+ax.set_title(f"{stubs[stub]} Weather", fontsize=50)
+ax.legend(fontsize=30, loc='upper left')
+ax.tick_params(axis='both', labelsize=20)
+
+# Adjust layout to prevent overlap
+plt.tight_layout()
+
+# Save as a single image
+filename_combined = os.path.join(scratch_dir, f"{stub}_shelter_weather.png")
+plt.savefig(filename_combined)
+
+plt.show()
+# -
+
+
+
+
+
+
 
 # +
 df = df_merged
@@ -735,13 +780,13 @@ fig, axes = plt.subplots(2, 1, figsize=(50, 30))  # Create two vertically stacke
 ax = axes[0]
 ax.plot(df.index, df["r2"] * 100, color='black', label='Shelter score vs productivity index ($r^2 \\times 100$)')
 ax.plot(df.index, df["percentage_benefit"] * 100, color='grey')
-opacity = 0.2
+opacity = 0.3
 ax.fill_between(
     df.index, 
     0, 
     df["percentage_benefit"] * 100, 
     where=(df["percentage_benefit"] > 0), 
-    color='green', 
+    color='limegreen', 
     alpha=opacity, 
     interpolate=True,
     label='Sheltered productivty > unsheltered productivity (%)'
@@ -765,7 +810,13 @@ ax = axes[1]
 rainfall_plot = ax.bar(df.index, df['Rainfall'], color='skyblue', width=5, label='Rainfall (mm)')
 ax.bar(df.index, df['Potential Evapotranspiration'], color='orange', label="Evapotranspiration (mm)")
 ax.plot(df.index, df['Minimum Soil Moisture'], color='blue', label="Soil moisture (mm)")
-ax.plot(df.index, df["median"] * 100, color='green', label="Overall productivity x100")
+ax.plot(df.index, df["q1"] * 100, color='grey')
+ax.plot(df.index, df["q3"] * 100, color='grey')
+
+# Plot the confidence interval
+ci_lower = df["q1"] * 100 
+ci_upper = df["q3"] * 100
+ax.fill_between(df.index, ci_lower, ci_upper, color='green', alpha=opacity, label="Overall productivity x100")
 
 ax.set_title(f"{stubs[stub]} Weather", fontsize=50)
 ax.legend(fontsize=30, loc='upper left')
@@ -779,8 +830,6 @@ filename_combined = os.path.join(scratch_dir, f"{stub}_shelter_weather.png")
 plt.savefig(filename_combined)
 
 plt.show()
-
-print("Saved", filename_combined)
 
 # -
 
