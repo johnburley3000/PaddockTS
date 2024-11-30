@@ -833,19 +833,35 @@ ridges = catchment_ridges(grid, fdir, acc, full_branches)
 slope = calculate_slope(filename)
 
 
+# +
+def add_numpy_band(ds, variable, array, affine, resampling_method):
+    """Add a new band to the xarray from a numpy array and affine using the given resampling method"""
+    da = xr.DataArray(
+        array, 
+        dims=["y", "x"], 
+        attrs={
+            "transform": affine,
+            "crs": "EPSG:3857"
+        }
+    )
+    da.rio.write_crs("EPSG:3857", inplace=True)
+    reprojected = da.rio.reproject_match(ds, resampling=resampling_method)
+    ds[variable] = reprojected
+    return ds
 
-grid
+# Add the topography bands
+ds = add_tiff_band(ds, "terrain", Resampling.average, outdir, stub)
+ds = add_numpy_band(ds, "ridges", ridges.astype(int), grid.affine, Resampling.max)
+ds = add_numpy_band(ds, "gullies", gullies.astype(int), grid.affine, Resampling.max)
 
-
-
-
+dem = ds['terrain']
+ridges = ds['ridges']
+gullies = ds['gullies']
 
 # +
-# Visualise the spatial variation in EVI
+# Calculate the productivity and shelter scores
 ds_productivity = ds.sel(time=time, method='nearest')[productivity_variable]
 ds_masked = ds_productivity.where(~adjacent_mask)
-
-# Calculate the productivity and shelter scores
 layer_name = f"percent_trees_0m-300m"
 s = ds[layer_name].values
 y = ds_masked.values.flatten()
@@ -865,8 +881,12 @@ x_values = x_values_outliers[(y_values_outliers > lower_bound) & (y_values_outli
 unsheltered = y_values[np.where(x_values < percent_tree_threshold)]
 median_value = np.median(unsheltered)
 
-# Plot the map
+# +
+# Productivity map
 fig, ax = plt.subplots(figsize=(8, 8))
+title_size = 22
+label_size = 18
+
 cmap = plt.cm.coolwarm
 cmap.set_bad(color='green')  # Set NaN pixels to green
 im = ds_masked.plot(
@@ -877,7 +897,7 @@ im = ds_masked.plot(
 )
 
 # Remove miscellaneous labels
-ax.set_title(f'Productivity at {stubs[stub]} on {time}', fontsize=22)
+ax.set_title(f'Productivity at {stubs[stub]} on {time}', fontsize=title_size)
 ax.set_xlabel('')
 ax.set_ylabel('')
 ax.set_xticks([])
@@ -891,7 +911,7 @@ ax.set_aspect(lat_lon_ratio)
 
 # Add color bar
 cbar = ax.collections[0].colorbar
-cbar.set_label(f"Enhanced Vegetation Index ({productivity_variable})", fontsize=18)
+cbar.set_label(f"Enhanced Vegetation Index ({productivity_variable})", fontsize=label_size)
 fig.tight_layout()
 
 # Save the plot
@@ -899,6 +919,7 @@ filename = os.path.join(scratch_dir, f"{stub}_{time}_productivitity_map.png")
 plt.savefig(filename)
 plt.show()
 print("Saved", filename)
+
 
 
 # Topography plot
@@ -913,10 +934,13 @@ plt.colorbar(im, ax=ax, label='Elevation (m)')
 ax.contour(ridges, levels=[0.5], colors='red', linewidths=1.5, zorder=2)
 ax.contour(gullies, levels=[0.5], colors='blue', linewidths=1.5, zorder=3)
 ax.contour(dem, colors='black', linewidths=0.5, zorder=4, alpha=0.5)
-ax.axis('off')
 ax.set_aspect(lat_lon_ratio)
+ax.set_xlabel('')
+ax.set_ylabel('')
+ax.set_xticks([])
+ax.set_yticks([])
 
-plt.title('Ridges and Gullies', size=14)
+plt.title('Ridges and Gullies', size=title_siz)
 plt.tight_layout()
 filename = os.path.join(scratch_dir, f"{stub}_ridge_gullies.png")
 plt.savefig(filename)
