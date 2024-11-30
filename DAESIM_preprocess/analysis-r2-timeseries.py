@@ -265,6 +265,8 @@ ds['EVI'] = 2.5 * ((B8 - B4) / (B8 + 6 * B4 - 7.5 * B2 + 1))
 # # band_names = ['nbart_blue', 'nbart_green', 'nbart_red', 'nbart_nir_1', 'nbart_swir_2', 'nbart_swir_3']
 # # # fractions = calculate_fractional_cover(ds, band_names)
 # # ds = add_fractional_cover_to_ds(ds, fractions)
+
+# y_values = (y_values - min(y_values)) / (max(y_values) - min(y_values)) # Normalisation for the fractional cover
 # -
 
 # # Example Linear Regression and 2D Histogram
@@ -537,10 +539,6 @@ tree_cover_threshold = 10
 
 benefits = []
 
-# distances = 1,2,3,4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50
-# distances = 0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100
-distances = 0, 30
-
 min_distance = 0
 max_distance = 30
 layer_name = f"percent_trees_{pixel_size * min_distance}m-{pixel_size * max_distance}m"
@@ -575,7 +573,7 @@ for i, time in enumerate(ds.time.values):
     
     sheltered = y_values[np.where(x_values >= tree_cover_threshold)]
     unsheltered = y_values[np.where(x_values < tree_cover_threshold)]
-    percentage_benefit = (np.median(sheltered) - np.median(unsheltered))/np.median(y_values)
+    percentage_benefit = (np.median(sheltered) - np.median(unsheltered))/np.median(unsheltered)
     sample_size = min(len(sheltered), len(unsheltered))
     
     res = stats.linregress(x_values, y_values)
@@ -609,67 +607,64 @@ df_top10
 
 # # Max r2 timepoint
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # +
+# Calculate shelter score and productivity index for this timepoint
 ndvi = ds.sel(time=time, method='nearest')[productivity_variable]
 productivity_score1 = ndvi.where(~adjacent_mask) #  & (grassland | cropland))
-
-# Visualise a linear regression for this timepoint
 layer_name = f"percent_trees_0m-300m"
-
 s = ds[layer_name].values
 
 # Remove all pixels that are trees or adjacent to trees
 y = productivity_score1.values.flatten()
 y_values_outliers = y[~np.isnan(y)]   
 
-# Remove outliers
-# q1 = np.percentile(y_values_outliers, 25)
-# q3 = np.percentile(y_values_outliers, 75)
-# iqr = q3 - q1
-# lower_bound = q1 - 1.5 * iqr
-# upper_bound = q3 + 1.5 * iqr
-
-# lower_bound = max(np.percentile(y_values_outliers, 0.1), 0)
-lower_bound = 0
-upper_bound = max(np.percentile(y_values_outliers, 99.9), 1)
+# Outlier boundary
+hist_lower_bound = 0
+hist_upper_bound = max(np.percentile(y_values_outliers, 99.9), 1)
 
 # Find the shelter scores not obstructed by cloud cover or outliers
-y_values = y_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]
-
+y_values = y_values_outliers[(y_values_outliers > hist_lower_bound) & (y_values_outliers < hist_upper_bound)]
 x = s.flatten()
 x_values_outliers = x[~np.isnan(y)]
-x_values = x_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]
-
-# Keeping outliers
-# x_values = x_values_outliers
-# y_values = y_values_outliers
-
-# Normalise
-x_values_normalised = (x_values - min(x_values)) / (max(x_values) - min(x_values))
-y_values_normalised = (y_values - min(y_values)) / (max(y_values) - min(y_values))
-
-lower_bound, upper_bound
+x_values = x_values_outliers[(y_values_outliers > hist_lower_bound) & (y_values_outliers < hist_upper_bound)]
 
 # +
-# 2D histogram with logarithmic normalization
-plt.figure(figsize=(14, 8))  # Width = 12, Height = 8
+# 2D histogram
+plt.figure(figsize=(14, 8))
+title_size = 24
+label_size = 18
 plt.hist2d(
     x_values, y_values, 
     bins=100, 
-    norm=mcolors.LogNorm(),  # Logarithmic color scale
+    norm=mcolors.LogNorm(),
     cmap='viridis'
 )
 pixel_size = 10
-plt.title(f"Productivity Index vs Shelter Score at {time}", fontsize=30)
-plt.xlabel(layer_name, fontsize=18)
-plt.ylabel(f'Enhanced Vegetation Index ({productivity_variable})', fontsize=18)
+plt.title(f"Productivity Index vs Shelter Score at {time}", fontsize=title_size)
+plt.xlabel(f"Tree cover within {max_distance * pixel_size}m (%)", fontsize=label_size)
+plt.ylabel(f'Enhanced Vegetation Index ({productivity_variable})', fontsize=label_size)
 
-# Add color bar with custom ticks
+# Colour bar
 cbar = plt.colorbar(label='Number of pixels')
-cbar.set_label('Number of pixels', fontsize=18)
-
-cbar.set_ticks([1, 10, 100, 1000, 10000])  # Set the desired tick marks
-cbar.set_ticklabels(['1', '10', '100', '1000', '10000'])  # Ensure labels match the ticks
+cbar.set_label('Number of pixels', fontsize=label_size)
+cbar.set_ticks([1, 10, 100, 1000, 10000]) 
+cbar.set_ticklabels(['1', '10', '100', '1000', '10000']) 
 
 # Linear regression line
 res = stats.linregress(x_values, y_values)
@@ -678,45 +673,60 @@ y_fit = res.intercept + res.slope * x_fit
 line_handle, = plt.plot(x_fit, y_fit, 'r-', label=f"$R^2$ = {res.rvalue**2:.2f}")
 plt.legend(fontsize=14)
 
-filename = os.path.join(scratch_dir, f"{stub}_{productivity_variable}_histregression_{time}.png")
-plt.savefig(filename, bbox_inches='tight')
-print(filename)
+# Save the plot
+filename_hist = os.path.join(scratch_dir, f"{stub}_{productivity_variable}_histregression_{time}.png")
+plt.savefig(filename_hist, bbox_inches='tight')
 plt.show()
 
-# +
-# Example box plot
-# y_values = (y_values - min(y_values)) / (max(y_values) - min(y_values)) # Normalisation for the fractional cover
 
-plt.figure(figsize=(8, 8))  # Width = 12, Height = 8
+
+# Calculate sheltered and unsheltered pixels
+annotation_size = 14
+
 percent_tree_threshold = 10
-
 sheltered = y_values[np.where(x_values >= percent_tree_threshold)]
 unsheltered = y_values[np.where(x_values < percent_tree_threshold)]
 
+# Box plot
 box_data = [unsheltered, sheltered]
+plt.figure(figsize=(12,8))
 plt.boxplot(box_data, labels=['Unsheltered', 'Sheltered'], showfliers=False)
-plt.xticks(fontsize=18)
+plt.xticks(fontsize=label_size)
+plt.title(f'Shelter threshold of {percent_tree_threshold}% tree cover within {max_distance * pixel_size}m', fontsize=title_size)
+plt.ylabel('Enhanced Vegetation Index (EVI)', fontsize=label_size)
 
-plt.title("Unsheltered vs Sheltered Pixels", fontsize=30)
-plt.ylabel('Enhanced Vegetation Index (EVI)', fontsize=18)
-plt.xlabel('Shelter threshold of 10% tree cover within 100m', fontsize=18, labelpad=18)
-
-
-# Add median values next to each box plot
+# Add medians and sample size next to each box plot
 medians = [np.median(data) for data in box_data]
-# for i, median in enumerate(medians, start=1):  # `start=1` because boxplot positions start at 1
-#     plt.text(i, median, f'{median:.2f}', ha='center', va='bottom', fontsize=14, color='blue')
-for i, median in enumerate(medians, start=1):  # `start=1` because boxplot positions start at 1
-    plt.text(i + 0.09, median, f'{median:.2f}', ha='left', va='center', fontsize=14)
+number_of_pixels = [len(unsheltered), len(sheltered)]  
 
+placement_unsheltered = np.percentile(unsheltered, 75) + (1.5 * (np.percentile(unsheltered, 75) - np.percentile(unsheltered, 25)))
+placement_sheltered = np.percentile(sheltered, 75) + (1.5 * (np.percentile(sheltered, 75) - np.percentile(sheltered, 25)))
+n_placements = [placement_unsheltered,  placement_sheltered]
 
-print(f"Shelter threshold = {int(percent_tree_threshold)}% tree cover within {distance * pixel_size}m")
-print("Number of sheltered pixels: ", len(sheltered))
-print("Number of unsheltered pixels: ", len(unsheltered))
+for i, median in enumerate(medians):
+    plt.text(i + 1 + 0.09, median, f'{median:.2f}', ha='left', va='center', fontsize=annotation_size)
+    plt.text(i + 1 - 0.09, n_placements[i] + 0.015, f'n={number_of_pixels[i]}', ha='left', va='center', fontsize=annotation_size)
 
-filename = os.path.join(scratch_dir, f"{stub}_{productivity_variable}_boxplot_{time}.png")
-plt.savefig(filename, bbox_inches='tight')
-print(filename)
+# Add some space above the sample size text
+y_max = max(placement_unsheltered, placement_sheltered) + 0.1 * max(placement_unsheltered, placement_sheltered)
+plt.ylim(None, y_max)
+
+# Explanatory text for calculating percentage benefit
+shelter_vs_unsheltered = (np.median(sheltered) - np.median(unsheltered)) / np.median(unsheltered) * 100
+plt.text(
+    0.53, y_max - 0.02,  # Position text in top left
+    f'Sheltered vs unsheltered (%) = ({medians[1]:.2f} - {medians[0]:.2f})/{medians[0]:.2f} = {shelter_vs_unsheltered:.2f}%',
+    fontsize=annotation_size, ha='left', va='top'
+)
+
+# Save the plot
+filename_boxplot = os.path.join(scratch_dir, f"{stub}_{productivity_variable}_boxplot_{time}.png")
+plt.savefig(filename_boxplot, bbox_inches='tight')
+plt.show()
+
+print(f"Number of unsheltered pixels: {len(unsheltered)}")
+print(f"Number of sheltered pixels: {len(sheltered)}")
+print("Saved", filename_boxplot)
 # -
 
 # # Temporal Variation
@@ -733,48 +743,10 @@ df_weekly = resample_weekly(df_daily)
 df_merged = pd.merge_asof(df_weekly, df_benefits, left_index=True, right_index=True, direction='nearest')
 df = df_merged
 
-
-
-
-
 # +
 fig, axes = plt.subplots(2, 1, figsize=(50, 30))  # Create two vertically stacked subplots
-
-ax = axes[1]
-rainfall_plot = ax.bar(df.index, df['Rainfall'], color='skyblue', width=5, label='Rainfall (mm)')
-ax.bar(df.index, df['Potential Evapotranspiration'], color='orange', label="Evapotranspiration (mm)")
-ax.plot(df.index, df['Minimum Soil Moisture'], color='blue', label="Soil moisture (mm)")
-ax.plot(df.index, df["q1"] * 100, color='grey')
-ax.plot(df.index, df["q3"] * 100, color='grey')
-
-# Plot the confidence interval
-ci_lower = df["q1"] * 100 
-ci_upper = df["q3"] * 100
-ax.fill_between(df.index, ci_lower, ci_upper, color='green', alpha=0.3, label="Overall productivity x100")
-
-ax.set_title(f"{stubs[stub]} Weather", fontsize=50)
-ax.legend(fontsize=30, loc='upper left')
-ax.tick_params(axis='both', labelsize=20)
-
-# Adjust layout to prevent overlap
-plt.tight_layout()
-
-# Save as a single image
-filename_combined = os.path.join(scratch_dir, f"{stub}_shelter_weather.png")
-plt.savefig(filename_combined)
-
-plt.show()
-# -
-
-
-
-
-
-
-
-# +
-df = df_merged
-fig, axes = plt.subplots(2, 1, figsize=(50, 30))  # Create two vertically stacked subplots
+title_fontsize = 70
+tick_size = 30
 
 # Visualise the shelter benefits
 ax = axes[0]
@@ -789,7 +761,7 @@ ax.fill_between(
     color='limegreen', 
     alpha=opacity, 
     interpolate=True,
-    label='Sheltered productivty > unsheltered productivity (%)'
+    label='Sheltered > unsheltered (%)'
 )
 ax.fill_between(
     df.index, 
@@ -799,11 +771,11 @@ ax.fill_between(
     color='red', 
     alpha=opacity, 
     interpolate=True,
-    label='Sheltered productivty < unsheltered productivity (%)'
+    label='Sheltered < unsheltered (%)'
 )
-ax.set_title(f"{stubs[stub]} Time Series of Shelter Benefits", fontsize=50)
-ax.legend(fontsize=30, loc='upper left')
-ax.tick_params(axis='both', labelsize=20)
+ax.set_title(f"{stubs[stub]} Time Series of Shelter Benefits", fontsize=title_fontsize)
+ax.legend(fontsize=tick_size, loc='upper left')
+ax.tick_params(axis='both', labelsize=tick_size)
 
 # Visualise the weather data
 ax = axes[1]
@@ -813,22 +785,22 @@ ax.plot(df.index, df['Minimum Soil Moisture'], color='blue', label="Soil moistur
 ax.plot(df.index, df["q1"] * 100, color='grey')
 ax.plot(df.index, df["q3"] * 100, color='grey')
 
-# Plot the confidence interval
-ci_lower = df["q1"] * 100 
-ci_upper = df["q3"] * 100
-ax.fill_between(df.index, ci_lower, ci_upper, color='green', alpha=opacity, label="Overall productivity x100")
+# Plot the interquartile range
+q1 = df["q1"] * 100 
+q3 = df["q3"] * 100
+ax.fill_between(df.index, q1, q3, color='green', alpha=opacity, label="Overall productivity x100")
 
-ax.set_title(f"{stubs[stub]} Weather", fontsize=50)
-ax.legend(fontsize=30, loc='upper left')
-ax.tick_params(axis='both', labelsize=20)
+ax.set_title(f"{stubs[stub]} Weather", fontsize=title_fontsize)
+ax.legend(fontsize=tick_size, loc='upper left')
+ax.tick_params(axis='both', labelsize=tick_size)
 
 # Adjust layout to prevent overlap
 plt.tight_layout()
+plt.subplots_adjust(hspace=0.2)  # Increase spacing between subplots (adjust value as needed)
 
 # Save as a single image
 filename_combined = os.path.join(scratch_dir, f"{stub}_shelter_weather.png")
 plt.savefig(filename_combined)
-
 plt.show()
 
 # -
