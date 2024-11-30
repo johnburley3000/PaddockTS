@@ -57,33 +57,13 @@ stubs = {
 
 # Filepaths
 outdir = os.path.join(gdata_dir, "Data/PadSeg/")
-stub = "MILG"
+stub = "ADAM"
 
 # %%time
 # Sentinel imagery
 filename = os.path.join(outdir, f"{stub}_ds2.pkl")
 with open(filename, 'rb') as file:
     ds = pickle.load(file)
-
-# +
-# Weather data
-filename_silo = os.path.join(outdir, f"{stub}_silo_daily.nc")
-ds_silo = xr.open_dataset(filename_silo)
-
-variable = 'max_temp'
-df_drought = pd.DataFrame(ds_silo.isel(lat=0, lon=0)[variable], index=ds_silo.isel(lat=0, lon=0).time, columns=[variable])
-
-
-# -
-
-def add_tiff_band(ds, variable, resampling_method, outdir, stub):
-    """Add a new band to the xarray from a tiff file using the given resampling method"""
-    filename = os.path.join(outdir, f"{stub}_{variable}.tif")
-    array = rxr.open_rasterio(filename)
-    reprojected = array.rio.reproject_match(ds, resampling=resampling_method)
-    ds[variable] = reprojected.isel(band=0).drop_vars('band')
-    return ds
-
 
 world_cover_layers = {
     "Tree cover": 10, # Green
@@ -94,31 +74,11 @@ world_cover_layers = {
     "Permanent water bodies": 80, # blue
 }
 
-# Calculate the percentage of tree cover in each sentinel pixel, based on the global canopy height map
-variable = "canopy_height"
-filename = os.path.join(outdir, f"{stub}_{variable}.tif")
-array = rxr.open_rasterio(filename)
-binary_mask = (array >= 1).astype(float)
-tree_percent = binary_mask.rio.reproject_match(ds, resampling=Resampling.average)
-ds['tree_percent'] = tree_percent
-
-ds = add_tiff_band(ds, "canopy_height", Resampling.max, outdir, stub)   # Maximum canopy height in each sentinel pixel
-
 # The resampling often messes up the boundary, so we trim the outside pixels after adding all the resampled bounds
-ds_trimmed = ds.isel(
+ds = ds.isel(
     y=slice(1, -1),
     x=slice(1, -1) 
 )
-
-# +
-# ds_trimmed['canopy_height'].plot()
-
-# +
-# ds_trimmed['NDVI'].isel(time=0).plot()
-# -
-
-ds_original = ds.copy()
-ds = ds_trimmed
 
 # +
 # %%time
@@ -136,25 +96,10 @@ tree_cover = ds["worldcover"].values == world_cover_layers["Tree cover"]
 
 crop_or_grass = cropland | grassland
 
-tree_percent = ds['tree_percent'].isel(band=0).values
-
 # +
 # %%time
 # Shelterscore showing the number of trees within a donut at a given distance away from the crop/pasture pixel
-
-# distances = 0, 4, 6, 8, 10, 12   # A distance of 20 would correspond to a 200m radius if the pixel size is 10m
-# distances = 0, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40    # A distance of 20 would correspond to a 200m radius if the pixel size is 10m
-# distances = 0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100
-# distances = 1,2,3,4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30 # , 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50
-# distances = 1,2,3,4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50
-# distances=0,10
 distances = 0, 30
-# distances = 1,2,3,4
-
-
-# Classify anything with a height greater than 1 as a tree
-tree_threshold = 1
-tree_mask = ds['canopy_height'] >= tree_threshold
 
 # Use the sentinel tree cover instead of global canopy height model
 tree_mask = tree_cover
@@ -198,346 +143,19 @@ for i in range(len(distances) - 1):
     ds[layer_name] = shelter_score_da
     print(f"Added layer: {layer_name}")
 # +
-# Additional vegetation indices
+# Enhanced Vegetation Index
 B8 = ds['nbart_nir_1']
 B4 = ds['nbart_red']
 B2 = ds['nbart_blue']
 ds['EVI'] = 2.5 * ((B8 - B4) / (B8 + 6 * B4 - 7.5 * B2 + 1))
 
-
-# ds['NIRV'] = ds['NDVI'] * ds['nbart_nir_1']
-# ds['kNDVI'] = np.tanh(ds['NDVI'] * ds['NDVI'])
-# ds['EVI2'] = 2.5 * ((B8 - B4)/(1 + B8 + 2.4 * B4))
-
-# +
-# # Fractional Cover
-# import tensorflow as tf
-# from fractionalcover3 import unmix_fractional_cover
-# from fractionalcover3 import data 
-
-# def calculate_fractional_cover(ds, band_names, i=3):
-#     # Check if the number of band names is exactly 6
-#     if len(band_names) != 6:
-#         raise ValueError("Exactly 6 band names must be provided")
-    
-#     # Extract the specified bands and stack them into a numpy array with shape (time, bands, x, y)
-#     inref = np.stack([ds[band].values for band in band_names], axis=1)
-#     print(inref.shape)  # This should now be (time, bands, x, y)
-
-#     #inref = inref * 0.0001 # if not applying the correcion factors below
-
-#     # Array for correction factors 
-#     # This is taken from here: https://github.com/petescarth/fractionalcover/blob/main/notebooks/ApplyModel.ipynb
-#     # and described in a paper by Neil Floodfor taking Landsat to Sentinel 2 reflectance (and visa versa).
-#     correction_factors = np.array([0.9551, 1.0582, 0.9871, 1.0187, 0.9528, 0.9688]) + \
-#                          np.array([-0.0022, 0.0031, 0.0064, 0.012, 0.0079, -0.0042])
-
-#     # Apply correction factors using broadcasting
-#     inref = inref * correction_factors[:, np.newaxis, np.newaxis]
-
-#     # Initialize an array to store the fractional cover results
-#     fractions = np.empty((inref.shape[0], 3, inref.shape[2], inref.shape[3]))
-
-#     # Loop over each time slice and apply the unmix_fractional_cover function
-#     for t in range(inref.shape[0]):
-#         fractions[t] = unmix_fractional_cover(inref[t], fc_model=data.get_model(n=i))
-    
-#     return fractions
-
-# def add_fractional_cover_to_ds(ds, fractions):
-#     """
-#     Add the fractional cover bands to the original xarray.Dataset.
-
-#     Parameters:
-#     ds (xarray.Dataset): The original xarray Dataset containing the satellite data.
-#     fractions (numpy.ndarray): The output array with fractional cover (time, bands, x, y).
-
-#     Returns:
-#     xarray.Dataset: The updated xarray Dataset with the new fractional cover bands.
-#     """
-#     # Create DataArray for each vegetation fraction
-#     bg = xr.DataArray(fractions[:, 0, :, :], coords=[ds.coords['time'], ds.coords['y'], ds.coords['x']], dims=['time', 'y', 'x'])
-#     pv = xr.DataArray(fractions[:, 1, :, :], coords=[ds.coords['time'], ds.coords['y'], ds.coords['x']], dims=['time', 'y', 'x'])
-#     npv = xr.DataArray(fractions[:, 2, :, :], coords=[ds.coords['time'], ds.coords['y'], ds.coords['x']], dims=['time', 'y', 'x'])
-    
-#     # Assign new DataArrays to the original Dataset
-#     ds_updated = ds.assign(bg=bg, pv=pv, npv=npv)
-    
-#     return ds_updated
-
-# # band_names = ['nbart_blue', 'nbart_green', 'nbart_red', 'nbart_nir_1', 'nbart_swir_2', 'nbart_swir_3']
-# # # fractions = calculate_fractional_cover(ds, band_names)
-# # ds = add_fractional_cover_to_ds(ds, fractions)
-
-# y_values = (y_values - min(y_values)) / (max(y_values) - min(y_values)) # Normalisation for the fractional cover
-# -
-
-# # Example Linear Regression and 2D Histogram
-
-# +
-# time = '2019-12-31'
-time = '2020-01-08'
-# time = '2024-03-07'
-# time = '2021-02-06'
-# time = '2022-06-01'
-# time = '2020-03-20'
-
-
 productivity_variable = 'EVI'
-ndvi = ds.sel(time=time, method='nearest')[productivity_variable]
-productivity_score1 = ndvi.where(~adjacent_mask) #  & (grassland | cropland))
-
-# Visualise a linear regression for this timepoint
-# layer_name = f"percent_trees_0m-100m"
-# layer_name = f"percent_trees_490m-500m"
-# layer_name = f"percent_trees_100m-110m"
-# layer_name = f"percent_trees_50m-300m"
-# layer_name = f"percent_trees_750m-800m"
-# layer_name = "percent_trees_950m-1000m"
-layer_name = f"percent_trees_0m-300m"
-
-s = ds[layer_name].values
-
-# Remove all pixels that are trees or adjacent to trees
-y = productivity_score1.values.flatten()
-y_values_outliers = y[~np.isnan(y)]   
-
-# Remove outliers
-q1 = np.percentile(y_values_outliers, 25)
-q3 = np.percentile(y_values_outliers, 75)
-iqr = q3 - q1
-lower_bound = q1 - 1.5 * iqr
-upper_bound = q3 + 1.5 * iqr
-
-# Find the shelter scores not obstructed by cloud cover or outliers
-y_values = y_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]
-
-x = s.flatten()
-x_values_outliers = x[~np.isnan(y)]
-x_values = x_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]
-
-# Keeping outliers
-# x_values = x_values_outliers
-# y_values = y_values_outliers
-
-# Normalise
-x_values_normalised = (x_values - min(x_values)) / (max(x_values) - min(x_values))
-y_values_normalised = (y_values - min(y_values)) / (max(y_values) - min(y_values))
-
-lower_bound, upper_bound
-
-# +
-# 2D histogram with logarithmic normalization
-plt.figure(figsize=(14, 8))  # Width = 12, Height = 8
-plt.hist2d(
-    x_values, y_values, 
-    bins=100, 
-    norm=mcolors.LogNorm(),  # Logarithmic color scale
-    cmap='viridis'
-)
-pixel_size = 10
-plt.title("Productivity Index vs Shelter Score", fontsize=30)
-plt.xlabel(layer_name, fontsize=18)
-plt.ylabel(f'Enhanced Vegetation Index ({productivity_variable})', fontsize=18)
-
-# Add color bar with custom ticks
-cbar = plt.colorbar(label='Number of pixels')
-cbar.set_label('Number of pixels', fontsize=18)
-
-cbar.set_ticks([1, 10, 100, 1000, 10000])  # Set the desired tick marks
-cbar.set_ticklabels(['1', '10', '100', '1000', '10000'])  # Ensure labels match the ticks
-
-# Linear regression line
-res = stats.linregress(x_values, y_values)
-x_fit = np.linspace(min(x_values), max(x_values), 500)
-y_fit = res.intercept + res.slope * x_fit
-line_handle, = plt.plot(x_fit, y_fit, 'r-', label=f"$R^2$ = {res.rvalue**2:.2f}")
-plt.legend(fontsize=14)
-
-filename = os.path.join(scratch_dir, f"{stub}_{productivity_variable}_histregression_{time}.png")
-plt.savefig(filename, bbox_inches='tight')
-print(filename)
-plt.show()
-
-
-# -
-
-# # Box Plot
-
-# +
-# Example box plot
-# y_values = (y_values - min(y_values)) / (max(y_values) - min(y_values)) # Normalisation for the fractional cover
-
-plt.figure(figsize=(8, 8))  # Width = 12, Height = 8
-percent_tree_threshold = 10
-
-sheltered = y_values[np.where(x_values >= percent_tree_threshold)]
-unsheltered = y_values[np.where(x_values < percent_tree_threshold)]
-
-box_data = [unsheltered, sheltered]
-plt.boxplot(box_data, labels=['Unsheltered', 'Sheltered'], showfliers=False)
-plt.xticks(fontsize=18)
-
-plt.title("Unsheltered vs Sheltered Pixels", fontsize=30)
-plt.ylabel('Enhanced Vegetation Index (EVI)', fontsize=18)
-plt.xlabel('Shelter threshold of 10% tree cover within 100m', fontsize=18, labelpad=18)
-
-
-# Add median values next to each box plot
-medians = [np.median(data) for data in box_data]
-# for i, median in enumerate(medians, start=1):  # `start=1` because boxplot positions start at 1
-#     plt.text(i, median, f'{median:.2f}', ha='center', va='bottom', fontsize=14, color='blue')
-for i, median in enumerate(medians, start=1):  # `start=1` because boxplot positions start at 1
-    plt.text(i + 0.09, median, f'{median:.2f}', ha='left', va='center', fontsize=14)
-
-
-print(f"Shelter threshold = {int(percent_tree_threshold)}% tree cover within {distance * pixel_size}m")
-print("Number of sheltered pixels: ", len(sheltered))
-print("Number of unsheltered pixels: ", len(unsheltered))
-
-filename = os.path.join(scratch_dir, f"{stub}_{productivity_variable}_boxplot_{time}.png")
-plt.savefig(filename, bbox_inches='tight')
-print(filename)
-# -
-# # Matrix of benefits at specific distances at a single timepoint
-
-# +
-# %%time
-# Shelterscore showing the number of trees within a donut at a given distance away from the crop/pasture pixel
-
-# distances = 0, 4, 6, 8, 10, 12   # A distance of 20 would correspond to a 200m radius if the pixel size is 10m
-# distances = 0, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40    # A distance of 20 would correspond to a 200m radius if the pixel size is 10m
-# distances = 0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100
-# distances = 1,2,3,4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50
-
-# distances = list(range(10, 32, 4))
-distances = list(range(4, 30, 1))
-
-# Classify anything with a height greater than 1 as a tree
-# tree_threshold = 1
-# tree_mask = ds['canopy_height'] >= tree_threshold
-
-distance = 6
-min_distance = 4
-max_distance = 6
-pixel_size = 10  # metres
-
-# Find all the pixels directly adjacent to trees
-structuring_element = np.ones((3, 3))  # This defines adjacency (including diagonals)
-adjacent_mask = scipy.ndimage.binary_dilation(tree_mask, structure=structuring_element)
-
-for i in range(len(distances) - 1):
-
-    min_distance = distances[i]
-    max_distance = distances[i+1]
-    
-    # Calculate the number of trees in a donut between the inner and outer circle
-    y, x = np.ogrid[-max_distance:max_distance+1, -max_distance:max_distance+1]
-    kernel = (x**2 + y**2 <= max_distance**2) & (x**2 + y**2 >= min_distance**2)
-    kernel = kernel.astype(float)
-    
-    total_tree_cover = fftconvolve(tree_percent, kernel, mode='same')
-    shelter_score = (total_tree_cover / kernel.sum()) * 100
-    
-    # Mask out trees and adjacent pixels
-    shelter_score[np.where(adjacent_mask)] = np.nan
-    shelter_score[shelter_score < 1] = 0
-    
-    # Add the shelter_score to the xarray
-    shelter_score_da = xr.DataArray(
-        shelter_score, 
-        dims=("y", "x"),  
-        coords={"y": ds.coords["y"], "x": ds.coords["x"]}, 
-        name="shelter_score" 
-    )
-
-    layer_name = f"percent_trees_{pixel_size * min_distance}m-{pixel_size * max_distance}m"
-    ds[layer_name] = shelter_score_da
-    print(f"Added layer: {layer_name}")
-
-# +
-# %%time
-benefits = []
-percentage_tree_thresholds = list(range(1, 30, 1))
-
-
-for i in range(len(distances) - 1):
-
-    # Shelter score 
-    min_distance = distances[i]
-    max_distance = distances[i+1]
-    layer_name = f"percent_trees_{pixel_size * min_distance}m-{pixel_size * max_distance}m"
-    s = ds[layer_name].values
-    
-    # Flatten the arrays for plotting
-    y = productivity_score1.values.flatten()
-    y_values = y[~np.isnan(y)]   # Remove all pixels that are trees or adjacent to trees
-    x = s.flatten()
-    x_values = x[~np.isnan(y)]   # Match the shape of the x_values
-
-    # Sheltered vs unsheltered pixels
-    for percentage_tree_threshold in percentage_tree_thresholds:
-        sheltered = y_values[np.where(x_values >= percentage_tree_threshold)]
-        unsheltered = y_values[np.where(x_values < percentage_tree_threshold)]
-        median_diff = np.median(sheltered) - np.median(unsheltered)
-        median_diff_percentage = median_diff/np.median(y_values)
-        sample_size = min(len(sheltered), len(unsheltered))
-        benefit = {
-            "distance": max_distance * 10,
-            "percentage_tree_threshold": percentage_tree_threshold,
-            "median_diff_percentage": 100 * np.round(median_diff_percentage, 2),
-            "sample_size": sample_size
-        }
-        benefits.append(benefit)
-
-df = pd.DataFrame(benefits)
-# +
-# Visualise the benefits matrix
-heatmap_data = df.pivot(index='percentage_tree_threshold', columns='distance', values='median_diff_percentage')
-
-plt.figure(figsize=(20, 10))  # Width = 12, Height = 8
-
-ax = sns.heatmap(heatmap_data, annot=True, cmap="YlGn", cbar=True)
-ax.invert_yaxis()
-
-label_size = 24
-pad_size = 10
-plt.title(f'Shelter benefits at Milgadara on {time}', fontsize = 30)
-plt.ylabel('Tree Cover (%)', fontsize=label_size, labelpad=pad_size)
-plt.xlabel('Distance (m)', fontsize=label_size, labelpad=pad_size)
-cbar = ax.collections[0].colorbar
-cbar.set_label(f'Sheltered vs Unsheltered difference in {productivity_variable} (%)', fontsize=label_size)
-
-filename = os.path.join(scratch_dir, f"{stub}_{productivity_variable}_bigmatrix_{time}.png")
-plt.savefig(filename, bbox_inches='tight')
-print(filename)
-
-plt.show()
-
-# +
-# Visualise the sample sizes
-heatmap_data = df.pivot(index='percentage_tree_threshold', columns='distance', values='sample_size')
-
-threshold = 10000
-annotations = np.where(heatmap_data < threshold, heatmap_data.astype(int).astype(str), "")
-
-plt.figure(figsize=(20, 10))  # Width = 12, Height = 8
-ax = sns.heatmap(heatmap_data, annot=annotations, fmt='', cbar=True)
-ax.invert_yaxis()
-
-plt.title(f'{stub}: Sample Sizes')
-plt.ylabel('Tree Cover (%)')
-plt.xlabel('Distance (m)')
-cbar = ax.collections[0].colorbar
-cbar.set_label('Sample size')
-plt.show()
 # -
 
 # # All Timepoints
 
 # +
 # %%time
-# Look at how the r2, slope and median difference between EVI and shelter threshold compares over time, using a donut of 50m-300m (and each different thresholds)
 tree_cover_threshold = 10
 
 benefits = []
@@ -557,22 +175,11 @@ for i, time in enumerate(ds.time.values):
     y_values_outliers = y[~np.isnan(y)]   
 
     # Remove outliers
-    # q1 = np.percentile(y_values_outliers, 25)
-    # q3 = np.percentile(y_values_outliers, 75)
-    # iqr = q3 - q1
-    # lower_bound = q1 - 1.5 * iqr
-    # upper_bound = q3 + 1.5 * iqr
-
     lower_bound = 0
     upper_bound = max(np.percentile(y_values_outliers, 99.9), 1)
-    
     y_values = y_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]
     x_values_outliers = x[~np.isnan(y)]
     x_values = x_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]
-
-    # Uncomment to keep outliers
-    # x_values = x_values_outliers
-    # y_values = y_values_outliers
     
     sheltered = y_values[np.where(x_values >= tree_cover_threshold)]
     unsheltered = y_values[np.where(x_values < tree_cover_threshold)]
@@ -590,9 +197,7 @@ for i, time in enumerate(ds.time.values):
         "sample_size": sample_size,
         "median": np.median(y_values),
         "q1": np.percentile(y_values, 25),
-        "q3": np.percentile(y_values, 75),
-        "p05": np.percentile(y_values, 5),
-        "p95": np.percentile(y_values, 95)
+        "q3": np.percentile(y_values, 75)
     }
     benefits.append(benefit)
 
@@ -604,11 +209,12 @@ df_benefits['date'] = df_benefits['time'].dt.date
 df_benefits = df_benefits.set_index('date')
 df_benefits.index = pd.to_datetime(df_benefits.index)
 df_top10 = df_benefits.nlargest(10, 'r2')
-time = df_top10.index[0].date()
-ds_timepoint = ds.sel(time=time, method='nearest')
 df_top10
 
 # # Max r2 timepoint
+
+time = df_top10.index[0].date()
+ds_timepoint = ds.sel(time=time, method='nearest')
 
 # +
 # Calculate shelter score and productivity index for this timepoint
@@ -637,6 +243,9 @@ sheltered = y_values[np.where(x_values >= percent_tree_threshold)]
 unsheltered = y_values[np.where(x_values < percent_tree_threshold)]
 # +
 fig, axes = plt.subplots(2, 1, figsize=(14, 16)) 
+title_size = 22
+label_size = 18
+annotations_size = 14
 
 # Plot 1: 2D histogram 
 ax1 = axes[0]
@@ -646,10 +255,10 @@ hist = ax1.hist2d(
     norm=mcolors.LogNorm(),
     cmap='viridis',
 )
-ax1.set_title(f"Productivity Index vs Shelter Score at {time}", fontsize=22)
-ax1.set_xlabel(f"Tree cover within {max_distance * pixel_size}m (%)", fontsize=18)
-ax1.set_ylabel(f'Enhanced Vegetation Index ({productivity_variable})', fontsize=18)
-ax1.tick_params(axis='both', labelsize=14)
+ax1.set_title(f"{stubs[stub]} Productivity Index vs Shelter Score at {time}", fontsize=title_size)
+ax1.set_xlabel(f"Tree cover within {max_distance * pixel_size}m (%)", fontsize=label_size)
+ax1.set_ylabel(f'Enhanced Vegetation Index ({productivity_variable})', fontsize=label_size)
+ax1.tick_params(axis='both', labelsize=annotations_size)
 
 cbar = plt.colorbar(hist[3], ax=ax1)  # hb[3] contains the QuadMesh, which is used for colorbar
 cbar.set_label(f"Number of pixels ({productivity_variable})", fontsize=label_size)
@@ -672,14 +281,13 @@ ax1.axvline(
 )
 
 
-
-# Plot 2: Box plot on the second subplot
+# Plot 2: Box plot
 ax2 = axes[1]
 box_data = [unsheltered, sheltered]
 im = ax2.boxplot(box_data, labels=['Unsheltered', 'Sheltered'], showfliers=False)
-ax2.set_title(f'Shelter threshold of {percent_tree_threshold}% tree cover within {max_distance * pixel_size}m', fontsize=22)
-ax2.set_ylabel('Enhanced Vegetation Index (EVI)', fontsize=18)
-ax2.tick_params(axis='both', labelsize=14)
+ax2.set_title(f'Shelter threshold of {percent_tree_threshold}% tree cover within {max_distance * pixel_size}m', fontsize=title_size)
+ax2.set_ylabel('Enhanced Vegetation Index (EVI)', fontsize=label_size)
+ax2.tick_params(axis='both', labelsize=annotations_size)
 
 # Add medians and sample size next to each box plot
 medians = [np.median(data) for data in box_data]
@@ -690,8 +298,8 @@ placement_sheltered = np.percentile(sheltered, 75) + (1.5 * (np.percentile(shelt
 n_placements = [placement_unsheltered, placement_sheltered]
 
 for i, median in enumerate(medians):
-    ax2.text(i + 1 + 0.09, median, f'{median:.2f}', ha='left', va='center', fontsize=14)
-    ax2.text(i + 1 - 0.09, n_placements[i] + 0.015, f'n={number_of_pixels[i]}', ha='left', va='center', fontsize=14)
+    ax2.text(i + 1 + 0.09, median, f'{median:.2f}', ha='left', va='center', fontsize=label_size)
+    ax2.text(i + 1 - 0.09, n_placements[i] + 0.015, f'n={number_of_pixels[i]}', ha='left', va='center', fontsize=label_size)
 
 # Add some space above the sample size text
 y_max = max(placement_unsheltered, placement_sheltered) + 0.1 * max(placement_unsheltered, placement_sheltered)
@@ -702,7 +310,7 @@ shelter_vs_unsheltered = (np.median(sheltered) - np.median(unsheltered)) / np.me
 ax2.text(
     0.53, y_max - 0.02,  # Position text in top left
     f'Sheltered vs unsheltered (%) = ({medians[1]:.2f} - {medians[0]:.2f})/{medians[0]:.2f} = {shelter_vs_unsheltered:.2f}%',
-    fontsize=14, ha='left', va='top'
+    fontsize=annotations_size, ha='left', va='top'
 )
 
 # Create a dummy white colorbar to align the plots nicely
@@ -714,10 +322,14 @@ cbar.set_ticks([])
 cbar.set_label('')  
 cbar.outline.set_visible(False)
 
-# Save the combined figure with both plots
+# Save the plots
 fig.tight_layout()
+plt.subplots_adjust(hspace=0.2) 
 
+filename = os.path.join(scratch_dir, f"{stub}_hist_and_boxplot.png")
+plt.savefig(filename)
 plt.show()
+print("Saved", filename)
 
 
 # -
@@ -830,6 +442,14 @@ slope = calculate_slope(filename)
 
 
 # +
+def add_tiff_band(ds, variable, resampling_method, outdir, stub):
+    """Add a new band to the xarray from a tiff file using the given resampling method"""
+    filename = os.path.join(outdir, f"{stub}_{variable}.tif")
+    array = rxr.open_rasterio(filename)
+    reprojected = array.rio.reproject_match(ds, resampling=resampling_method)
+    ds[variable] = reprojected.isel(band=0).drop_vars('band')
+    return ds
+
 def add_numpy_band(ds, variable, array, affine, resampling_method):
     """Add a new band to the xarray from a numpy array and affine using the given resampling method"""
     da = xr.DataArray(
@@ -920,7 +540,7 @@ im = ds_masked.plot(
     vmax=median_value + (upper_bound - lower_bound) / 2,
     ax=ax
 )
-ax.set_title(f'Productivity at {stubs[stub]} on {time}', fontsize=title_size)
+ax.set_title(f'{stubs[stub]} Productivity on {time}', fontsize=title_size)
 ax.set_xlabel('')
 ax.set_ylabel('')
 ax.set_xticks([])
@@ -1003,7 +623,7 @@ cbar.outline.set_visible(False)
 
 # Adjust layout and save
 plt.tight_layout()
-filename = os.path.join(scratch_dir, f"{stub}_{time}_spatial_variation.png")
+filename = os.path.join(scratch_dir, f"{stub}_spatial_variation.png")
 plt.savefig(filename)
 plt.show()
 print("Saved:", filename)
