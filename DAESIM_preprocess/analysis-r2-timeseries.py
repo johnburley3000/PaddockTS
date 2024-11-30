@@ -9,6 +9,7 @@
 import os
 import pickle
 import datetime
+import math
 
 # Dependencies
 import numpy as np
@@ -791,16 +792,53 @@ ax.tick_params(axis='both', labelsize=tick_size)
 
 # Adjust layout to prevent overlap
 plt.tight_layout()
-plt.subplots_adjust(hspace=0.2)  # Increase spacing between subplots (adjust value as needed)
+plt.subplots_adjust(hspace=0.2)
 
 # Save as a single image
 filename_combined = os.path.join(scratch_dir, f"{stub}_shelter_weather.png")
 plt.savefig(filename_combined)
 plt.show()
-
+print("Saved", filename_combined)
 # -
 
 # # Spatial Variation
+
+# +
+# Calculate aspect ratio of this region
+earth_radius_km = 6371
+
+# Lat and lon parameters used to generate the imagery
+filename = os.path.join(outdir, f"{stub}_ds2_query.pkl")
+with open(filename, 'rb') as file:
+    query = pickle.load(file)
+latitude_deg = query['y'][0]
+lat_diff_deg = query['y'][1] - query['y'][0]
+lon_diff_deg = query['x'][1] - query['x'][0]
+
+# Conversion to km
+latitude_rad = math.radians(latitude_deg)
+lat_distance_km = lat_diff_deg * (math.pi * earth_radius_km / 180)
+lon_distance_km = lon_diff_deg * (math.cos(latitude_rad) * (math.pi * earth_radius_km / 180))
+
+# Conversion to aspect for matplotlib plotting
+lon_distance_km, lat_distance_km
+# -
+
+# Load and calculate topography layers
+filename = os.path.join(outdir, f"{stub}_terrain.tif")
+grid, dem, fdir, acc = pysheds_accumulation(filename)
+num_catchments = 20
+gullies, full_branches = catchment_gullies(grid, fdir, acc, num_catchments)
+ridges = catchment_ridges(grid, fdir, acc, full_branches)
+slope = calculate_slope(filename)
+
+
+
+grid
+
+
+
+
 
 # +
 # Visualise the spatial variation in EVI
@@ -815,19 +853,9 @@ y_values_outliers = y[~np.isnan(y)]
 x = s.flatten()
 x_values_outliers = x[~np.isnan(y)]  
 
-# Remove outliers from list
-q1 = np.percentile(y_values_outliers, 25)
-q3 = np.percentile(y_values_outliers, 75)
-iqr = q3 - q1
-lower_bound = q1 - 1.5 * iqr
-upper_bound = q3 + 1.5 * iqr
-
-# lower_bound = 0
-# upper_bound = max(np.percentile(y_values_outliers, 99.9), 1)
-
+# Remove outliers
 lower_bound = np.percentile(y_values_outliers, 1)
 upper_bound = np.percentile(y_values_outliers, 99)
-print(lower_bound, upper_bound)
 
 y_values = y_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]    
 x = s.flatten()
@@ -837,48 +865,142 @@ x_values = x_values_outliers[(y_values_outliers > lower_bound) & (y_values_outli
 unsheltered = y_values[np.where(x_values < percent_tree_threshold)]
 median_value = np.median(unsheltered)
 
-# Define color map
-plt.figure(figsize=(10, 8))  # Width=10, Height=8 (adjust as needed)
-
-cmap = plt.cm.coolwarm  
+# Plot the map
+fig, ax = plt.subplots(figsize=(8, 8))
+cmap = plt.cm.coolwarm
 cmap.set_bad(color='green')  # Set NaN pixels to green
-ax = ds_masked.plot(
+im = ds_masked.plot(
     cmap=cmap,
     vmin=median_value - (upper_bound - lower_bound) / 2,
     vmax=median_value + (upper_bound - lower_bound) / 2,
+    ax=ax
 )
 
-# Plot the map
-ax = plt.gca() 
-ax.set_title(f'Productivity at {stubs[stub]} on {time}', fontsize=22) 
+# Remove miscellaneous labels
+ax.set_title(f'Productivity at {stubs[stub]} on {time}', fontsize=22)
 ax.set_xlabel('')
 ax.set_ylabel('')
-ax.set_xticks([]) 
+ax.set_xticks([])
 ax.set_yticks([])
-cbar = ax.collections[0].colorbar
-cbar.set_label(f"Enhanced Vegetation Index ({productivity_variable})", fontsize=18)  # Set font size
 
-filename = os.path.join(scratch_dir, f"{stub}_{productivity_variable}_spatial_variation_{time}.png")
-plt.savefig(filename, bbox_inches='tight')
-print(filename)
+# Calculate the aspect ratio
+xlim = ax.get_xlim()
+ylim = ax.get_ylim()
+lat_lon_ratio = (ylim[1] - ylim[0]) / (xlim[1] - xlim[0])
+ax.set_aspect(lat_lon_ratio)
+
+# Add color bar
+cbar = ax.collections[0].colorbar
+cbar.set_label(f"Enhanced Vegetation Index ({productivity_variable})", fontsize=18)
+fig.tight_layout()
+
+# Save the plot
+filename = os.path.join(scratch_dir, f"{stub}_{time}_productivitity_map.png")
+plt.savefig(filename)
 plt.show()
+print("Saved", filename)
+
+
+# Topography plot
+fig, ax = plt.subplots(figsize=(8, 8))
+fig.patch.set_alpha(0)
+
+# Add DEM background
+im = ax.imshow(dem, cmap='terrain', zorder=1, interpolation='bilinear')
+plt.colorbar(im, ax=ax, label='Elevation (m)')
+
+# Overlay ridges and gullies
+ax.contour(ridges, levels=[0.5], colors='red', linewidths=1.5, zorder=2)
+ax.contour(gullies, levels=[0.5], colors='blue', linewidths=1.5, zorder=3)
+ax.contour(dem, colors='black', linewidths=0.5, zorder=4, alpha=0.5)
+ax.axis('off')
+ax.set_aspect(lat_lon_ratio)
+
+plt.title('Ridges and Gullies', size=14)
+plt.tight_layout()
+filename = os.path.join(scratch_dir, f"{stub}_ridge_gullies.png")
+plt.savefig(filename)
+plt.show()
+print("Saved:", filename)
 # -
-# %%time
-filename = os.path.join(outdir, f"{stub}_terrain.tif")
-grid, dem, fdir, acc = pysheds_accumulation(filename)
-num_catchments = 20
-gullies, full_branches = catchment_gullies(grid, fdir, acc, num_catchments)
-ridges = catchment_ridges(grid, fdir, acc, full_branches)
-slope = calculate_slope(filename)
-show_ridge_gullies(dem, ridges, gullies, scratch_dir, stub)
+
+
+
+
+
+
+# +
+# Create a figure with 2 rows and 1 column
+fig, axes = plt.subplots(2, 1, figsize=(8, 16))
+title_size = 22
+
+# Productivity Map
+ax = axes[0]
+cmap = plt.cm.coolwarm
+cmap.set_bad(color='green')  # Set NaN pixels to green
+im = ds_masked.plot(
+    cmap=cmap,
+    vmin=median_value - (upper_bound - lower_bound) / 2,
+    vmax=median_value + (upper_bound - lower_bound) / 2,
+    ax=ax
+)
+
+# Remove miscellaneous labels 
+ax.set_title(f'Productivity at {stubs[stub]} on {time}', fontsize=title_size)
+ax.set_xlabel('')
+ax.set_ylabel('')
+ax.set_xticks([])
+ax.set_yticks([])
+
+# Calculate the aspect ratio
+xlim = ax.get_xlim()
+ylim = ax.get_ylim()
+lat_lon_ratio = (ylim[1] - ylim[0]) / (xlim[1] - xlim[0])
+ax.set_aspect(lat_lon_ratio)
+
+# Add color bar 
+cbar = ax.collections[0].colorbar
+cbar.set_label(f"Enhanced Vegetation Index ({productivity_variable})", fontsize=18)
+
+
+# Topography Map
+ax = axes[1]
+
+# Add DEM background
+im = ax.imshow(dem, cmap='terrain', zorder=1, interpolation='bilinear')
+plt.colorbar(im, ax=ax, label='Elevation (m)')
+
+# Overlay ridges and gullies
+ax.contour(ridges, levels=[0.5], colors='red', linewidths=1.5, zorder=2)
+ax.contour(gullies, levels=[0.5], colors='blue', linewidths=1.5, zorder=3)
+ax.contour(dem, colors='black', linewidths=0.5, zorder=4, alpha=0.5)
+
+ax.axis('off')
+ax.set_aspect(lat_lon_ratio)
+ax.set_title('Ridges and Gullies', fontsize=title_size)
+
+# Save the combined figure with both plots
+fig.tight_layout()
+filename = os.path.join(scratch_dir, f"{stub}_{time}_productivity_and_topography.png")
+plt.savefig(filename)
+plt.show()
+print("Saved:", filename)
+
+# -
+
+
+
+
+
 
 
 # +
 
+# True colour image
+fig, ax = plt.subplots(figsize=(10, 10))
+
 def normalize(arr):
     return (arr - arr.min()) / (arr.max() - arr.min())
-
-# True colour image
 red = ds_timepoint['nbart_red']
 green = ds_timepoint['nbart_green']
 blue = ds_timepoint['nbart_blue']
@@ -886,14 +1008,13 @@ red_norm = normalize(red)
 green_norm = normalize(green)
 blue_norm = normalize(blue)
 rgb = np.stack([red_norm, green_norm, blue_norm], axis=-1)
-fig, ax = plt.subplots(figsize=(10, 10))
 ax.imshow(rgb)
 ax.axis('off')
 
 # Scale bar
-width_km = 10  # 10 km
-height_km = 10  # 10 km
-pixels_per_km = ds.dims['x'] / width_km  # or ds.dims['y'] / height_km
+width_km = 10 
+height_km = 10 m
+pixels_per_km = ds.dims['x'] / width_km
 fontprops = FontProperties(size=12)
 scalebar = AnchoredSizeBar(
     ax.transData,
@@ -913,12 +1034,6 @@ plt.show()
 
 # !ls /g/data/xe2/cb8590/Data/PadSeg/MILG_ds2_query.pkl
 
-
-filename = os.path.join(outdir, f"{stub}_ds2_query.pkl")
-with open(filename, 'rb') as file:
-    query = pickle.load(file)
-
-query
 
 # +
 
