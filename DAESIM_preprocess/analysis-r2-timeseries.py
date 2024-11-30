@@ -882,13 +882,35 @@ unsheltered = y_values[np.where(x_values < percent_tree_threshold)]
 median_value = np.median(unsheltered)
 
 # +
+# Calculate bounding box of a larger region to get an idea of the location
+image_bbox = {
+    'y': query['y'],
+    'x': query['x'],
+}
+buffer = 1  
+region_bbox = {
+    'y': (image_bbox['y'][0] - buffer, image_bbox['y'][1] + buffer),
+    'x': (image_bbox['x'][0] - buffer, image_bbox['x'][1] + buffer),
+}
+
+# Create GeoDataFrames for the image and region
+image_gdf = gpd.GeoDataFrame(
+    {'geometry': [box(image_bbox['x'][0], image_bbox['y'][0], image_bbox['x'][1], image_bbox['y'][1])]},
+    crs='EPSG:4326', 
+)
+region_gdf = gpd.GeoDataFrame(
+    {'geometry': [box(region_bbox['x'][0], region_bbox['y'][0], region_bbox['x'][1], region_bbox['y'][1])]},
+    crs='EPSG:4326', 
+)
+
+# +
 # Productivity and Topography Map
 fig, axes = plt.subplots(2, 1, figsize=(8, 16))
 title_size = 22
 label_size = 18
 annotations_size = 14
 
-# Productivity Map
+# Plot 1: Productivity Map
 ax = axes[0]
 cmap = plt.cm.coolwarm
 cmap.set_bad(color='green')  # Set NaN pixels to green
@@ -918,7 +940,7 @@ cbar.set_label(f"Enhanced Vegetation Index ({productivity_variable})", fontsize=
 cbar.ax.tick_params(labelsize=annotations_size)
 
 
-# Topography Map
+# Plot 2: Topography Map
 ax = axes[1]
 
 # Add DEM background
@@ -932,7 +954,10 @@ ax.contour(ridges, levels=[0.5], colors='red', linewidths=1.5, zorder=2)
 ax.contour(gullies, levels=[0.5], colors='blue', linewidths=1.5, zorder=3)
 ax.contour(dem, colors='black', linewidths=0.5, zorder=4, alpha=0.5)
 
-ax.axis('off')
+ax.set_xlabel('')
+ax.set_ylabel('')
+ax.set_xticks([])
+ax.set_yticks([])
 ax.set_aspect(lat_lon_ratio)
 ax.set_title('Ridges and Gullies', fontsize=title_size)
 
@@ -943,18 +968,28 @@ plt.savefig(filename)
 plt.show()
 print("Saved:", filename)
 
-# -
 
 
+# Plot 3: Larger region and bounding box
+fig, ax = plt.subplots(figsize=(8, 8))
+region_gdf.boundary.plot(ax=ax, edgecolor='black', linewidth=1, label='200km Region')
+image_gdf.boundary.plot(ax=ax, edgecolor='red', linewidth=2, label='10km Bounding Box')
 
+# Use OpenStreetMaps basemap
+ctx.add_basemap(ax, source=ctx.providers.OpenStreetMap.Mapnik, crs=image_gdf.crs)
 
+# Add Legend
+ax.set_xlim(region_bbox['x'][0], region_bbox['x'][1])
+ax.set_ylim(region_bbox['y'][0], region_bbox['y'][1])
+ax.legend()
 
+filename = os.path.join(scratch_dir, f"{stub}_{time}_location.png")
+plt.savefig(filename)
+plt.show()
+print("Saved:", filename)
 
-
-# +
-
-# True colour image
-fig, ax = plt.subplots(figsize=(10, 10))
+# Plot 4: True colour image
+fig, ax = plt.subplots(figsize=(8, 8))
 
 def normalize(arr):
     return (arr - arr.min()) / (arr.max() - arr.min())
@@ -966,12 +1001,17 @@ green_norm = normalize(green)
 blue_norm = normalize(blue)
 rgb = np.stack([red_norm, green_norm, blue_norm], axis=-1)
 ax.imshow(rgb)
-ax.axis('off')
+
+ax.set_xlabel('')
+ax.set_ylabel('')
+ax.set_xticks([])
+ax.set_yticks([])
+ax.set_aspect(lat_lon_ratio)
 
 # Scale bar
 width_km = 10 
-height_km = 10 m
-pixels_per_km = ds.dims['x'] / width_km
+height_km = 10
+pixels_per_km = ds.sizes['x'] / width_km
 fontprops = FontProperties(size=12)
 scalebar = AnchoredSizeBar(
     ax.transData,
@@ -986,59 +1026,233 @@ scalebar = AnchoredSizeBar(
 )
 ax.add_artist(scalebar)
 
+filename = os.path.join(scratch_dir, f"{stub}_{time}_true_colour.png")
+plt.savefig(filename)
 plt.show()
+print("Saved:", filename)
 # -
 
-# !ls /g/data/xe2/cb8590/Data/PadSeg/MILG_ds2_query.pkl
+
+
+
+
+
+
+
 
 
 # +
+# Set up 2x2 subplots
+fig, axes = plt.subplots(2, 2, figsize=(16, 16))
+title_size = 22
+label_size = 18
+annotations_size = 14
 
-
-# Coordinates of the bounding box (your image region)
-image_bbox = {
-    'y': (-34.439042773032035, -34.33904277303204),
-    'x': (148.41949938279095, 148.51949938279097),
-}
-
-# Calculate the larger 100km x 100km bounding box
-buffer = 1  # ~0.5 degrees buffer for ~50 km each side
-region_bbox = {
-    'y': (image_bbox['y'][0] - buffer, image_bbox['y'][1] + buffer),
-    'x': (image_bbox['x'][0] - buffer, image_bbox['x'][1] + buffer),
-}
-
-# Create GeoDataFrames for the image and region
-image_gdf = gpd.GeoDataFrame(
-    {'geometry': [box(image_bbox['x'][0], image_bbox['y'][0], image_bbox['x'][1], image_bbox['y'][1])]},
-    crs='EPSG:4326',  # WGS84 Lat/Lon
+# Plot 1: Productivity Map
+ax = axes[0, 0]
+cmap = plt.cm.coolwarm
+cmap.set_bad(color='green')  # Set NaN pixels to green
+im = ds_masked.plot(
+    cmap=cmap,
+    vmin=median_value - (upper_bound - lower_bound) / 2,
+    vmax=median_value + (upper_bound - lower_bound) / 2,
+    ax=ax,
+    add_colorbar=False
 )
 
-region_gdf = gpd.GeoDataFrame(
-    {'geometry': [box(region_bbox['x'][0], region_bbox['y'][0], region_bbox['x'][1], region_bbox['y'][1])]},
-    crs='EPSG:4326',  # WGS84 Lat/Lon
-)
+# Create a colorbar on the left
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("left", size="5%", pad=0.1)  
+cbar = fig.colorbar(im, cax=cax, orientation='vertical')
+cbar.set_label(f"Enhanced Vegetation Index ({productivity_variable})", fontsize=label_size, labelpad=10)
+cbar.ax.tick_params(labelsize=annotations_size)
 
-# Plot the region with the image bounding box overlaid
-fig, ax = plt.subplots(figsize=(10, 10))
+# Move ticks and label to the left
+cbar.ax.yaxis.set_ticks_position('left')
+cbar.ax.yaxis.set_label_position('left')
 
-# Plot the larger region
+# Adjust plot
+ax.set_title(f'Productivity at {stubs[stub]} on {time}', fontsize=title_size)
+ax.set_xlabel('')
+ax.set_ylabel('')
+ax.set_xticks([])
+ax.set_yticks([])
+xlim, ylim = ax.get_xlim(), ax.get_ylim()
+lat_lon_ratio = (ylim[1] - ylim[0]) / (xlim[1] - xlim[0])
+ax.set_aspect(lat_lon_ratio)
+
+
+# Plot 2: Topography Map
+ax = axes[0, 1]
+im = ax.imshow(dem, cmap='terrain', zorder=1, interpolation='bilinear')
+cbar = plt.colorbar(im, ax=ax, label='Elevation (m)')
+cbar.set_label('Elevation (m)', fontsize=label_size)
+cbar.ax.tick_params(labelsize=annotations_size)
+ax.contour(ridges, levels=[0.5], colors='red', linewidths=1.5, zorder=2)
+ax.contour(gullies, levels=[0.5], colors='blue', linewidths=1.5, zorder=3)
+ax.contour(dem, colors='black', linewidths=0.5, zorder=4, alpha=0.5)
+ax.set_title('Ridges and Gullies', fontsize=title_size)
+ax.set_xlabel('')
+ax.set_ylabel('')
+ax.set_xticks([])
+ax.set_yticks([])
+ax.set_aspect(lat_lon_ratio)
+
+# Plot 3: Larger region and bounding box
+ax = axes[1, 1]
 region_gdf.boundary.plot(ax=ax, edgecolor='black', linewidth=1, label='200km Region')
-
-# Plot the smaller image bounding box
 image_gdf.boundary.plot(ax=ax, edgecolor='red', linewidth=2, label='10km Bounding Box')
-
-# Add a basemap using the correct contextily provider syntax
 ctx.add_basemap(ax, source=ctx.providers.OpenStreetMap.Mapnik, crs=image_gdf.crs)
-
-# Adjust plot appearance
 ax.set_xlim(region_bbox['x'][0], region_bbox['x'][1])
 ax.set_ylim(region_bbox['y'][0], region_bbox['y'][1])
-ax.set_xlabel('Longitude')
-ax.set_ylabel('Latitude')
 ax.legend()
+ax.set_title('Location', fontsize=title_size)
+# ax.tick_params(labelsize=annotations_size)
+
+# Plot 4: True Colour Image
+ax = axes[1, 0]
+def normalize(arr):
+    return (arr - arr.min()) / (arr.max() - arr.min())
+red = ds_timepoint['nbart_red']
+green = ds_timepoint['nbart_green']
+blue = ds_timepoint['nbart_blue']
+rgb = np.stack([normalize(red), normalize(green), normalize(blue)], axis=-1)
+ax.imshow(rgb)
+ax.set_xlabel('')
+ax.set_ylabel('')
+ax.set_xticks([])
+ax.set_yticks([])
+ax.set_aspect(lat_lon_ratio)
+width_km = 10  # Scale bar settings
+pixels_per_km = ds.sizes['x'] / width_km
+fontprops = FontProperties(size=12)
+scalebar = AnchoredSizeBar(
+    ax.transData,
+    pixels_per_km,
+    '1 km',
+    'lower left',
+    pad=0.5,
+    color='white',
+    frameon=False,
+    size_vertical=2,
+    fontproperties=fontprops,
+)
+ax.add_artist(scalebar)
+ax.set_title('True Colour', fontsize=title_size)
+
+# Adjust layout and save
+plt.tight_layout()
+filename = os.path.join(scratch_dir, f"{stub}_{time}_spatial_variation.png")
+plt.savefig(filename)
 plt.show()
+print("Saved:", filename)
+# -
+
+
+
+
+
+
+
+# +
+# Set up 2x2 subplots
+fig, axes = plt.subplots(2, 2, figsize=(16, 16))
+title_size = 22
+label_size = 18
+annotations_size = 14
+
+# Plot 1: Productivity Map
+ax = axes[0, 0]
+cmap = plt.cm.coolwarm
+cmap.set_bad(color='green')  # Set NaN pixels to green
+im = ds_masked.plot(
+    cmap=cmap,
+    vmin=median_value - (upper_bound - lower_bound) / 2,
+    vmax=median_value + (upper_bound - lower_bound) / 2,
+    ax=ax
+)
+ax.set_title(f'Productivity at {stubs[stub]} on {time}', fontsize=title_size)
+ax.set_xlabel('')
+ax.set_ylabel('')
+ax.set_xticks([])
+ax.set_yticks([])
+xlim, ylim = ax.get_xlim(), ax.get_ylim()
+lat_lon_ratio = (ylim[1] - ylim[0]) / (xlim[1] - xlim[0])
+ax.set_aspect(lat_lon_ratio)
+cbar = ax.collections[0].colorbar
+cbar.set_label(f"Enhanced Vegetation Index ({productivity_variable})", fontsize=label_size)
+cbar.ax.tick_params(labelsize=annotations_size)
+
+# Plot 2: Topography Map
+ax = axes[0, 1]
+im = ax.imshow(dem, cmap='terrain', zorder=1, interpolation='bilinear')
+cbar = plt.colorbar(im, ax=ax, label='Elevation (m)')
+cbar.set_label('Elevation (m)', fontsize=label_size)
+cbar.ax.tick_params(labelsize=annotations_size)
+ax.contour(ridges, levels=[0.5], colors='red', linewidths=1.5, zorder=2)
+ax.contour(gullies, levels=[0.5], colors='blue', linewidths=1.5, zorder=3)
+ax.contour(dem, colors='black', linewidths=0.5, zorder=4, alpha=0.5)
+ax.set_title('Ridges and Gullies', fontsize=title_size)
+ax.set_xlabel('')
+ax.set_ylabel('')
+ax.set_xticks([])
+ax.set_yticks([])
+ax.set_aspect(lat_lon_ratio)
+
+# Plot 3: Larger region and bounding box
+ax = axes[1, 1]
+region_gdf.boundary.plot(ax=ax, edgecolor='black', linewidth=1, label='200km Region')
+image_gdf.boundary.plot(ax=ax, edgecolor='red', linewidth=2, label='10km Bounding Box')
+ctx.add_basemap(ax, source=ctx.providers.OpenStreetMap.Mapnik, crs=image_gdf.crs)
+ax.set_xlim(region_bbox['x'][0], region_bbox['x'][1])
+ax.set_ylim(region_bbox['y'][0], region_bbox['y'][1])
+ax.legend()
+ax.set_title('Location', fontsize=title_size)
+
+# Plot 4: True Colour Image
+ax = axes[1, 0]
+def normalize(arr):
+    return (arr - arr.min()) / (arr.max() - arr.min())
+red = ds_timepoint['nbart_red']
+green = ds_timepoint['nbart_green']
+blue = ds_timepoint['nbart_blue']
+rgb = np.stack([normalize(red), normalize(green), normalize(blue)], axis=-1)
+ax.imshow(rgb)
+ax.set_xlabel('')
+ax.set_ylabel('')
+ax.set_xticks([])
+ax.set_yticks([])
+ax.set_aspect(lat_lon_ratio)
+width_km = 10  # Scale bar settings
+pixels_per_km = ds.sizes['x'] / width_km
+fontprops = FontProperties(size=12)
+scalebar = AnchoredSizeBar(
+    ax.transData,
+    pixels_per_km,
+    '1 km',
+    'lower left',
+    pad=0.5,
+    color='white',
+    frameon=False,
+    size_vertical=2,
+    fontproperties=fontprops,
+)
+ax.add_artist(scalebar)
+ax.set_title('True Colour', fontsize=title_size)
+
+# Adjust layout and save
+plt.tight_layout()
+filename = os.path.join(scratch_dir, f"{stub}_{time}_2x2_plots.png")
+plt.savefig(filename)
+plt.show()
+print("Saved:", filename)
 
 # -
+
+
+
+
+
+
 
 
