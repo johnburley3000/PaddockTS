@@ -29,6 +29,8 @@ import matplotlib.colors as mcolors
 import matplotlib.patches as mpatches
 from matplotlib.ticker import MaxNLocator
 from matplotlib.font_manager import FontProperties
+from matplotlib.colors import LinearSegmentedColormap, Normalize
+from matplotlib.cm import ScalarMappable
 from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
 import seaborn as sns
 import contextily as ctx
@@ -633,41 +635,35 @@ x_values = x_values_outliers[(y_values_outliers > lower_bound) & (y_values_outli
 percent_tree_threshold = 10
 sheltered = y_values[np.where(x_values >= percent_tree_threshold)]
 unsheltered = y_values[np.where(x_values < percent_tree_threshold)]
-
 # +
-# 2D histogram
-plt.figure(figsize=(14, 8))
-title_size = 22
-label_size = 18
-annotation_size = 14
+fig, axes = plt.subplots(2, 1, figsize=(14, 16)) 
 
-plt.hist2d(
+# Plot 1: 2D histogram 
+ax1 = axes[0]
+hist = ax1.hist2d(
     x_values, y_values, 
     bins=100, 
     norm=mcolors.LogNorm(),
-    cmap='viridis'
+    cmap='viridis',
 )
-pixel_size = 10
-plt.title(f"Productivity Index vs Shelter Score at {time}", fontsize=title_size)
-plt.xlabel(f"Tree cover within {max_distance * pixel_size}m (%)", fontsize=label_size)
-plt.ylabel(f'Enhanced Vegetation Index ({productivity_variable})', fontsize=label_size)
-plt.tick_params(axis='both', labelsize=annotation_size)
+ax1.set_title(f"Productivity Index vs Shelter Score at {time}", fontsize=22)
+ax1.set_xlabel(f"Tree cover within {max_distance * pixel_size}m (%)", fontsize=18)
+ax1.set_ylabel(f'Enhanced Vegetation Index ({productivity_variable})', fontsize=18)
+ax1.tick_params(axis='both', labelsize=14)
 
-# Colour bar
-cbar = plt.colorbar(label='Number of pixels')
-cbar.set_label('Number of pixels', fontsize=label_size)
-cbar.set_ticks([1, 10, 100, 1000, 10000]) 
-cbar.set_ticklabels(['1', '10', '100', '1000', '10000']) 
+cbar = plt.colorbar(hist[3], ax=ax1)  # hb[3] contains the QuadMesh, which is used for colorbar
+cbar.set_label(f"Number of pixels ({productivity_variable})", fontsize=label_size)
+cbar.ax.tick_params(labelsize=annotations_size)
 
 # Linear regression line
 res = stats.linregress(x_values, y_values)
 x_fit = np.linspace(min(x_values), max(x_values), 500)
 y_fit = res.intercept + res.slope * x_fit
-line_handle, = plt.plot(x_fit, y_fit, 'r-', label=f"$R^2$ = {res.rvalue**2:.2f}")
-plt.legend(fontsize=annotation_size)
+ax1.plot(x_fit, y_fit, 'r-', label=f"$R^2$ = {res.rvalue**2:.2f}")
+ax1.legend(fontsize=14)
 
 # Add vertical black dotted line at the tree cover threshold
-plt.axvline(
+ax1.axvline(
     percent_tree_threshold, 
     color='black', 
     linestyle='dotted', 
@@ -675,21 +671,15 @@ plt.axvline(
     label=f"Tree cover = {tree_cover_threshold}%"
 )
 
-# Save the plot
-filename_hist = os.path.join(scratch_dir, f"{stub}_{productivity_variable}_histregression_{time}.png")
-plt.savefig(filename_hist, bbox_inches='tight')
-plt.show()
 
 
-
-# Box plot
+# Plot 2: Box plot on the second subplot
+ax2 = axes[1]
 box_data = [unsheltered, sheltered]
-plt.figure(figsize=(11,8))
-plt.boxplot(box_data, labels=['Unsheltered', 'Sheltered'], showfliers=False)
-plt.xticks(fontsize=label_size)
-plt.title(f'Shelter threshold of {percent_tree_threshold}% tree cover within {max_distance * pixel_size}m', fontsize=title_size)
-plt.ylabel('Enhanced Vegetation Index (EVI)', fontsize=label_size)
-plt.tick_params(axis='both', labelsize=annotation_size)
+im = ax2.boxplot(box_data, labels=['Unsheltered', 'Sheltered'], showfliers=False)
+ax2.set_title(f'Shelter threshold of {percent_tree_threshold}% tree cover within {max_distance * pixel_size}m', fontsize=22)
+ax2.set_ylabel('Enhanced Vegetation Index (EVI)', fontsize=18)
+ax2.tick_params(axis='both', labelsize=14)
 
 # Add medians and sample size next to each box plot
 medians = [np.median(data) for data in box_data]
@@ -697,34 +687,40 @@ number_of_pixels = [len(unsheltered), len(sheltered)]
 
 placement_unsheltered = np.percentile(unsheltered, 75) + (1.5 * (np.percentile(unsheltered, 75) - np.percentile(unsheltered, 25)))
 placement_sheltered = np.percentile(sheltered, 75) + (1.5 * (np.percentile(sheltered, 75) - np.percentile(sheltered, 25)))
-n_placements = [placement_unsheltered,  placement_sheltered]
+n_placements = [placement_unsheltered, placement_sheltered]
 
 for i, median in enumerate(medians):
-    plt.text(i + 1 + 0.09, median, f'{median:.2f}', ha='left', va='center', fontsize=annotation_size)
-    plt.text(i + 1 - 0.09, n_placements[i] + 0.015, f'n={number_of_pixels[i]}', ha='left', va='center', fontsize=annotation_size)
+    ax2.text(i + 1 + 0.09, median, f'{median:.2f}', ha='left', va='center', fontsize=14)
+    ax2.text(i + 1 - 0.09, n_placements[i] + 0.015, f'n={number_of_pixels[i]}', ha='left', va='center', fontsize=14)
 
 # Add some space above the sample size text
 y_max = max(placement_unsheltered, placement_sheltered) + 0.1 * max(placement_unsheltered, placement_sheltered)
-plt.ylim(None, y_max)
-# plt.ylim(0, upper_bound) # Use this if we want to match the histogram axis
+ax2.set_ylim(None, y_max)
 
 # Explanatory text for calculating percentage benefit
 shelter_vs_unsheltered = (np.median(sheltered) - np.median(unsheltered)) / np.median(unsheltered) * 100
-plt.text(
+ax2.text(
     0.53, y_max - 0.02,  # Position text in top left
     f'Sheltered vs unsheltered (%) = ({medians[1]:.2f} - {medians[0]:.2f})/{medians[0]:.2f} = {shelter_vs_unsheltered:.2f}%',
-    fontsize=annotation_size, ha='left', va='top'
+    fontsize=14, ha='left', va='top'
 )
 
-# Save the plot
-filename_boxplot = os.path.join(scratch_dir, f"{stub}_{productivity_variable}_boxplot_{time}.png")
-plt.savefig(filename_boxplot, bbox_inches='tight')
+# Create a dummy white colorbar to align the plots nicely
+white_cmap = LinearSegmentedColormap.from_list("white_cmap", ["white", "white"])
+norm = Normalize(vmin=0, vmax=1)
+sm = ScalarMappable(norm=norm, cmap=white_cmap)
+cbar = plt.colorbar(sm, ax=ax2, orientation='vertical')
+cbar.set_ticks([])  
+cbar.set_label('')  
+cbar.outline.set_visible(False)
+
+# Save the combined figure with both plots
+fig.tight_layout()
+
 plt.show()
 
-print("Saved", filename_hist)
-print("Saved", filename_boxplot)
-# -
 
+# -
 # # Temporal Variation
 
 # Load weather data
@@ -910,6 +906,10 @@ title_size = 22
 label_size = 18
 annotations_size = 14
 
+white_cmap = LinearSegmentedColormap.from_list("white_cmap", ["white", "white"])
+norm = Normalize(vmin=0, vmax=1)
+sm = ScalarMappable(norm=norm, cmap=white_cmap)
+
 # Plot 1: Productivity Map
 ax = axes[0, 0]
 cmap = plt.cm.coolwarm
@@ -958,6 +958,12 @@ ax.set_ylim(region_bbox['y'][0], region_bbox['y'][1])
 ax.legend()
 ax.set_title('Location', fontsize=title_size)
 
+# Create a dummy white colorbar to align the plots nicely
+cbar = plt.colorbar(sm, ax=ax, orientation='vertical')
+cbar.set_ticks([])  
+cbar.set_label('')  
+cbar.outline.set_visible(False)
+
 # Plot 4: True Colour Image
 ax = axes[1, 0]
 def normalize(arr):
@@ -990,9 +996,6 @@ ax.add_artist(scalebar)
 ax.set_title('True Colour', fontsize=title_size)
 
 # Create a dummy white colorbar to align the plots nicely
-white_cmap = LinearSegmentedColormap.from_list("white_cmap", ["white", "white"])
-norm = Normalize(vmin=0, vmax=1)
-sm = ScalarMappable(norm=norm, cmap=white_cmap)
 cbar = plt.colorbar(sm, ax=ax, orientation='vertical')
 cbar.set_ticks([])  
 cbar.set_label('')  
@@ -1004,35 +1007,3 @@ filename = os.path.join(scratch_dir, f"{stub}_{time}_spatial_variation.png")
 plt.savefig(filename)
 plt.show()
 print("Saved:", filename)
-
-# +
-import matplotlib.pyplot as plt
-import numpy as np
-from matplotlib.colors import LinearSegmentedColormap, Normalize
-from matplotlib.cm import ScalarMappable
-
-
-# Create the figure and subplots
-fig, axes = plt.subplots(2, 2, figsize=(16, 16))
-
-# Bottom left subplot
-ax = axes[1, 0]
-ax.set_title('Bottom Left Plot')
-
-# Create a dummy ScalarMappable with the white colormap
-white_cmap = LinearSegmentedColormap.from_list("white_cmap", ["white", "white"])
-norm = Normalize(vmin=0, vmax=1)
-sm = ScalarMappable(norm=norm, cmap=white_cmap)
-cbar = plt.colorbar(sm, ax=ax, orientation='vertical')
-cbar.set_ticks([])  
-cbar.set_label('')  
-cbar.outline.set_visible(False)
-
-# Add some content to the plot (optional)
-x = np.linspace(0, 10, 100)
-y = np.sin(x)
-ax.plot(x, y)
-
-plt.tight_layout()
-plt.show()
-
