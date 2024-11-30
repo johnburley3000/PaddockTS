@@ -1,8 +1,8 @@
 # +
 # Aim of this notebook is to combine all the datasources into a single xarray
-# -
 
-# !pip install contextily
+# +
+# # !pip install contextily
 
 # +
 # Standard library
@@ -607,89 +607,6 @@ df_top10
 
 # # Max r2 timepoint
 
-
-
-
-
-max(y_values)
-
-# +
-# 2D histogram
-plt.figure(figsize=(14, 8))
-title_size = 24
-label_size = 18
-annotation_size = 14
-
-plt.hist2d(
-    x_values, y_values, 
-    bins=100, 
-    norm=mcolors.LogNorm(),
-    cmap='viridis'
-)
-pixel_size = 10
-plt.title(f"Productivity Index vs Shelter Score at {time}", fontsize=title_size)
-plt.xlabel(f"Tree cover within {max_distance * pixel_size}m (%)", fontsize=label_size)
-plt.ylabel(f'Enhanced Vegetation Index ({productivity_variable})', fontsize=label_size)
-
-# Colour bar
-cbar = plt.colorbar(label='Number of pixels')
-cbar.set_label('Number of pixels', fontsize=label_size)
-cbar.set_ticks([1, 10, 100, 1000, 10000]) 
-cbar.set_ticklabels(['1', '10', '100', '1000', '10000']) 
-
-# Linear regression line
-res = stats.linregress(x_values, y_values)
-x_fit = np.linspace(min(x_values), max(x_values), 500)
-y_fit = res.intercept + res.slope * x_fit
-line_handle, = plt.plot(x_fit, y_fit, 'r-', label=f"$R^2$ = {res.rvalue**2:.2f}")
-plt.legend(fontsize=annotation_size)
-
-# Add vertical black dotted line at the tree cover threshold
-plt.axvline(
-    percent_tree_threshold, 
-    color='black', 
-    linestyle='dotted', 
-    linewidth=2, 
-    label=f"Tree cover = {tree_cover_threshold}%"
-)
-
-# Add labels for 'Sheltered' and 'Unsheltered'
-alpha = 0.5
-plt.text(
-    5,  
-    max(y_values)/2, 
-    'Unsheltered', 
-    color='black', 
-    fontsize=annotation_size, 
-    ha='center', 
-    va='top',
-    bbox=dict(facecolor='white', alpha=alpha, edgecolor='none', boxstyle='round,pad=0.5')
-)
-plt.text(
-    24, 
-    max(y_values)/2,
-    'Sheltered', 
-    color='black', 
-    fontsize=annotation_size, 
-    ha='center', 
-    va='top',
-    bbox=dict(facecolor='white', alpha=alpha, edgecolor='none', boxstyle='round,pad=0.5')
-)
-
-# Save the plot
-filename_hist = os.path.join(scratch_dir, f"{stub}_{productivity_variable}_histregression_{time}.png")
-plt.savefig(filename_hist, bbox_inches='tight')
-plt.show()
-# -
-
-
-
-
-
-
-
-
-
 # +
 # Calculate shelter score and productivity index for this timepoint
 ndvi = ds.sel(time=time, method='nearest')[productivity_variable]
@@ -702,14 +619,14 @@ y = productivity_score1.values.flatten()
 y_values_outliers = y[~np.isnan(y)]   
 
 # Outlier boundary
-hist_lower_bound = 0
-hist_upper_bound = max(np.percentile(y_values_outliers, 99.9), 1)
+lower_bound = 0
+upper_bound = max(np.percentile(y_values_outliers, 99.9), 1)
 
 # Find the shelter scores not obstructed by cloud cover or outliers
-y_values = y_values_outliers[(y_values_outliers > hist_lower_bound) & (y_values_outliers < hist_upper_bound)]
+y_values = y_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]
 x = s.flatten()
 x_values_outliers = x[~np.isnan(y)]
-x_values = x_values_outliers[(y_values_outliers > hist_lower_bound) & (y_values_outliers < hist_upper_bound)]
+x_values = x_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]
 
 # Calculate sheltered and unsheltered pixels
 percent_tree_threshold = 10
@@ -733,6 +650,7 @@ pixel_size = 10
 plt.title(f"Productivity Index vs Shelter Score at {time}", fontsize=title_size)
 plt.xlabel(f"Tree cover within {max_distance * pixel_size}m (%)", fontsize=label_size)
 plt.ylabel(f'Enhanced Vegetation Index ({productivity_variable})', fontsize=label_size)
+plt.tick_params(axis='both', labelsize=annotation_size)
 
 # Colour bar
 cbar = plt.colorbar(label='Number of pixels')
@@ -756,29 +674,6 @@ plt.axvline(
     label=f"Tree cover = {tree_cover_threshold}%"
 )
 
-# Add labels for 'Sheltered' and 'Unsheltered'
-alpha = 0.5
-plt.text(
-    5,  
-    max(y_values)/2, 
-    'Unsheltered', 
-    color='black', 
-    fontsize=annotation_size, 
-    ha='center', 
-    va='top',
-    bbox=dict(facecolor='white', alpha=alpha, edgecolor='none', boxstyle='round,pad=0.5')
-)
-plt.text(
-    24, 
-    max(y_values)/2,
-    'Sheltered', 
-    color='black', 
-    fontsize=annotation_size, 
-    ha='center', 
-    va='top',
-    bbox=dict(facecolor='white', alpha=alpha, edgecolor='none', boxstyle='round,pad=0.5')
-)
-
 # Save the plot
 filename_hist = os.path.join(scratch_dir, f"{stub}_{productivity_variable}_histregression_{time}.png")
 plt.savefig(filename_hist, bbox_inches='tight')
@@ -788,11 +683,12 @@ plt.show()
 
 # Box plot
 box_data = [unsheltered, sheltered]
-plt.figure(figsize=(12,8))
+plt.figure(figsize=(11,8))
 plt.boxplot(box_data, labels=['Unsheltered', 'Sheltered'], showfliers=False)
 plt.xticks(fontsize=label_size)
 plt.title(f'Shelter threshold of {percent_tree_threshold}% tree cover within {max_distance * pixel_size}m', fontsize=title_size)
 plt.ylabel('Enhanced Vegetation Index (EVI)', fontsize=label_size)
+plt.tick_params(axis='both', labelsize=annotation_size)
 
 # Add medians and sample size next to each box plot
 medians = [np.median(data) for data in box_data]
@@ -809,6 +705,7 @@ for i, median in enumerate(medians):
 # Add some space above the sample size text
 y_max = max(placement_unsheltered, placement_sheltered) + 0.1 * max(placement_unsheltered, placement_sheltered)
 plt.ylim(None, y_max)
+# plt.ylim(0, upper_bound) # Use this if we want to match the histogram axis
 
 # Explanatory text for calculating percentage benefit
 shelter_vs_unsheltered = (np.median(sheltered) - np.median(unsheltered)) / np.median(unsheltered) * 100
@@ -823,8 +720,7 @@ filename_boxplot = os.path.join(scratch_dir, f"{stub}_{productivity_variable}_bo
 plt.savefig(filename_boxplot, bbox_inches='tight')
 plt.show()
 
-print(f"Number of unsheltered pixels: {len(unsheltered)}")
-print(f"Number of sheltered pixels: {len(sheltered)}")
+print("Saved", filename_hist)
 print("Saved", filename_boxplot)
 # -
 
