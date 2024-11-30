@@ -882,81 +882,11 @@ unsheltered = y_values[np.where(x_values < percent_tree_threshold)]
 median_value = np.median(unsheltered)
 
 # +
-# Productivity map
-fig, ax = plt.subplots(figsize=(8, 8))
-title_size = 22
-label_size = 18
-
-cmap = plt.cm.coolwarm
-cmap.set_bad(color='green')  # Set NaN pixels to green
-im = ds_masked.plot(
-    cmap=cmap,
-    vmin=median_value - (upper_bound - lower_bound) / 2,
-    vmax=median_value + (upper_bound - lower_bound) / 2,
-    ax=ax
-)
-
-# Remove miscellaneous labels
-ax.set_title(f'Productivity at {stubs[stub]} on {time}', fontsize=title_size)
-ax.set_xlabel('')
-ax.set_ylabel('')
-ax.set_xticks([])
-ax.set_yticks([])
-
-# Calculate the aspect ratio
-xlim = ax.get_xlim()
-ylim = ax.get_ylim()
-lat_lon_ratio = (ylim[1] - ylim[0]) / (xlim[1] - xlim[0])
-ax.set_aspect(lat_lon_ratio)
-
-# Add color bar
-cbar = ax.collections[0].colorbar
-cbar.set_label(f"Enhanced Vegetation Index ({productivity_variable})", fontsize=label_size)
-fig.tight_layout()
-
-# Save the plot
-filename = os.path.join(scratch_dir, f"{stub}_{time}_productivitity_map.png")
-plt.savefig(filename)
-plt.show()
-print("Saved", filename)
-
-
-
-# Topography plot
-fig, ax = plt.subplots(figsize=(8, 8))
-fig.patch.set_alpha(0)
-
-# Add DEM background
-im = ax.imshow(dem, cmap='terrain', zorder=1, interpolation='bilinear')
-plt.colorbar(im, ax=ax, label='Elevation (m)')
-
-# Overlay ridges and gullies
-ax.contour(ridges, levels=[0.5], colors='red', linewidths=1.5, zorder=2)
-ax.contour(gullies, levels=[0.5], colors='blue', linewidths=1.5, zorder=3)
-ax.contour(dem, colors='black', linewidths=0.5, zorder=4, alpha=0.5)
-ax.set_aspect(lat_lon_ratio)
-ax.set_xlabel('')
-ax.set_ylabel('')
-ax.set_xticks([])
-ax.set_yticks([])
-
-plt.title('Ridges and Gullies', size=title_siz)
-plt.tight_layout()
-filename = os.path.join(scratch_dir, f"{stub}_ridge_gullies.png")
-plt.savefig(filename)
-plt.show()
-print("Saved:", filename)
-# -
-
-
-
-
-
-
-# +
-# Create a figure with 2 rows and 1 column
+# Productivity and Topography Map
 fig, axes = plt.subplots(2, 1, figsize=(8, 16))
 title_size = 22
+label_size = 18
+annotations_size = 14
 
 # Productivity Map
 ax = axes[0]
@@ -984,7 +914,8 @@ ax.set_aspect(lat_lon_ratio)
 
 # Add color bar 
 cbar = ax.collections[0].colorbar
-cbar.set_label(f"Enhanced Vegetation Index ({productivity_variable})", fontsize=18)
+cbar.set_label(f"Enhanced Vegetation Index ({productivity_variable})", fontsize=label_size)
+cbar.ax.tick_params(labelsize=annotations_size)
 
 
 # Topography Map
@@ -992,7 +923,9 @@ ax = axes[1]
 
 # Add DEM background
 im = ax.imshow(dem, cmap='terrain', zorder=1, interpolation='bilinear')
-plt.colorbar(im, ax=ax, label='Elevation (m)')
+cbar = plt.colorbar(im, ax=ax, label='Elevation (m)')
+cbar.set_label('Elevation (m)', fontsize=label_size)
+cbar.ax.tick_params(labelsize=annotations_size)
 
 # Overlay ridges and gullies
 ax.contour(ridges, levels=[0.5], colors='red', linewidths=1.5, zorder=2)
