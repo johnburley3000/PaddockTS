@@ -611,9 +611,76 @@ df_top10
 
 
 
+max(y_values)
 
+# +
+# 2D histogram
+plt.figure(figsize=(14, 8))
+title_size = 24
+label_size = 18
+annotation_size = 14
 
+plt.hist2d(
+    x_values, y_values, 
+    bins=100, 
+    norm=mcolors.LogNorm(),
+    cmap='viridis'
+)
+pixel_size = 10
+plt.title(f"Productivity Index vs Shelter Score at {time}", fontsize=title_size)
+plt.xlabel(f"Tree cover within {max_distance * pixel_size}m (%)", fontsize=label_size)
+plt.ylabel(f'Enhanced Vegetation Index ({productivity_variable})', fontsize=label_size)
 
+# Colour bar
+cbar = plt.colorbar(label='Number of pixels')
+cbar.set_label('Number of pixels', fontsize=label_size)
+cbar.set_ticks([1, 10, 100, 1000, 10000]) 
+cbar.set_ticklabels(['1', '10', '100', '1000', '10000']) 
+
+# Linear regression line
+res = stats.linregress(x_values, y_values)
+x_fit = np.linspace(min(x_values), max(x_values), 500)
+y_fit = res.intercept + res.slope * x_fit
+line_handle, = plt.plot(x_fit, y_fit, 'r-', label=f"$R^2$ = {res.rvalue**2:.2f}")
+plt.legend(fontsize=annotation_size)
+
+# Add vertical black dotted line at the tree cover threshold
+plt.axvline(
+    percent_tree_threshold, 
+    color='black', 
+    linestyle='dotted', 
+    linewidth=2, 
+    label=f"Tree cover = {tree_cover_threshold}%"
+)
+
+# Add labels for 'Sheltered' and 'Unsheltered'
+alpha = 0.5
+plt.text(
+    5,  
+    max(y_values)/2, 
+    'Unsheltered', 
+    color='black', 
+    fontsize=annotation_size, 
+    ha='center', 
+    va='top',
+    bbox=dict(facecolor='white', alpha=alpha, edgecolor='none', boxstyle='round,pad=0.5')
+)
+plt.text(
+    24, 
+    max(y_values)/2,
+    'Sheltered', 
+    color='black', 
+    fontsize=annotation_size, 
+    ha='center', 
+    va='top',
+    bbox=dict(facecolor='white', alpha=alpha, edgecolor='none', boxstyle='round,pad=0.5')
+)
+
+# Save the plot
+filename_hist = os.path.join(scratch_dir, f"{stub}_{productivity_variable}_histregression_{time}.png")
+plt.savefig(filename_hist, bbox_inches='tight')
+plt.show()
+# -
 
 
 
@@ -644,11 +711,18 @@ x = s.flatten()
 x_values_outliers = x[~np.isnan(y)]
 x_values = x_values_outliers[(y_values_outliers > hist_lower_bound) & (y_values_outliers < hist_upper_bound)]
 
+# Calculate sheltered and unsheltered pixels
+percent_tree_threshold = 10
+sheltered = y_values[np.where(x_values >= percent_tree_threshold)]
+unsheltered = y_values[np.where(x_values < percent_tree_threshold)]
+
 # +
 # 2D histogram
 plt.figure(figsize=(14, 8))
-title_size = 24
+title_size = 22
 label_size = 18
+annotation_size = 14
+
 plt.hist2d(
     x_values, y_values, 
     bins=100, 
@@ -671,7 +745,39 @@ res = stats.linregress(x_values, y_values)
 x_fit = np.linspace(min(x_values), max(x_values), 500)
 y_fit = res.intercept + res.slope * x_fit
 line_handle, = plt.plot(x_fit, y_fit, 'r-', label=f"$R^2$ = {res.rvalue**2:.2f}")
-plt.legend(fontsize=14)
+plt.legend(fontsize=annotation_size)
+
+# Add vertical black dotted line at the tree cover threshold
+plt.axvline(
+    percent_tree_threshold, 
+    color='black', 
+    linestyle='dotted', 
+    linewidth=2, 
+    label=f"Tree cover = {tree_cover_threshold}%"
+)
+
+# Add labels for 'Sheltered' and 'Unsheltered'
+alpha = 0.5
+plt.text(
+    5,  
+    max(y_values)/2, 
+    'Unsheltered', 
+    color='black', 
+    fontsize=annotation_size, 
+    ha='center', 
+    va='top',
+    bbox=dict(facecolor='white', alpha=alpha, edgecolor='none', boxstyle='round,pad=0.5')
+)
+plt.text(
+    24, 
+    max(y_values)/2,
+    'Sheltered', 
+    color='black', 
+    fontsize=annotation_size, 
+    ha='center', 
+    va='top',
+    bbox=dict(facecolor='white', alpha=alpha, edgecolor='none', boxstyle='round,pad=0.5')
+)
 
 # Save the plot
 filename_hist = os.path.join(scratch_dir, f"{stub}_{productivity_variable}_histregression_{time}.png")
@@ -679,13 +785,6 @@ plt.savefig(filename_hist, bbox_inches='tight')
 plt.show()
 
 
-
-# Calculate sheltered and unsheltered pixels
-annotation_size = 14
-
-percent_tree_threshold = 10
-sheltered = y_values[np.where(x_values >= percent_tree_threshold)]
-unsheltered = y_values[np.where(x_values < percent_tree_threshold)]
 
 # Box plot
 box_data = [unsheltered, sheltered]
