@@ -1,10 +1,14 @@
 # +
 # Aim of this notebook is to combine all the datasources into a single xarray
+# -
+
+# !pip install contextily
 
 # +
 # Standard library
 import os
 import pickle
+import datetime
 
 # Dependencies
 import numpy as np
@@ -26,6 +30,7 @@ from matplotlib.ticker import MaxNLocator
 from matplotlib.font_manager import FontProperties
 from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
 import seaborn as sns
+import contextily as ctx
 
 # Local imports
 os.chdir(os.path.join(os.path.expanduser('~'), "Projects/PaddockTS"))
@@ -262,7 +267,7 @@ ds['EVI'] = 2.5 * ((B8 - B4) / (B8 + 6 * B4 - 7.5 * B2 + 1))
 # # ds = add_fractional_cover_to_ds(ds, fractions)
 # -
 
-# # Linear Regression and 2D Histogram
+# # Example Linear Regression and 2D Histogram
 
 # +
 # time = '2019-12-31'
@@ -523,7 +528,7 @@ cbar.set_label('Sample size')
 plt.show()
 # -
 
-# # Temporal Variation
+# # All Timepoints
 
 # +
 # %%time
@@ -536,58 +541,180 @@ benefits = []
 # distances = 0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100
 distances = 0, 30
 
-for i in range(len(distances) - 1):
-    min_distance = distances[i]
-    max_distance = distances[i+1]
-    layer_name = f"percent_trees_{pixel_size * min_distance}m-{pixel_size * max_distance}m"
-    shelter_score = ds[layer_name]
-    x = shelter_score.values.flatten()
+min_distance = 0
+max_distance = 30
+layer_name = f"percent_trees_{pixel_size * min_distance}m-{pixel_size * max_distance}m"
+shelter_score = ds[layer_name]
+x = shelter_score.values.flatten()
 
-    for i, time in enumerate(ds.time.values):
-        ndvi = ds.sel(time=time, method='nearest')[productivity_variable]
-        productivity_score = ndvi.where(~adjacent_mask)
+for i, time in enumerate(ds.time.values):
+    ndvi = ds.sel(time=time, method='nearest')[productivity_variable]
+    productivity_score = ndvi.where(~adjacent_mask)
 
-        # Remove all pixels that are trees, adjacent to trees, or masked by cloud cover
-        y = productivity_score.values.flatten()
-        y_values_outliers = y[~np.isnan(y)]   
+    # Remove all pixels that are trees, adjacent to trees, or masked by cloud cover
+    y = productivity_score.values.flatten()
+    y_values_outliers = y[~np.isnan(y)]   
 
-        # Remove outliers
-        q1 = np.percentile(y_values_outliers, 25)
-        q3 = np.percentile(y_values_outliers, 75)
-        iqr = q3 - q1
-        lower_bound = q1 - 1.5 * iqr
-        upper_bound = q3 + 1.5 * iqr
-        
-        y_values = y_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]
-        x_values_outliers = x[~np.isnan(y)]
-        x_values = x_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]
+    # Remove outliers
+    # q1 = np.percentile(y_values_outliers, 25)
+    # q3 = np.percentile(y_values_outliers, 75)
+    # iqr = q3 - q1
+    # lower_bound = q1 - 1.5 * iqr
+    # upper_bound = q3 + 1.5 * iqr
 
-        # Uncomment to keep outliers
-        # x_values = x_values_outliers
-        # y_values = y_values_outliers
-        
-        sheltered = y_values[np.where(x_values >= tree_cover_threshold)]
-        unsheltered = y_values[np.where(x_values < tree_cover_threshold)]
-        percentage_benefit = (np.median(sheltered) - np.median(unsheltered))/np.median(y_values)
-        sample_size = min(len(sheltered), len(unsheltered))
-        
-        res = stats.linregress(x_values, y_values)
+    lower_bound = 0
+    upper_bound = max(np.percentile(y_values_outliers, 99.9), 1)
     
-        benefit = {
-            "distance":max_distance,
-            "time": time,
-            "r2": res.rvalue**2,
-            "slope": res.slope,
-            "percentage_benefit": percentage_benefit,
-            "sample_size": sample_size,
-            "median": np.median(y_values)
-        }
-        benefits.append(benefit)
+    y_values = y_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]
+    x_values_outliers = x[~np.isnan(y)]
+    x_values = x_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]
+
+    # Uncomment to keep outliers
+    # x_values = x_values_outliers
+    # y_values = y_values_outliers
+    
+    sheltered = y_values[np.where(x_values >= tree_cover_threshold)]
+    unsheltered = y_values[np.where(x_values < tree_cover_threshold)]
+    percentage_benefit = (np.median(sheltered) - np.median(unsheltered))/np.median(y_values)
+    sample_size = min(len(sheltered), len(unsheltered))
+    
+    res = stats.linregress(x_values, y_values)
+
+    benefit = {
+        "distance":max_distance,
+        "time": time,
+        "r2": res.rvalue**2,
+        "slope": res.slope,
+        "percentage_benefit": percentage_benefit,
+        "sample_size": sample_size,
+        "median": np.median(y_values)
+    }
+    benefits.append(benefit)
 
 len(benefits)
 # -
 
-pd.DataFrame(benefits)
+df_benefits = pd.DataFrame(benefits)
+df_benefits['date'] = df_benefits['time'].dt.date
+df_benefits = df_benefits.set_index('date')
+df_benefits.index = pd.to_datetime(df_benefits.index)
+df_top10 = df_benefits.nlargest(10, 'r2')
+time = df_top10.index[0].date()
+ds_timepoint = ds.sel(time=time, method='nearest')
+df_top10[['r2', 'slope', 'percentage_benefit', 'sample_size']]
+
+# # Max r2 timepoint
+
+# +
+ndvi = ds.sel(time=time, method='nearest')[productivity_variable]
+productivity_score1 = ndvi.where(~adjacent_mask) #  & (grassland | cropland))
+
+# Visualise a linear regression for this timepoint
+layer_name = f"percent_trees_0m-300m"
+
+s = ds[layer_name].values
+
+# Remove all pixels that are trees or adjacent to trees
+y = productivity_score1.values.flatten()
+y_values_outliers = y[~np.isnan(y)]   
+
+# Remove outliers
+# q1 = np.percentile(y_values_outliers, 25)
+# q3 = np.percentile(y_values_outliers, 75)
+# iqr = q3 - q1
+# lower_bound = q1 - 1.5 * iqr
+# upper_bound = q3 + 1.5 * iqr
+
+lower_bound = 0
+upper_bound = max(np.percentile(y_values_outliers, 99.9), 1)
+
+# Find the shelter scores not obstructed by cloud cover or outliers
+y_values = y_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]
+
+x = s.flatten()
+x_values_outliers = x[~np.isnan(y)]
+x_values = x_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]
+
+# Keeping outliers
+# x_values = x_values_outliers
+# y_values = y_values_outliers
+
+# Normalise
+x_values_normalised = (x_values - min(x_values)) / (max(x_values) - min(x_values))
+y_values_normalised = (y_values - min(y_values)) / (max(y_values) - min(y_values))
+
+lower_bound, upper_bound
+
+# +
+# 2D histogram with logarithmic normalization
+plt.figure(figsize=(14, 8))  # Width = 12, Height = 8
+plt.hist2d(
+    x_values, y_values, 
+    bins=100, 
+    norm=mcolors.LogNorm(),  # Logarithmic color scale
+    cmap='viridis'
+)
+pixel_size = 10
+plt.title(f"Productivity Index vs Shelter Score at {time}", fontsize=30)
+plt.xlabel(layer_name, fontsize=18)
+plt.ylabel(f'Enhanced Vegetation Index ({productivity_variable})', fontsize=18)
+
+# Add color bar with custom ticks
+cbar = plt.colorbar(label='Number of pixels')
+cbar.set_label('Number of pixels', fontsize=18)
+
+cbar.set_ticks([1, 10, 100, 1000, 10000])  # Set the desired tick marks
+cbar.set_ticklabels(['1', '10', '100', '1000', '10000'])  # Ensure labels match the ticks
+
+# Linear regression line
+res = stats.linregress(x_values, y_values)
+x_fit = np.linspace(min(x_values), max(x_values), 500)
+y_fit = res.intercept + res.slope * x_fit
+line_handle, = plt.plot(x_fit, y_fit, 'r-', label=f"$R^2$ = {res.rvalue**2:.2f}")
+plt.legend(fontsize=14)
+
+filename = os.path.join(scratch_dir, f"{stub}_{productivity_variable}_histregression_{time}.png")
+plt.savefig(filename, bbox_inches='tight')
+print(filename)
+plt.show()
+
+# +
+# Example box plot
+# y_values = (y_values - min(y_values)) / (max(y_values) - min(y_values)) # Normalisation for the fractional cover
+
+plt.figure(figsize=(8, 8))  # Width = 12, Height = 8
+percent_tree_threshold = 10
+
+sheltered = y_values[np.where(x_values >= percent_tree_threshold)]
+unsheltered = y_values[np.where(x_values < percent_tree_threshold)]
+
+box_data = [unsheltered, sheltered]
+plt.boxplot(box_data, labels=['Unsheltered', 'Sheltered'], showfliers=False)
+plt.xticks(fontsize=18)
+
+plt.title("Unsheltered vs Sheltered Pixels", fontsize=30)
+plt.ylabel('Enhanced Vegetation Index (EVI)', fontsize=18)
+plt.xlabel('Shelter threshold of 10% tree cover within 100m', fontsize=18, labelpad=18)
+
+
+# Add median values next to each box plot
+medians = [np.median(data) for data in box_data]
+# for i, median in enumerate(medians, start=1):  # `start=1` because boxplot positions start at 1
+#     plt.text(i, median, f'{median:.2f}', ha='center', va='bottom', fontsize=14, color='blue')
+for i, median in enumerate(medians, start=1):  # `start=1` because boxplot positions start at 1
+    plt.text(i + 0.09, median, f'{median:.2f}', ha='left', va='center', fontsize=14)
+
+
+print(f"Shelter threshold = {int(percent_tree_threshold)}% tree cover within {distance * pixel_size}m")
+print("Number of sheltered pixels: ", len(sheltered))
+print("Number of unsheltered pixels: ", len(unsheltered))
+
+filename = os.path.join(scratch_dir, f"{stub}_{productivity_variable}_boxplot_{time}.png")
+plt.savefig(filename, bbox_inches='tight')
+print(filename)
+# -
+
+# # Temporal Variation
 
 # Load weather data
 filename_ozwald = os.path.join(outdir, f"{stub}_ozwald_8day.nc")
@@ -598,10 +725,6 @@ df_daily = merge_ozwald_silo(ds_ozwald, ds_silo)
 df_weekly = resample_weekly(df_daily)
 
 # Merge shelter benefits
-df_benefits = pd.DataFrame(benefits)
-df_benefits['date'] = df_benefits['time'].dt.date
-df_benefits = df_benefits.set_index('date')
-df_benefits.index = pd.to_datetime(df_benefits.index)
 df_merged = pd.merge_asof(df_weekly, df_benefits, left_index=True, right_index=True, direction='nearest')
 
 # +
@@ -663,13 +786,8 @@ print("Saved", filename_combined)
 
 # # Spatial Variation
 
-df_top10 = df_benefits.nlargest(10, 'r2')
-df_top10[['r2', 'slope', 'percentage_benefit', 'sample_size']]
-
 # +
 # Visualise the spatial variation in EVI
-time = df_top10.index[0].date()
-
 ds_productivity = ds.sel(time=time, method='nearest')[productivity_variable]
 ds_masked = ds_productivity.where(~adjacent_mask)
 
@@ -687,6 +805,14 @@ q3 = np.percentile(y_values_outliers, 75)
 iqr = q3 - q1
 lower_bound = q1 - 1.5 * iqr
 upper_bound = q3 + 1.5 * iqr
+
+# lower_bound = 0
+# upper_bound = max(np.percentile(y_values_outliers, 99.9), 1)
+
+lower_bound = np.percentile(y_values_outliers, 1)
+upper_bound = np.percentile(y_values_outliers, 99)
+print(lower_bound, upper_bound)
+
 y_values = y_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]    
 x = s.flatten()
 x_values_outliers = x[~np.isnan(y)]
@@ -730,8 +856,8 @@ ridges = catchment_ridges(grid, fdir, acc, full_branches)
 slope = calculate_slope(filename)
 show_ridge_gullies(dem, ridges, gullies, scratch_dir, stub)
 
+
 # +
-ds_timepoint = ds.sel(time=time, method='nearest')
 
 def normalize(arr):
     return (arr - arr.min()) / (arr.max() - arr.min())
@@ -778,13 +904,8 @@ with open(filename, 'rb') as file:
 
 query
 
-# !pip install contextily
-
 # +
-import matplotlib.pyplot as plt
-import geopandas as gpd
-from shapely.geometry import box
-import contextily as ctx
+
 
 # Coordinates of the bounding box (your image region)
 image_bbox = {
