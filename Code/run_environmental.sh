@@ -1,12 +1,13 @@
 #!/bin/bash
 #PBS -N Environmental
 #PBS -q copyq
-#PBS -l mem=128GB
-#PBS -l jobfs=24GB
+#PBS -l mem=32GB
 #PBS -l ncpus=1
 #PBS -P xe2
-#PBS -l walltime=04:00:00
+#PBS -l walltime=00:30:00
 #PBS -l storage=gdata/xe2+gdata/ub8
+#PBS -l jobfs=24GB
+
 
 # Notes:
 # 'copyq' queue required for internet access
@@ -32,6 +33,7 @@ cd $wd
 echo "Working directory: $wd"
 
 # Run script:
+# Actually don't need the lat, lon, buffer, start_time, or end_time. Just there for easier copy pasting
 python Code/04_environmental.py --stub $stub --outdir $dir --tmpdir $tmpdir --lat $lat --lon $lon --buffer $buffer --start_time $start_time --end_time $end_time
 
 

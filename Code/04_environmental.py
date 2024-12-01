@@ -23,12 +23,12 @@ os.chdir(paddockTS_dir)
 sys.path.append(paddockTS_dir)
 
 from DAESIM_preprocess.terrain_tiles import terrain_tiles
-from DAESIM_preprocess.slga_soils import slga_soils, asris_urls
-from DAESIM_preprocess.ozwald_yearly import ozwald_yearly_average
+# from DAESIM_preprocess.slga_soils import slga_soils, asris_urls
+# from DAESIM_preprocess.ozwald_yearly import ozwald_yearly_average
 from DAESIM_preprocess.ozwald_8day import ozwald_8day, ozwald_8day_abbreviations
-from DAESIM_preprocess.ozwald_daily import ozwald_daily, ozwald_daily_abbreviations
+# from DAESIM_preprocess.ozwald_daily import ozwald_daily, ozwald_daily_abbreviations
 from DAESIM_preprocess.silo_daily import silo_daily
-from DAESIM_preprocess.canopy_height import canopy_height
+# from DAESIM_preprocess.canopy_height import canopy_height
 
 
 # Adjust logging configuration for the script
@@ -65,8 +65,9 @@ def main(args):
 
     terrain_tiles(lat, lon, buffer, outdir, stub, tmpdir)
 
-    variables = ['Clay', 'Sand', 'Silt', 'pH_CaCl2']
-    slga_soils(variables, lat, lon, buffer, outdir, stub)
+    # Not needed for my shelterbelts script right now
+    # variables = ['Clay', 'Sand', 'Silt', 'pH_CaCl2']
+    # slga_soils(variables, lat, lon, buffer, outdir, stub)
 
     # NCI Thredds not working via PBS for some reason. Have to rewrite these two functions to access the directories directly like with ozwald_8day below.
     # ozwald_yearly_average(["Tmax", "Tmin", "Pg"], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir)
@@ -78,7 +79,7 @@ def main(args):
     variables = ["daily_rain", "max_temp", "min_temp", "et_morton_actual", "et_morton_potential"]
     ds_silo_daily = silo_daily(variables, lat, lon, buffer, start_year, end_year, outdir, stub)
 
-    canopy_height(lat, lon, buffer, outdir, stub, tmpdir)
+    # canopy_height(lat, lon, buffer, outdir, stub, tmpdir)
 
 if __name__ == "__main__":
     args = parse_arguments()
