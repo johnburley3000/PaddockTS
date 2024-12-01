@@ -1,12 +1,12 @@
 #!/bin/bash
-#PBS -N Environmental
+#PBS -N S_Environmental
 #PBS -q copyq
 #PBS -l mem=32GB
 #PBS -l ncpus=1
 #PBS -P xe2
 #PBS -l walltime=00:30:00
 #PBS -l storage=gdata/xe2+gdata/ub8
-#PBS -l jobfs=24GB
+#PBS -l jobfs=0GB
 
 
 # Notes:

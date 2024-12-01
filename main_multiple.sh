@@ -20,7 +20,7 @@ lat_start=-34.8
 lat_end=-33.8
 
 # Spacing
-spacing=0.6
+spacing=2
 
 # Remove existing file if it exists
 if [[ -f $coordinates_file ]]; then
@@ -41,30 +41,27 @@ echo "Coordinates saved to $coordinates_file"
 while IFS=, read -r lon lat; do
     lon=$(echo $lon | xargs)
     lat=$(echo $lat | xargs)
-    stub="$(printf "%.1f_%.1f" $lat $lon | tr '.' '_')"
+    stub="$(printf "%.1f_%.1f" $lat $lon | sed 's/-//' | tr '.' '_')"
+    # echo $stub
     
     ## Run first job
     job_id1=$(qsub -v wd=$wd,stub=$stub,dir=$dir,lat=$lat,lon=$lon,buffer=$buffer,start_time=$start,end_time=$end_ Code/run_sentinel.sh)
     echo "First job submitted with ID $job_id1"
 
-    # Run second job
-    job_id2=$(qsub -v wd=$wd,stub=$stub,dir=$dir,tmpdir=$tmpdir,lat=$lat,lon=$lon,buffer=$buffer,start_time=$start,end_time=$end_ Code/run_shelter.sh)
+    # # Run second job
+    job_id2=$(qsub -v wd=$wd,stub=$stub,dir=$dir,tmpdir=$tmpdir,lat=$lat,lon=$lon,buffer=$buffer,start_time=$start,end_time=$end_ Code/run_environmental.sh)
     echo "Second job submitted with ID $job_id2"
 
-    ## Run third job (dependent on first and second)
-    if [[ -z "$job_id1" || -z "$job_id2" ]]
-    then
+    # Run third job (dependent on first and second)
+    if [[ -z "$job_id1" || -z "$job_id2" ]]; then
         echo "Failed to submit the first or second job."
         exit 1
     else
-        echo "Submitting third job, dependent on the completion of the first two."
-        job_id3 = qsub -W depend=afterok:$job_id1 -v wd=$wd,stub=$stub,dir=$dir,min_area_ha=$min_area_ha,max_area_ha=$max_area_ha,max_perim_area_ratio=$max_perim_area_ratio Code/run_shelter.sh
+        # Specify dependency on both jobs
+        job_id3=$(qsub -W depend=afterok:$job_id1:$job_id2 \
+            -v wd=$wd,stub=$stub,dir=$dir,tmpdir=$tmpdir,lat=$lat,lon=$lon,buffer=$buffer,start_time=$start,end_time=$end_ \
+            Code/run_shelter.sh)
         echo "Third job submitted with ID $job_id3"
     fi
 
 done < "$coordinates_file"
-
-
-
-
-

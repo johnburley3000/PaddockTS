@@ -1,12 +1,12 @@
 #!/bin/bash
 #PBS -N Shelter
-#PBS -q normal
-#PBS -l mem=128GB
+#PBS -q copyq
+#PBS -l mem=64GB
 #PBS -l jobfs=0GB
-#PBS -l ncpus=12
+#PBS -l ncpus=1
 #PBS -P xe2
-#PBS -l walltime=01:00:00
-#PBS -l storage=gdata/xe2+gdata/ub8
+#PBS -l walltime=00:30:00
+#PBS -l storage=gdata/xe2
 
 # Print out input variables to the error log
 echo "Running shelter script with the following variables:"

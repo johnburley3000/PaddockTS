@@ -1,10 +1,10 @@
 #!/bin/bash
 #PBS -N Sentinel
-#PBS -l mem=186GB
+#PBS -l mem=96GB
 #PBS -l ncpus=24
 #PBS -l jobfs=24GB
 #PBS -P xe2
-#PBS -l walltime=10:00:00
+#PBS -l walltime=01:00:00
 #PBS -l storage=gdata/xe2+gdata/v10+gdata/ka08
 #PBS -q normal
 
@@ -35,5 +35,5 @@ module load dea/20231204
 python3 Code/00_sentinel.py --stub $stub --outdir $dir --lat $lat --lon $lon --buffer $buffer --start_time $start_time --end_time $end_time
 
 # Example usage:
-# qsub -v stub=test1,dir=/g/data/xe2/John/Data/PadSeg/,lat=-34.3890,lon=148.4695,buffer=0.01,start_time='2020-01-01',end_time='2020-03-31' Code/run_pre-seg.sh
+# python Code/05_shelter.py --stub 34_8_148_0 --outdir /g/data/xe2/cb8590/Data/shelter/ --tmpdir /scratch/xe2/cb8590/shelter --lat -35.273807 --lon 148.272152 --buffer 0.05 --start_time '2017-01-01' --end_time '2024-12-31'
 
