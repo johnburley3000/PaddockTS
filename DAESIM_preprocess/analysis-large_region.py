@@ -65,20 +65,23 @@ ds['EVI'] = 2.5 * ((B8 - B4) / (B8 + 6 * B4 - 7.5 * B2 + 1))
 
 ds
 
+# +
+
+
 time = ds.time[0]
-time_string = str(time.dt.date.values)
-ds_time = ds.isel(time=0)
 
-time_string
+for time in ds.time:
+    time_string = str(time.dt.date.values)
+    ds_time = ds.isel(time=0)
 
-# Export the EVI
-filename = os.path.join(scratch_dir, f"EVI_{stub}_{time_string}.tif")
-ds_time['EVI'].rio.to_raster(filename)
-print(filename)
+    # Export the EVI
+    filename = os.path.join(scratch_dir, f"EVI_{stub}_{time_string}.tif")
+    ds_time['EVI'].rio.to_raster(filename)
+    print(filename)
 
-# Export the true colour image
-filename = os.path.join(scratch_dir, f"RGB_{stub}_{time_string}.tif")
-ds_time.attrs = {}
-rgb_stack = ds_time[['nbart_red', 'nbart_green', 'nbart_blue']]
-rgb_stack.rio.to_raster(filename)
-print(filename)
+    # Export the true colour image
+    filename = os.path.join(scratch_dir, f"RGB_{stub}_{time_string}.tif")
+    ds_time.attrs = {}
+    rgb_stack = ds_time[['nbart_red', 'nbart_green', 'nbart_blue']]
+    rgb_stack.rio.to_raster(filename)
+    print(filename)
