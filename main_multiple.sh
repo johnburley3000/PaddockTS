@@ -20,7 +20,7 @@ lat_start=-34.8
 lat_end=-33.8
 
 # Spacing
-spacing=2
+spacing=0.1
 
 # Remove existing file if it exists
 if [[ -f $coordinates_file ]]; then

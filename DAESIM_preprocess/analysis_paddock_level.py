@@ -1,10 +1,3 @@
-# +
-# Aim of this notebook is to combine all the datasources into a single xarray
-
-# +
-# # !pip install contextily
-
-# +
 # Standard library
 import os
 import pickle
@@ -43,21 +36,11 @@ from DAESIM_preprocess.silo_daily import merge_ozwald_silo, resample_weekly, vis
 from DAESIM_preprocess.ozwald_daily import ozwald_daily, ozwald_daily_abbreviations
 from DAESIM_preprocess.topography import show_acc, show_aspect, show_slope, show_ridge_gullies, pysheds_accumulation, catchment_gullies, catchment_ridges, calculate_slope
 
-# -
 
-stubs = {
-    "MULL": "Mulloon",
-    "CRGM": "Craig Moritz Farm",
-    "MILG": "Milgadara",
-    "ARBO": "Arboreturm",
-    "KOWN": "Kowen Forest",
-    "ADAM": "Canowindra",
-    "LCHV": "Lachlan Valley"
-}
-
-# Filepaths
-outdir = os.path.join(gdata_dir, "Data/PadSeg/")
 stub = "MILG"
+outdir = os.path.join(gdata_dir, "Data", "PadSeg")
+tmpdir = scratch_dir
+
 
 # %%time
 # Sentinel imagery
@@ -141,7 +124,7 @@ for i in range(len(distances) - 1):
 
     layer_name = f"percent_trees_{pixel_size * min_distance}m-{pixel_size * max_distance}m"
     ds[layer_name] = shelter_score_da
-    print(f"Added layer: {layer_name}")
+
 # +
 # Enhanced Vegetation Index
 B8 = ds['nbart_nir_1']
@@ -201,18 +184,18 @@ for i, time in enumerate(ds.time.values):
     }
     benefits.append(benefit)
 
-len(benefits)
+# -
 
 df_benefits = pd.DataFrame(benefits)
 df_benefits['date'] = df_benefits['time'].dt.date
 df_benefits = df_benefits.set_index('date')
 df_benefits.index = pd.to_datetime(df_benefits.index)
 df_top10 = df_benefits.nlargest(10, 'r2')
-df_top10
 
 # # Max r2 timepoint
 
-time = df_top10.index[0].date()
+# time = df_top10.index[0].date()
+time = '2020-01-08'
 ds_timepoint = ds.sel(time=time, method='nearest')
 
 # +
@@ -240,15 +223,11 @@ x_values = x_values_outliers[(y_values_outliers > lower_bound) & (y_values_outli
 percent_tree_threshold = 10
 sheltered = y_values[np.where(x_values >= percent_tree_threshold)]
 unsheltered = y_values[np.where(x_values < percent_tree_threshold)]
-# -
-from matplotlib.ticker import FormatStrFormatter
-
-
 # +
 fig, axes = plt.subplots(2, 1, figsize=(14, 16)) 
-title_size = 30
-label_size = 26
-annotations_size = label_size
+title_size = 22
+label_size = 18
+annotations_size = 14
 
 # Plot 1: 2D histogram 
 ax1 = axes[0]
@@ -258,12 +237,10 @@ hist = ax1.hist2d(
     norm=mcolors.LogNorm(),
     cmap='viridis',
 )
-ax1.set_title(f"Vegetation Index vs Shelter Score on {time}", fontsize=title_size)
+ax1.set_title(f"Productivity Index vs Shelter Score at {time}", fontsize=title_size)
 ax1.set_xlabel(f"Tree cover within {max_distance * pixel_size}m (%)", fontsize=label_size)
-ax1.set_ylabel(f'{productivity_variable}', fontsize=label_size)
+ax1.set_ylabel(f'Enhanced Vegetation Index ({productivity_variable})', fontsize=label_size)
 ax1.tick_params(axis='both', labelsize=annotations_size)
-ax1.yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
-
 
 cbar = plt.colorbar(hist[3], ax=ax1)  # hb[3] contains the QuadMesh, which is used for colorbar
 cbar.set_label(f"Number of pixels", fontsize=label_size)
@@ -274,7 +251,7 @@ res = stats.linregress(x_values, y_values)
 x_fit = np.linspace(min(x_values), max(x_values), 500)
 y_fit = res.intercept + res.slope * x_fit
 ax1.plot(x_fit, y_fit, 'r-', label=f"$R^2$ = {res.rvalue**2:.2f}")
-ax1.legend(fontsize=label_size)
+ax1.legend(fontsize=14)
 
 # Add vertical black dotted line at the tree cover threshold
 ax1.axvline(
@@ -291,7 +268,7 @@ ax2 = axes[1]
 box_data = [unsheltered, sheltered]
 im = ax2.boxplot(box_data, labels=['Unsheltered', 'Sheltered'], showfliers=False)
 ax2.set_title(f'Shelter threshold of {percent_tree_threshold}% tree cover within {max_distance * pixel_size}m', fontsize=title_size)
-ax2.set_ylabel('EVI', fontsize=label_size)
+ax2.set_ylabel('Enhanced Vegetation Index (EVI)', fontsize=label_size)
 ax2.tick_params(axis='both', labelsize=annotations_size)
 
 # Add medians and sample size next to each box plot
@@ -311,12 +288,12 @@ y_max = max(placement_unsheltered, placement_sheltered) + 0.1 * max(placement_un
 ax2.set_ylim(None, y_max)
 
 # Explanatory text for calculating percentage benefit
-# shelter_vs_unsheltered = (np.median(sheltered) - np.median(unsheltered)) / np.median(unsheltered) * 100
-# ax2.text(
-#     0.53, y_max - 0.02,  # Position text in top left
-#     f'    Sheltered vs unsheltered \n = ({medians[1]:.2f} - {medians[0]:.2f})/{medians[0]:.2f} = {shelter_vs_unsheltered:.2f}%',
-#     fontsize=annotations_size, ha='left', va='top'
-# )
+shelter_vs_unsheltered = (np.median(sheltered) - np.median(unsheltered)) / np.median(unsheltered) * 100
+ax2.text(
+    0.53, y_max - 0.02,  # Position text in top left
+    f'Sheltered vs unsheltered (%) = ({medians[1]:.2f} - {medians[0]:.2f})/{medians[0]:.2f} = {shelter_vs_unsheltered:.2f}%',
+    fontsize=annotations_size, ha='left', va='top'
+)
 
 # Create a dummy white colorbar to align the plots nicely
 white_cmap = LinearSegmentedColormap.from_list("white_cmap", ["white", "white"])
@@ -328,85 +305,15 @@ cbar.set_label('')
 cbar.outline.set_visible(False)
 
 # Save the plots
-plt.tight_layout()
-plt.subplots_adjust(hspace=0.3) 
+fig.tight_layout()
+plt.subplots_adjust(hspace=0.2) 
 
 filename = os.path.join(scratch_dir, f"{stub}_hist_and_boxplot.png")
 plt.savefig(filename)
-plt.show()
 print("Saved", filename)
 
 
 # -
-
-
-# +
-
-plt.figure(figsize=(8, 8))  # Width = 12, Height = 8
-fig, axes = plt.subplots(1, 1, figsize=(8, 8)) 
-
-title_size = 30
-label_size = 26
-
-box_data = [unsheltered, sheltered]
-plt.boxplot(box_data, labels=['Unsheltered', 'Sheltered'], showfliers=False, widths=0.15)
-plt.xticks(fontsize=label_size)
-plt.yticks(fontsize=label_size)
-
-# plt.title("Threshold of 10% Tree Cover", fontsize=title_size)
-# plt.ylabel('EVI', fontsize=label_size)
-
-# Add median values next to each box plot
-medians = [np.median(data) for data in box_data]
-for i, median in enumerate(medians, start=1):  # `start=1` because boxplot positions start at 1
-    plt.text(i + 0.09, median, f'{median:.2f}', ha='left', va='center', fontsize=label_size)
-
-
-print(f"Shelter threshold = {int(percent_tree_threshold)}% tree cover within {distance * pixel_size}m")
-print("Number of sheltered pixels: ", len(sheltered))
-print("Number of unsheltered pixels: ", len(unsheltered))
-
-filename = os.path.join(scratch_dir, f"{stub}_{productivity_variable}_boxplot_{time}.png")
-plt.savefig(filename, bbox_inches='tight')
-print(filename)
-
-# +
-
-# Plot 2: Box plot
-ax2 = axes[1]
-box_data = [unsheltered, sheltered]
-im = ax2.boxplot(box_data, labels=['Unsheltered', 'Sheltered'], showfliers=False)
-ax2.set_title(f'Shelter threshold of {percent_tree_threshold}% tree cover within {max_distance * pixel_size}m', fontsize=title_size)
-ax2.set_ylabel('EVI', fontsize=label_size)
-ax2.tick_params(axis='both', labelsize=annotations_size)
-
-# Add medians and sample size next to each box plot
-medians = [np.median(data) for data in box_data]
-number_of_pixels = [len(unsheltered), len(sheltered)]  
-
-placement_unsheltered = np.percentile(unsheltered, 75) + (1.5 * (np.percentile(unsheltered, 75) - np.percentile(unsheltered, 25)))
-placement_sheltered = np.percentile(sheltered, 75) + (1.5 * (np.percentile(sheltered, 75) - np.percentile(sheltered, 25)))
-n_placements = [placement_unsheltered, placement_sheltered]
-
-for i, median in enumerate(medians):
-    ax2.text(i + 1 + 0.09, median, f'{median:.2f}', ha='left', va='center', fontsize=label_size)
-    ax2.text(i + 1 - 0.09, n_placements[i] + 0.015, f'n={number_of_pixels[i]}', ha='left', va='center', fontsize=label_size)
-
-# Add some space above the sample size text
-y_max = max(placement_unsheltered, placement_sheltered) + 0.1 * max(placement_unsheltered, placement_sheltered)
-ax2.set_ylim(None, y_max)
-
-plt.tight_layout()
-plt.subplots_adjust(hspace=0.3) 
-
-filename = os.path.join(scratch_dir, f"{stub}_hist_and_boxplot.png")
-plt.savefig(filename)
-plt.show()
-print("Saved", filename)
-# -
-
-
-
 # # Temporal Variation
 
 # Load weather data
@@ -424,7 +331,7 @@ df = df_merged
 # +
 fig, axes = plt.subplots(2, 1, figsize=(50, 30))  # Create two vertically stacked subplots
 title_fontsize = 70
-tick_size = 42
+tick_size = 30
 
 # Visualise the shelter benefits
 ax = axes[0]
@@ -457,21 +364,18 @@ ax.tick_params(axis='both', labelsize=tick_size)
 
 # Visualise the weather data
 ax = axes[1]
-ax.set_title(f"Environmental Variables", fontsize=title_fontsize)
-
-EVI_scale_factor = 100
-
-rainfall_plot = ax.bar(df.index, df['Rainfall']/EVI_scale_factor, color='skyblue', width=5, label=r'Weekly Rainfall (mm $\times 10^2$)')
-ax.bar(df.index, df['Potential Evapotranspiration']/EVI_scale_factor, color='orange', label=r"Potential Evapotranspiration (mm $\times 10^2$)")
-# ax.plot(df.index, df['Minimum Soil Moisture'], color='blue', label="Soil moisture (mm)")
-ax.plot(df.index, df["q1"], color='grey')
-ax.plot(df.index, df["q3"], color='grey')
+rainfall_plot = ax.bar(df.index, df['Rainfall'], color='skyblue', width=5, label='Weekly rainfall (mm)')
+ax.bar(df.index, df['Potential Evapotranspiration'], color='orange', label="Potential evapotranspiration (mm)")
+# ax.plot(df.index, df['Minimum Soil Moisture'], color='blue', label="Minimum soil moisture (mm)")
+ax.plot(df.index, df["q1"] * 100, color='grey')
+ax.plot(df.index, df["q3"] * 100, color='grey')
 
 # Plot the interquartile range
-q1 = df["q1"] 
-q3 = df["q3"]
-ax.fill_between(df.index, q1, q3, color='green', alpha=opacity, label="Enhanced Vegetation Index (IQR)")
+q1 = df["q1"] * 100 
+q3 = df["q3"] * 100
+ax.fill_between(df.index, q1, q3, color='green', alpha=opacity, label="Productivity IQR (EVI x100)")
 
+ax.set_title(f"Overall Productivity", fontsize=title_fontsize)
 ax.legend(fontsize=tick_size, loc='upper left')
 ax.tick_params(axis='both', labelsize=tick_size)
 
@@ -480,9 +384,8 @@ plt.tight_layout()
 plt.subplots_adjust(hspace=0.2)
 
 # Save as a single image
-filename_combined = os.path.join(scratch_dir, f"{stub}_shelter_weather.png")
+filename_combined = os.path.join(scratch_dir, f"{stub}_time_series.png")
 plt.savefig(filename_combined)
-plt.show()
 print("Saved", filename_combined)
 # -
 
@@ -504,10 +407,6 @@ lon_diff_deg = query['x'][1] - query['x'][0]
 latitude_rad = math.radians(latitude_deg)
 lat_distance_km = lat_diff_deg * (math.pi * earth_radius_km / 180)
 lon_distance_km = lon_diff_deg * (math.cos(latitude_rad) * (math.pi * earth_radius_km / 180))
-
-# Conversion to aspect for matplotlib plotting
-lon_distance_km, lat_distance_km
-# -
 
 # Load and calculate topography layers
 filename = os.path.join(outdir, f"{stub}_terrain.tif")
@@ -550,9 +449,6 @@ ds = add_numpy_band(ds, "gullies", gullies.astype(int), grid.affine, Resampling.
 dem = ds['terrain']
 ridges = ds['ridges']
 gullies = ds['gullies']
-# -
-
-time = "2020-01-08"
 
 # +
 # Calculate the productivity and shelter scores
@@ -620,7 +516,7 @@ im = ds_masked.plot(
     vmax=median_value + (upper_bound - lower_bound) / 2,
     ax=ax
 )
-ax.set_title(f'Static View of the Productivy Proxy on {time}', fontsize=title_size)
+ax.set_title(f'Productivity on {time}', fontsize=title_size)
 ax.set_xlabel('')
 ax.set_ylabel('')
 ax.set_xticks([])
@@ -638,10 +534,10 @@ im = ax.imshow(dem, cmap='terrain', zorder=1, interpolation='bilinear')
 cbar = plt.colorbar(im, ax=ax, label='Elevation (m)')
 cbar.set_label('Elevation (m)', fontsize=label_size)
 cbar.ax.tick_params(labelsize=annotations_size)
-ax.contour(ridges, levels=[0.5], colors='red', linewidths=1.5, zorder=2)
-ax.contour(gullies, levels=[0.5], colors='blue', linewidths=1.5, zorder=3)
+# ax.contour(ridges, levels=[0.5], colors='red', linewidths=1.5, zorder=2)
+# ax.contour(gullies, levels=[0.5], colors='blue', linewidths=1.5, zorder=3)
 ax.contour(dem, colors='black', linewidths=0.5, zorder=4, alpha=0.5)
-ax.set_title('Ridges and Gullies', fontsize=title_size)
+ax.set_title('Topography', fontsize=title_size)
 ax.set_xlabel('')
 ax.set_ylabel('')
 ax.set_xticks([])
@@ -703,43 +599,11 @@ cbar.outline.set_visible(False)
 
 # Adjust layout and save
 plt.tight_layout()
-filename = os.path.join(scratch_dir, f"{stub}_spatial_variation.png")
+filename = os.path.join(scratch_dir, f"{stub}_maps.png")
 plt.savefig(filename)
-plt.show()
 print("Saved:", filename)
-
-# +
-# Set up 2x2 subplots
-fig, axes = plt.subplots(2, 2, figsize=(16, 16))
-title_size = 18
-label_size = 18
-annotations_size = 14
-
-white_cmap = LinearSegmentedColormap.from_list("white_cmap", ["white", "white"])
-norm = Normalize(vmin=0, vmax=1)
-sm = ScalarMappable(norm=norm, cmap=white_cmap)
-
-# Plot 1: Productivity Map
-ax = axes[0, 0]
-cmap = plt.cm.coolwarm
-cmap.set_bad(color='green')  # Set NaN pixels to green
-im = ds_masked.plot(
-    cmap=cmap,
-    vmin=median_value - (upper_bound - lower_bound) / 2,
-    vmax=median_value + (upper_bound - lower_bound) / 2,
-    ax=ax
-)
-ax.set_title(f'Static View of the Productivy Proxy on {time}', fontsize=title_size)
-ax.set_xlabel('')
-ax.set_ylabel('')
-ax.set_xticks([])
-ax.set_yticks([])
-xlim, ylim = ax.get_xlim(), ax.get_ylim()
-lat_lon_ratio = (ylim[1] - ylim[0]) / (xlim[1] - xlim[0])
-ax.set_aspect(lat_lon_ratio)
-cbar = ax.collections[0].colorbar
-cbar.set_label(f"Enhanced Vegetation Index ({productivity_variable})", fontsize=label_size)
-cbar.ax.tick_params(labelsize=annotations_size)
 # -
+
+
 
 
