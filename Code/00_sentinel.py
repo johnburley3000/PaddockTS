@@ -82,10 +82,6 @@ def load_and_process_data(dc, query):
         measurements=['nbart_red', 'nbart_green', 'nbart_blue', 'nbart_nir_1'],
         **query
     )
-    ds = calculate_indices(ds, 
-                           #index=['NDVI', 'kNDVI', 'EVI', 'LAI', 'SAVI', 'MSAVI', 'NDMI', 'NDWI', 'MNDWI', 'NBR', 'NDCI', 'NDTI', 'BSI'],
-			   index=['EVI'],
-                           collection='ga_s2_3')
     return ds
     
 
