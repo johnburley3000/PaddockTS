@@ -177,7 +177,13 @@ def canopy_height(lat=-34.3890427, lon=148.469499, buffer=0.005, outdir=scratch_
 
 # %%time
 if __name__ == '__main__':
-    # canopy_height()
-    visualise_canopy_height("/g/data/xe2/cb8590/Data/PadSeg/MILG_canopy_height.tif")
+
+    outdir = '/g/data/xe2/cb8590/Data/shelter/'
+    stub = '34_0_148_5'
+    lat = -34.0
+    lon = 148.5
+    buffer = 0.05
+    canopy_height(lat, lon, buffer, outdir, stub)
+    # visualise_canopy_height("/g/data/xe2/cb8590/Data/PadSeg/MILG_canopy_height.tif")
 
 

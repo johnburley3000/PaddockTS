@@ -55,9 +55,14 @@ stubs = {
     "LCHV": "Lachlan Valley"
 }
 
+# +
 # Filepaths
-outdir = os.path.join(gdata_dir, "Data/PadSeg/")
-stub = "MILG"
+# outdir = os.path.join(gdata_dir, "Data/PadSeg/")
+# stub = "MILG"
+
+outdir = '/g/data/xe2/cb8590/Data/shelter/'
+stub = '34_0_148_5'
+# -
 
 # %%time
 # Load the sentinel imagery xarray 
@@ -72,7 +77,6 @@ filename = os.path.join(outdir, f"{stub}_{variable}.tif")
 array = rxr.open_rasterio(filename)
 binary_mask = (array >= 1).astype(float)
 ds['tree_percent'] = binary_mask.rio.reproject_match(ds, resampling=Resampling.average)
-tree_percent = ds['tree_percent'].values[0]
 
 # +
 # %%time
@@ -112,6 +116,7 @@ ds = ds.isel(
 distances = 0, 30
 
 # Global canopy height tree_mask
+tree_percent = ds['tree_percent'].values[0]
 tree_mask = tree_percent > 0
 
 distance = 6
@@ -213,6 +218,7 @@ for i, time in enumerate(ds.time.values):
 
 len(benefits)
 
+# +
 df_benefits = pd.DataFrame(benefits)
 df_benefits['date'] = df_benefits['time'].dt.date
 df_benefits = df_benefits.set_index('date')
@@ -417,7 +423,7 @@ plt.tight_layout()
 plt.subplots_adjust(hspace=0.2)
 
 # Save as a single image
-filename_combined = os.path.join(scratch_dir, f"{stub}_shelter_weather.png")
+filename_combined = os.path.join(scratch_dir, f"{stub}_time_series.png")
 plt.savefig(filename_combined)
 plt.show()
 print("Saved", filename_combined)
@@ -487,9 +493,6 @@ ds = add_numpy_band(ds, "gullies", gullies.astype(int), grid.affine, Resampling.
 dem = ds['terrain']
 ridges = ds['ridges']
 gullies = ds['gullies']
-# -
-
-time = "2020-01-08"
 
 # +
 # Calculate the productivity and shelter scores
@@ -570,7 +573,7 @@ cbar.set_label(f"Enhanced Vegetation Index ({productivity_variable})", fontsize=
 cbar.ax.tick_params(labelsize=annotations_size)
 
 # Plot 2: Topography Map
-ax = axes[0, 1]
+ax = axes[1, 1]
 im = ax.imshow(dem, cmap='terrain', zorder=1, interpolation='bilinear')
 cbar = plt.colorbar(im, ax=ax, label='Elevation (m)')
 cbar.set_label('Elevation (m)', fontsize=label_size)
@@ -602,7 +605,7 @@ ax.set_aspect(lat_lon_ratio)
 # cbar.outline.set_visible(False)
 
 # Plot 4: True Colour Image
-ax = axes[1, 0]
+ax = axes[0, 1]
 def normalize(arr):
     return (arr - arr.min()) / (arr.max() - arr.min())
 red = ds_timepoint['nbart_red']
@@ -645,6 +648,8 @@ plt.savefig(filename)
 plt.show()
 print("Saved:", filename)
 # -
+
+
 
 
 
