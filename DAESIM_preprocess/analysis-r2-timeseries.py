@@ -33,7 +33,7 @@ from matplotlib.colors import LinearSegmentedColormap, Normalize
 from matplotlib.cm import ScalarMappable
 from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
 import seaborn as sns
-import contextily as ctx
+# import contextily as ctx
 
 # Local imports
 os.chdir(os.path.join(os.path.expanduser('~'), "Projects/PaddockTS"))
@@ -60,11 +60,25 @@ outdir = os.path.join(gdata_dir, "Data/PadSeg/")
 stub = "MILG"
 
 # %%time
-# Sentinel imagery
+# Load the sentinel imagery xarray 
 filename = os.path.join(outdir, f"{stub}_ds2.pkl")
 with open(filename, 'rb') as file:
     ds = pickle.load(file)
 
+# %%time
+# Calculate the percentage of tree cover in each sentinel pixel, based on the global canopy height map
+variable = "canopy_height"
+filename = os.path.join(outdir, f"{stub}_{variable}.tif")
+array = rxr.open_rasterio(filename)
+binary_mask = (array >= 1).astype(float)
+ds['tree_percent'] = binary_mask.rio.reproject_match(ds, resampling=Resampling.average)
+tree_percent = ds['tree_percent'].values[0]
+
+ds['tree_percent'].values[0]
+
+# +
+# %%time
+# Add worldcover classes to the xarray
 world_cover_layers = {
     "Tree cover": 10, # Green
     "Shrubland": 20, # Orange
@@ -74,15 +88,6 @@ world_cover_layers = {
     "Permanent water bodies": 80, # blue
 }
 
-# The resampling often messes up the boundary, so we trim the outside pixels after adding all the resampled bounds
-ds = ds.isel(
-    y=slice(1, -1),
-    x=slice(1, -1) 
-)
-
-# +
-# %%time
-# Add worldcover classes to the xarray
 worldcover_path = os.path.join("/g/data/xe2/cb8590/WORLDCOVER/ESA_WORLDCOVER_10M_2021_V200/MAP/")
 MILG_id = "S36E147"
 filename = os.path.join(worldcover_path, f"ESA_WorldCover_10m_2021_v200_{MILG_id}_Map", f"ESA_WorldCover_10m_2021_v200_{MILG_id}_Map.tif")
@@ -95,6 +100,15 @@ grassland = ds["worldcover"].values == world_cover_layers["Grassland"]
 tree_cover = ds["worldcover"].values == world_cover_layers["Tree cover"]
 
 crop_or_grass = cropland | grassland
+# -
+
+# The resampling often messes up the boundary, so we trim the outside pixels after adding all the resampled bounds
+ds = ds.isel(
+    y=slice(1, -1),
+    x=slice(1, -1) 
+)
+
+tree_percent
 
 # +
 # %%time
@@ -102,8 +116,8 @@ crop_or_grass = cropland | grassland
 distances = 0, 30
 
 # Use the sentinel tree cover instead of global canopy height model
-tree_mask = tree_cover
-tree_percent = tree_cover
+tree_mask = tree_percent
+tree_percent = tree_percent.values[0]
 
 distance = 6
 min_distance = 4
@@ -113,6 +127,8 @@ pixel_size = 10  # metres
 # Find all the pixels directly adjacent to trees
 structuring_element = np.ones((3, 3))  # This defines adjacency (including diagonals)
 adjacent_mask = scipy.ndimage.binary_dilation(tree_mask, structure=structuring_element)
+
+# -
 
 for i in range(len(distances) - 1):
 
@@ -335,9 +351,6 @@ filename = os.path.join(scratch_dir, f"{stub}_hist_and_boxplot.png")
 plt.savefig(filename)
 plt.show()
 print("Saved", filename)
-
-
-# -
 
 
 # +
