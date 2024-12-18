@@ -27,7 +27,7 @@ from scipy.signal import fftconvolve
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import matplotlib.patches as mpatches
-from matplotlib.ticker import MaxNLocator
+from matplotlib.ticker import MaxNLocator, FormatStrFormatter
 from matplotlib.font_manager import FontProperties
 from matplotlib.colors import LinearSegmentedColormap, Normalize
 from matplotlib.cm import ScalarMappable
@@ -74,8 +74,6 @@ binary_mask = (array >= 1).astype(float)
 ds['tree_percent'] = binary_mask.rio.reproject_match(ds, resampling=Resampling.average)
 tree_percent = ds['tree_percent'].values[0]
 
-ds['tree_percent'].values[0]
-
 # +
 # %%time
 # Add worldcover classes to the xarray
@@ -108,16 +106,13 @@ ds = ds.isel(
     x=slice(1, -1) 
 )
 
-tree_percent
-
 # +
 # %%time
 # Shelterscore showing the number of trees within a donut at a given distance away from the crop/pasture pixel
 distances = 0, 30
 
-# Use the sentinel tree cover instead of global canopy height model
-tree_mask = tree_percent
-tree_percent = tree_percent.values[0]
+# Global canopy height tree_mask
+tree_mask = tree_percent > 0
 
 distance = 6
 min_distance = 4
@@ -127,7 +122,6 @@ pixel_size = 10  # metres
 # Find all the pixels directly adjacent to trees
 structuring_element = np.ones((3, 3))  # This defines adjacency (including diagonals)
 adjacent_mask = scipy.ndimage.binary_dilation(tree_mask, structure=structuring_element)
-
 # -
 
 for i in range(len(distances) - 1):
@@ -256,10 +250,6 @@ x_values = x_values_outliers[(y_values_outliers > lower_bound) & (y_values_outli
 percent_tree_threshold = 10
 sheltered = y_values[np.where(x_values >= percent_tree_threshold)]
 unsheltered = y_values[np.where(x_values < percent_tree_threshold)]
-# -
-from matplotlib.ticker import FormatStrFormatter
-
-
 # +
 fig, axes = plt.subplots(2, 1, figsize=(14, 16)) 
 title_size = 30
@@ -351,73 +341,7 @@ filename = os.path.join(scratch_dir, f"{stub}_hist_and_boxplot.png")
 plt.savefig(filename)
 plt.show()
 print("Saved", filename)
-
-
-# +
-
-plt.figure(figsize=(8, 8))  # Width = 12, Height = 8
-fig, axes = plt.subplots(1, 1, figsize=(8, 8)) 
-
-title_size = 30
-label_size = 26
-
-box_data = [unsheltered, sheltered]
-plt.boxplot(box_data, labels=['Unsheltered', 'Sheltered'], showfliers=False, widths=0.15)
-plt.xticks(fontsize=label_size)
-plt.yticks(fontsize=label_size)
-
-# plt.title("Threshold of 10% Tree Cover", fontsize=title_size)
-# plt.ylabel('EVI', fontsize=label_size)
-
-# Add median values next to each box plot
-medians = [np.median(data) for data in box_data]
-for i, median in enumerate(medians, start=1):  # `start=1` because boxplot positions start at 1
-    plt.text(i + 0.09, median, f'{median:.2f}', ha='left', va='center', fontsize=label_size)
-
-
-print(f"Shelter threshold = {int(percent_tree_threshold)}% tree cover within {distance * pixel_size}m")
-print("Number of sheltered pixels: ", len(sheltered))
-print("Number of unsheltered pixels: ", len(unsheltered))
-
-filename = os.path.join(scratch_dir, f"{stub}_{productivity_variable}_boxplot_{time}.png")
-plt.savefig(filename, bbox_inches='tight')
-print(filename)
-
-# +
-
-# Plot 2: Box plot
-ax2 = axes[1]
-box_data = [unsheltered, sheltered]
-im = ax2.boxplot(box_data, labels=['Unsheltered', 'Sheltered'], showfliers=False)
-ax2.set_title(f'Shelter threshold of {percent_tree_threshold}% tree cover within {max_distance * pixel_size}m', fontsize=title_size)
-ax2.set_ylabel('EVI', fontsize=label_size)
-ax2.tick_params(axis='both', labelsize=annotations_size)
-
-# Add medians and sample size next to each box plot
-medians = [np.median(data) for data in box_data]
-number_of_pixels = [len(unsheltered), len(sheltered)]  
-
-placement_unsheltered = np.percentile(unsheltered, 75) + (1.5 * (np.percentile(unsheltered, 75) - np.percentile(unsheltered, 25)))
-placement_sheltered = np.percentile(sheltered, 75) + (1.5 * (np.percentile(sheltered, 75) - np.percentile(sheltered, 25)))
-n_placements = [placement_unsheltered, placement_sheltered]
-
-for i, median in enumerate(medians):
-    ax2.text(i + 1 + 0.09, median, f'{median:.2f}', ha='left', va='center', fontsize=label_size)
-    ax2.text(i + 1 - 0.09, n_placements[i] + 0.015, f'n={number_of_pixels[i]}', ha='left', va='center', fontsize=label_size)
-
-# Add some space above the sample size text
-y_max = max(placement_unsheltered, placement_sheltered) + 0.1 * max(placement_unsheltered, placement_sheltered)
-ax2.set_ylim(None, y_max)
-
-plt.tight_layout()
-plt.subplots_adjust(hspace=0.3) 
-
-filename = os.path.join(scratch_dir, f"{stub}_hist_and_boxplot.png")
-plt.savefig(filename)
-plt.show()
-print("Saved", filename)
 # -
-
 
 
 # # Temporal Variation
@@ -662,20 +586,20 @@ ax.set_yticks([])
 ax.set_aspect(lat_lon_ratio)
 
 # Plot 3: Larger region and bounding box
-ax = axes[1, 1]
-region_gdf.boundary.plot(ax=ax, edgecolor='black', linewidth=1, label='200km Region')
-image_gdf.boundary.plot(ax=ax, edgecolor='red', linewidth=2, label='10km Bounding Box')
-ctx.add_basemap(ax, source=ctx.providers.OpenStreetMap.Mapnik, crs=image_gdf.crs)
-ax.set_xlim(region_bbox['x'][0], region_bbox['x'][1])
-ax.set_ylim(region_bbox['y'][0], region_bbox['y'][1])
-ax.legend()
-ax.set_title('Location', fontsize=title_size)
+# ax = axes[1, 1]
+# region_gdf.boundary.plot(ax=ax, edgecolor='black', linewidth=1, label='200km Region')
+# image_gdf.boundary.plot(ax=ax, edgecolor='red', linewidth=2, label='10km Bounding Box')
+# ctx.add_basemap(ax, source=ctx.providers.OpenStreetMap.Mapnik, crs=image_gdf.crs)
+# ax.set_xlim(region_bbox['x'][0], region_bbox['x'][1])
+# ax.set_ylim(region_bbox['y'][0], region_bbox['y'][1])
+# ax.legend()
+# ax.set_title('Location', fontsize=title_size)
 
 # Create a dummy white colorbar to align the plots nicely
-cbar = plt.colorbar(sm, ax=ax, orientation='vertical')
-cbar.set_ticks([])  
-cbar.set_label('')  
-cbar.outline.set_visible(False)
+# cbar = plt.colorbar(sm, ax=ax, orientation='vertical')
+# cbar.set_ticks([])  
+# cbar.set_label('')  
+# cbar.outline.set_visible(False)
 
 # Plot 4: True Colour Image
 ax = axes[1, 0]
@@ -720,39 +644,7 @@ filename = os.path.join(scratch_dir, f"{stub}_spatial_variation.png")
 plt.savefig(filename)
 plt.show()
 print("Saved:", filename)
-
-# +
-# Set up 2x2 subplots
-fig, axes = plt.subplots(2, 2, figsize=(16, 16))
-title_size = 18
-label_size = 18
-annotations_size = 14
-
-white_cmap = LinearSegmentedColormap.from_list("white_cmap", ["white", "white"])
-norm = Normalize(vmin=0, vmax=1)
-sm = ScalarMappable(norm=norm, cmap=white_cmap)
-
-# Plot 1: Productivity Map
-ax = axes[0, 0]
-cmap = plt.cm.coolwarm
-cmap.set_bad(color='green')  # Set NaN pixels to green
-im = ds_masked.plot(
-    cmap=cmap,
-    vmin=median_value - (upper_bound - lower_bound) / 2,
-    vmax=median_value + (upper_bound - lower_bound) / 2,
-    ax=ax
-)
-ax.set_title(f'Static View of the Productivy Proxy on {time}', fontsize=title_size)
-ax.set_xlabel('')
-ax.set_ylabel('')
-ax.set_xticks([])
-ax.set_yticks([])
-xlim, ylim = ax.get_xlim(), ax.get_ylim()
-lat_lon_ratio = (ylim[1] - ylim[0]) / (xlim[1] - xlim[0])
-ax.set_aspect(lat_lon_ratio)
-cbar = ax.collections[0].colorbar
-cbar.set_label(f"Enhanced Vegetation Index ({productivity_variable})", fontsize=label_size)
-cbar.ax.tick_params(labelsize=annotations_size)
 # -
+
 
 
