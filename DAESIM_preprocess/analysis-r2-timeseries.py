@@ -191,9 +191,14 @@ plt.axis('off')
 plt.show()
 print(filename)
 
-# Remove unnecessary variables from 
+# Remove unnecessary variables from ds
 useful_variables = ['nbart_red', 'nbart_green', 'nbart_blue', 'EVI', 'percent_trees_0m-300m']
 ds_small = ds.isel(band=0)[useful_variables]
+
+# Select a paddock
+paddock_id = 66
+paddock_row = pol[pol['paddock'] == 66]
+paddock_geometry = paddock_row['geometry'].iloc[0]
 
 # Create a rectangular buffer
 minx, miny, maxx, maxy = paddock_geometry.bounds
@@ -207,10 +212,23 @@ buffered_gdf = gpd.GeoDataFrame(geometry=[rectangular_buffer])
 buffered_gdf.iloc[0,0]
 
 # %%time
-buffered_mask = ds_small.rio.clip(buffered_gdf.geometry, drop=True, invert=False)
-buffered_mask.sel(time=time)['EVI'].plot()
+# Clip the xarray to this paddock
+ds_buffered = ds_small.rio.clip(buffered_gdf.geometry, drop=True, invert=False)
 
+# Visualise a panchromatic image of this paddock
+time = "2020-01-08"
+ds_timepoint = ds_buffered.sel(time=time, method='nearest')
+red = ds_timepoint['nbart_red']
+green = ds_timepoint['nbart_green']
+blue = ds_timepoint['nbart_blue']
+rgb = np.stack([normalize(red), normalize(green), normalize(blue)], axis=-1)
+bounds = ds_buffered[productivity_variable].rio.bounds()
+left, bottom, right, top = bounds
 
+fig, ax = plt.subplots(figsize=(10, 10))
+ax.imshow(rgb, extent=(left, right, bottom, top))
+paddock_row.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=1)
+plt.show()
 
 # # All Timepoints
 
