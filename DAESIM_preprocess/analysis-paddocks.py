@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 import rioxarray as rxr
+from rasterio.features import geometry_mask
 import geopandas as gpd
 from shapely.geometry import box, Polygon
 from rasterio.enums import Resampling
@@ -42,7 +43,7 @@ outdir = os.path.join(gdata_dir, "Data/PadSeg/")
 stub = "MILG"
 
 # Global variables
-tree_cover_threshold = 10
+tree_cover_threshold = 5
 pixel_size = 10  # metres
 distances = (0, 30) # pixels. So all pixels within 300m. Might be more robust to look at pixels in a donut, e.g. 50m-300m.
 min_distance = distances[0]
@@ -218,8 +219,6 @@ fig, ax = plt.subplots(figsize=(10, 10))
 ax.imshow(rgb, extent=(left, right, bottom, top))
 paddock_row.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=1)
 plt.show()
-
-
 
 # region
 # Recreate the adjacency mask for just this paddock
@@ -599,6 +598,109 @@ region_gdf = gpd.GeoDataFrame(
     {'geometry': [box(region_bbox['x'][0], region_bbox['y'][0], region_bbox['x'][1], region_bbox['y'][1])]},
     crs='EPSG:4326', 
 )
+
+
+
+# region
+
+# Create figure and axes
+fig, ax = plt.subplots(1, 1, figsize=(10, 10))
+
+# Plot 1: Productivity Map
+vmin = median_value - (upper_bound - lower_bound) / 2
+vmax = median_value + (upper_bound - lower_bound) / 2
+cmap = plt.cm.coolwarm
+cmap.set_bad(color='green')  # Set NaN pixels to green
+
+ds_trees = ds_productivity.where(~tree_mask)
+
+im = ds_trees.plot(
+    cmap=cmap,
+    vmin=vmin,
+    vmax=vmax,
+    ax=ax,
+    add_colorbar=False  # Suppress the automatic color bar
+)
+paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=1)
+
+
+ax.set_title(f'Paddock {paddock_id} on {time}', fontsize=title_size)
+ax.set_xlabel('')
+ax.set_ylabel('')
+ax.set_xticks([])
+ax.set_yticks([])
+xlim, ylim = ax.get_xlim(), ax.get_ylim()
+lat_lon_ratio = (ylim[1] - ylim[0]) / (xlim[1] - xlim[0])
+ax.set_aspect(lat_lon_ratio)
+
+# Add a color bar axis manually
+colorbar_ax = fig.add_axes([1, 0.125, 0.03, 0.75])  # [x-position, y-position, width, height]
+cbar = fig.colorbar(im, cax=colorbar_ax)
+
+# Add labels and ticks
+cbar.set_label(f"Enhanced Vegetation Index ({productivity_variable})", fontsize=label_size)
+cbar.ax.tick_params(labelsize=annotations_size)
+
+plt.tight_layout()
+plt.show()
+# endregion
+
+# region
+
+
+
+# endregion
+
+# region
+import matplotlib.patches as mpatches
+
+# Create figure and axes
+fig, ax = plt.subplots(1, 1, figsize=(10, 10))
+
+# Plot 1: Productivity Map
+vmin = median_value - (upper_bound - lower_bound) / 2
+vmax = median_value + (upper_bound - lower_bound) / 2
+cmap = plt.cm.coolwarm
+cmap.set_bad(color='green')  # Set NaN pixels to green
+
+ds_trees = ds_productivity.where(~tree_mask)
+
+im = ds_trees.plot(
+    cmap=cmap,
+    vmin=vmin,
+    vmax=vmax,
+    ax=ax,
+    add_colorbar=False  # Suppress the automatic color bar
+)
+paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
+
+ax.set_title(f'Paddock {paddock_id} on {time}', fontsize=title_size)
+ax.set_xlabel('')
+ax.set_ylabel('')
+ax.set_xticks([])
+ax.set_yticks([])
+xlim, ylim = ax.get_xlim(), ax.get_ylim()
+lat_lon_ratio = (ylim[1] - ylim[0]) / (xlim[1] - xlim[0])
+ax.set_aspect(lat_lon_ratio)
+
+# Add a color bar axis manually
+colorbar_ax = fig.add_axes([1, 0.125, 0.03, 0.75])  # [x-position, y-position, width, height]
+cbar = fig.colorbar(im, cax=colorbar_ax)
+
+# Add labels and ticks
+cbar.set_label(f"Enhanced Vegetation Index ({productivity_variable})", fontsize=label_size)
+cbar.ax.tick_params(labelsize=annotations_size)
+
+# Add legend for tree pixels
+tree_patch = mpatches.Patch(color='green', label='Tree')  # Custom legend entry
+ax.legend(handles=[tree_patch], loc='upper left', fontsize=label_size)
+
+plt.tight_layout()
+plt.show()
+
+# endregion
+
+
 
 # region
 # Set up 2x2 subplots
