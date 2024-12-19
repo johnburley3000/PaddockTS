@@ -167,19 +167,50 @@ pol['paddock'] = range(1,len(pol)+1)
 pol['paddock'] = pol.paddock.astype('category')
 # endregion
 
+# region
+# Calculate aspect ratio of this region
+earth_radius_km = 6371
+
+# Lat and lon parameters used to generate the imagery
+filename = os.path.join(outdir, f"{stub}_ds2_query.pkl")
+with open(filename, 'rb') as file:
+    query = pickle.load(file)
+latitude_deg = query['y'][0]
+lat_diff_deg = query['y'][1] - query['y'][0]
+lon_diff_deg = query['x'][1] - query['x'][0]
+
+# Conversion to km
+latitude_rad = math.radians(latitude_deg)
+lat_distance_km = lat_diff_deg * (math.pi * earth_radius_km / 180)
+lon_distance_km = lon_diff_deg * (math.cos(latitude_rad) * (math.pi * earth_radius_km / 180))
+
+lat_lon_ratio = lon_distance_km/lat_distance_km
+# lat_lon_ratio = lat_distance_km/lon_distance_km
+
+# lat_lon_ratio = 0.5
+# endregion
+
+# region
 # Generate a map of the paddocks 
 bounds = ds[productivity_variable].rio.bounds()
 left, bottom, right, top = bounds
 fig, ax = plt.subplots(figsize=(10, 10))
+
 ax.imshow(rgb, extent=(left, right, bottom, top))
+
 pol.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=1)
 for x, y, label in zip(pol.geometry.centroid.x, pol.geometry.centroid.y, pol['paddock']):
     ax.text(x, y, label, fontsize=12, ha='center', va='center', color='yellow')
+
+ax.set_aspect(lat_lon_ratio)
+
+
 filename = os.path.join(scratch_dir, stub+'_paddock_map_auto.tif')
 plt.savefig(filename, dpi=300, bbox_inches='tight')
 plt.axis('off')
 plt.show()
 print(filename)
+# endregion
 
 # Remove unnecessary variables from ds
 useful_variables = ['nbart_red', 'nbart_green', 'nbart_blue', 'EVI', 'worldcover', 'tree_percent', 'percent_trees_0m-300m']
@@ -205,20 +236,7 @@ buffered_gdf = gpd.GeoDataFrame(geometry=[rectangular_buffer])
 # Clip the xarray to this paddock
 ds_buffered = ds_small.rio.clip(buffered_gdf.geometry, drop=True, invert=False)
 
-# Visualise a panchromatic image of this paddock
-time = "2020-01-08"
-ds_timepoint = ds_buffered.sel(time=time, method='nearest')
-red = ds_timepoint['nbart_red']
-green = ds_timepoint['nbart_green']
-blue = ds_timepoint['nbart_blue']
-rgb = np.stack([normalize(red), normalize(green), normalize(blue)], axis=-1)
-bounds = ds_buffered[productivity_variable].rio.bounds()
-left, bottom, right, top = bounds
 
-fig, ax = plt.subplots(figsize=(10, 10))
-ax.imshow(rgb, extent=(left, right, bottom, top))
-paddock_row.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=1)
-plt.show()
 
 # region
 # Recreate the adjacency mask for just this paddock
@@ -496,24 +514,7 @@ print("Saved", filename_combined)
 
 # # Spatial Variation
 
-# Calculate aspect ratio of this region
-earth_radius_km = 6371
 
-# Lat and lon parameters used to generate the imagery
-filename = os.path.join(outdir, f"{stub}_ds2_query.pkl")
-with open(filename, 'rb') as file:
-    query = pickle.load(file)
-latitude_deg = query['y'][0]
-lat_diff_deg = query['y'][1] - query['y'][0]
-lon_diff_deg = query['x'][1] - query['x'][0]
-
-# Conversion to km
-latitude_rad = math.radians(latitude_deg)
-lat_distance_km = lat_diff_deg * (math.pi * earth_radius_km / 180)
-lon_distance_km = lon_diff_deg * (math.cos(latitude_rad) * (math.pi * earth_radius_km / 180))
-
-# Conversion to aspect for matplotlib plotting
-lon_distance_km, lat_distance_km
 
 # Load and calculate topography layers
 filename = os.path.join(outdir, f"{stub}_terrain.tif")
@@ -599,65 +600,13 @@ region_gdf = gpd.GeoDataFrame(
     crs='EPSG:4326', 
 )
 
-
-
 # region
-
-# Create figure and axes
+# Productivity Map
 fig, ax = plt.subplots(1, 1, figsize=(10, 10))
+title_size = 22
+label_size = 18
+annotations_size = 14
 
-# Plot 1: Productivity Map
-vmin = median_value - (upper_bound - lower_bound) / 2
-vmax = median_value + (upper_bound - lower_bound) / 2
-cmap = plt.cm.coolwarm
-cmap.set_bad(color='green')  # Set NaN pixels to green
-
-ds_trees = ds_productivity.where(~tree_mask)
-
-im = ds_trees.plot(
-    cmap=cmap,
-    vmin=vmin,
-    vmax=vmax,
-    ax=ax,
-    add_colorbar=False  # Suppress the automatic color bar
-)
-paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=1)
-
-
-ax.set_title(f'Paddock {paddock_id} on {time}', fontsize=title_size)
-ax.set_xlabel('')
-ax.set_ylabel('')
-ax.set_xticks([])
-ax.set_yticks([])
-xlim, ylim = ax.get_xlim(), ax.get_ylim()
-lat_lon_ratio = (ylim[1] - ylim[0]) / (xlim[1] - xlim[0])
-ax.set_aspect(lat_lon_ratio)
-
-# Add a color bar axis manually
-colorbar_ax = fig.add_axes([1, 0.125, 0.03, 0.75])  # [x-position, y-position, width, height]
-cbar = fig.colorbar(im, cax=colorbar_ax)
-
-# Add labels and ticks
-cbar.set_label(f"Enhanced Vegetation Index ({productivity_variable})", fontsize=label_size)
-cbar.ax.tick_params(labelsize=annotations_size)
-
-plt.tight_layout()
-plt.show()
-# endregion
-
-# region
-
-
-
-# endregion
-
-# region
-import matplotlib.patches as mpatches
-
-# Create figure and axes
-fig, ax = plt.subplots(1, 1, figsize=(10, 10))
-
-# Plot 1: Productivity Map
 vmin = median_value - (upper_bound - lower_bound) / 2
 vmax = median_value + (upper_bound - lower_bound) / 2
 cmap = plt.cm.coolwarm
@@ -698,45 +647,34 @@ ax.legend(handles=[tree_patch], loc='upper left', fontsize=label_size)
 plt.tight_layout()
 plt.show()
 
-# endregion
 
+# Visualise a panchromatic image of this paddock
+fig, ax = plt.subplots(1, 1, figsize=(10, 10))
 
+time = "2020-01-08"
+ds_timepoint = ds_buffered.sel(time=time, method='nearest')
+red = ds_timepoint['nbart_red']
+green = ds_timepoint['nbart_green']
+blue = ds_timepoint['nbart_blue']
+rgb = np.stack([normalize(red), normalize(green), normalize(blue)], axis=-1)
+bounds = ds_buffered[productivity_variable].rio.bounds()
+left, bottom, right, top = bounds
 
-# region
-# Set up 2x2 subplots
-fig, axes = plt.subplots(2, 2, figsize=(16, 16))
-title_size = 22
-label_size = 18
-annotations_size = 14
-
-# Fake colour bar for lining up images nicely
-white_cmap = LinearSegmentedColormap.from_list("white_cmap", ["white", "white"])
-norm = Normalize(vmin=0, vmax=1)
-sm = ScalarMappable(norm=norm, cmap=white_cmap)
-
-# Plot 1: Productivity Map
-vmin = median_value - (upper_bound - lower_bound) / 2
-vmax = median_value + (upper_bound - lower_bound) / 2
-ax = axes[0, 0]
-cmap = plt.cm.coolwarm
-cmap.set_bad(color='green')  # Set NaN pixels to green
-im = ds_masked.plot(
-    cmap=cmap,
-    vmin=vmin,
-    vmax=vmax,
-    ax=ax
-)
-ax.set_title(f'{time}', fontsize=title_size)
+ax.set_aspect(lat_lon_ratio)
+ax.set_title(f'Paddock {paddock_id} on {time}', fontsize=title_size)
 ax.set_xlabel('')
 ax.set_ylabel('')
 ax.set_xticks([])
 ax.set_yticks([])
-xlim, ylim = ax.get_xlim(), ax.get_ylim()
-lat_lon_ratio = (ylim[1] - ylim[0]) / (xlim[1] - xlim[0])
-ax.set_aspect(lat_lon_ratio)
-cbar = ax.collections[0].colorbar
-cbar.set_label(f"Enhanced Vegetation Index ({productivity_variable})", fontsize=label_size)
-cbar.ax.tick_params(labelsize=annotations_size)
+
+ax.imshow(rgb, extent=(left, right, bottom, top))
+paddock_row.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=5)
+plt.show()
+# endregion
+
+# region
+# Set up 2x2 subplots
+fig, axes = plt.subplots(2, 2, figsize=(10, 10))
 
 # Plot 2: WorldCover
 # Abbreviate the WorldCover names to take less space on the plot
