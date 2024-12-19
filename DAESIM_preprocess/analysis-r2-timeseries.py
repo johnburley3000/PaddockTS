@@ -43,19 +43,18 @@ from DAESIM_preprocess.silo_daily import merge_ozwald_silo, resample_weekly, vis
 from DAESIM_preprocess.ozwald_daily import ozwald_daily, ozwald_daily_abbreviations
 from DAESIM_preprocess.topography import show_acc, show_aspect, show_slope, show_ridge_gullies, pysheds_accumulation, catchment_gullies, catchment_ridges, calculate_slope
 
-stubs = {
-    "MULL": "Mulloon",
-    "CRGM": "Craig Moritz Farm",
-    "MILG": "Milgadara",
-    "ARBO": "Arboreturm",
-    "KOWN": "Kowen Forest",
-    "ADAM": "Canowindra",
-    "LCHV": "Lachlan Valley"
-}
-
+# region
 # Filepaths
 outdir = os.path.join(gdata_dir, "Data/PadSeg/")
 stub = "MILG"
+
+# Global variables
+tree_cover_threshold = 10
+pixel_size = 10  # metres
+distances = (0, 30) # pixels. So all pixels within 300m. Might be more robust to look at pixels in a donut, e.g. 50m-300m.
+min_distance = distances[0]
+max_distance = distances[1]
+# endregion
 
 # region
 # outdir = '/g/data/xe2/cb8590/Data/shelter/'
@@ -104,19 +103,12 @@ ds = ds.isel(
     x=slice(1, -1) 
 )
 
-# Shelterscore showing the number of trees within a donut at a given distance away from the crop/pasture pixel
-distances = 0, 30
-
 # Global canopy height tree_mask
 tree_percent = ds['tree_percent'].values[0]
 tree_mask = tree_percent > 0
 
 # region
-# Find all the pixels directly adjacent to trees
-distance = 6
-min_distance = 4
-max_distance = 6
-pixel_size = 10  # metres
+# Shelterscore showing the number of trees within a donut at a given distance away from the crop/pasture pixel
 structuring_element = np.ones((3, 3))  # This defines adjacency (including diagonals)
 adjacent_mask = scipy.ndimage.binary_dilation(tree_mask, structure=structuring_element)
 
@@ -167,7 +159,8 @@ productivity_variable = 'EVI'
 # Selecting an individual paddock
 # endregion
 
-timepoint = "2020-01-08"
+time = "2020-01-08"
+ds_timepoint = ds.sel(time=time, method='nearest')
 def normalize(arr):
     return (arr - arr.min()) / (arr.max() - arr.min())
 red = ds_timepoint['nbart_red']
@@ -184,55 +177,45 @@ pol['paddock'] = range(1,len(pol)+1)
 pol['paddock'] = pol.paddock.astype('category')
 # endregion
 
-ds
-
-# region
-bounds = ds_productivity.rio.bounds()
-
-# Access individual bounds
-left, bottom, right, top = bounds
-# endregion
-
-# region
 # Generate a map of the paddocks 
-
-# Plotting
+bounds = ds[productivity_variable].rio.bounds()
+left, bottom, right, top = bounds
 fig, ax = plt.subplots(figsize=(10, 10))
-
-# Display the RGB image
 ax.imshow(rgb, extent=(left, right, bottom, top))
-
-# Overlay the paddock polygons
 pol.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=1)
-
-# Add paddock labels
 for x, y, label in zip(pol.geometry.centroid.x, pol.geometry.centroid.y, pol['paddock']):
     ax.text(x, y, label, fontsize=12, ha='center', va='center', color='yellow')
-
-# Save the figure with the correct size and resolution
-plt.savefig(scratch_dir+stub+'_paddock_map_auto.tif', dpi=300, bbox_inches='tight')
-
+filename = os.path.join(scratch_dir, stub+'_paddock_map_auto.tif')
+plt.savefig(filename, dpi=300, bbox_inches='tight')
 plt.axis('off')
 plt.show()
-# endregion
+print(filename)
 
+# Remove unnecessary variables from 
+useful_variables = ['nbart_red', 'nbart_green', 'nbart_blue', 'EVI', 'percent_trees_0m-300m']
+ds_small = ds.isel(band=0)[useful_variables]
 
+# Create a rectangular buffer
+minx, miny, maxx, maxy = paddock_geometry.bounds
+buffer_distance = max_distance * pixel_size
+expanded_minx = minx - buffer_distance
+expanded_miny = miny - buffer_distance
+expanded_maxx = maxx + buffer_distance
+expanded_maxy = maxy + buffer_distance
+rectangular_buffer = box(expanded_minx, expanded_miny, expanded_maxx, expanded_maxy)
+buffered_gdf = gpd.GeoDataFrame(geometry=[rectangular_buffer])
+buffered_gdf.iloc[0,0]
 
-
-
-
-
-
+# %%time
+buffered_mask = ds_small.rio.clip(buffered_gdf.geometry, drop=True, invert=False)
+buffered_mask.sel(time=time)['EVI'].plot()
 
 
 
 # # All Timepoints
 
 # %%time
-tree_cover_threshold = 10
 benefits = []
-min_distance = 0
-max_distance = 30
 layer_name = f"percent_trees_{pixel_size * min_distance}m-{pixel_size * max_distance}m"
 shelter_score = ds[layer_name]
 x = shelter_score.values.flatten()
