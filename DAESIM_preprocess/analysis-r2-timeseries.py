@@ -157,6 +157,75 @@ B2 = ds['nbart_blue']
 ds['EVI'] = 2.5 * ((B8 - B4) / (B8 + 6 * B4 - 7.5 * B2 + 1))
 productivity_variable = 'EVI'
 
+
+
+
+
+
+
+# region
+# Selecting an individual paddock
+# endregion
+
+timepoint = "2020-01-08"
+def normalize(arr):
+    return (arr - arr.min()) / (arr.max() - arr.min())
+red = ds_timepoint['nbart_red']
+green = ds_timepoint['nbart_green']
+blue = ds_timepoint['nbart_blue']
+rgb = np.stack([normalize(red), normalize(green), normalize(blue)], axis=-1)
+
+# region
+# Read in the polygons from SAMGeo (these will not neccesarily match user-provided paddocks)
+pol = gpd.read_file(outdir+stub+'_filt.gpkg')
+
+# have to set a paddock id. Preferably do this in earlier step in future... 
+pol['paddock'] = range(1,len(pol)+1)
+pol['paddock'] = pol.paddock.astype('category')
+# endregion
+
+ds
+
+# region
+bounds = ds_productivity.rio.bounds()
+
+# Access individual bounds
+left, bottom, right, top = bounds
+# endregion
+
+# region
+# Generate a map of the paddocks 
+
+# Plotting
+fig, ax = plt.subplots(figsize=(10, 10))
+
+# Display the RGB image
+ax.imshow(rgb, extent=(left, right, bottom, top))
+
+# Overlay the paddock polygons
+pol.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=1)
+
+# Add paddock labels
+for x, y, label in zip(pol.geometry.centroid.x, pol.geometry.centroid.y, pol['paddock']):
+    ax.text(x, y, label, fontsize=12, ha='center', va='center', color='yellow')
+
+# Save the figure with the correct size and resolution
+plt.savefig(scratch_dir+stub+'_paddock_map_auto.tif', dpi=300, bbox_inches='tight')
+
+plt.axis('off')
+plt.show()
+# endregion
+
+
+
+
+
+
+
+
+
+
+
 # # All Timepoints
 
 # %%time
