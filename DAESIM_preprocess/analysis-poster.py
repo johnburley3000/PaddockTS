@@ -1,4 +1,3 @@
-# # +
 # Standard library
 import os
 import pickle
@@ -220,25 +219,24 @@ ax.imshow(rgb, extent=(left, right, bottom, top))
 paddock_row.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=1)
 plt.show()
 
-
-
 # region
 # Recreate the adjacency mask for just this paddock
-paddock_geometry = paddock_row['geometry'].iloc[0]
-ds = ds_buffered
-tree_percent = ds_buffered['tree_percent'].values
-tree_mask = tree_percent > 0
-structuring_element = np.ones((3, 3))
-adjacent_mask = scipy.ndimage.binary_dilation(tree_mask, structure=structuring_element)
+# ds = ds_buffered
 
-# Exclude pixels outside the paddock for the rest of this analysis
-paddock_mask = geometry_mask(
-    [paddock_geometry],
-    out_shape=(ds.sizes["y"], ds.sizes["x"]),
-    transform=ds.rio.transform())
-adjacent_mask |= paddock_mask
+# paddock_geometry = paddock_row['geometry'].iloc[0]
+# tree_percent = ds_buffered['tree_percent'].values
+# tree_mask = tree_percent > 0
+# structuring_element = np.ones((3, 3))
+# adjacent_mask = scipy.ndimage.binary_dilation(tree_mask, structure=structuring_element)
 
-plt.imshow(adjacent_mask)
+# # Exclude pixels outside the paddock for the rest of this analysis
+# paddock_mask = geometry_mask(
+#     [paddock_geometry],
+#     out_shape=(ds.sizes["y"], ds.sizes["x"]),
+#     transform=ds.rio.transform())
+# adjacent_mask |= paddock_mask
+
+# plt.imshow(adjacent_mask)
 # endregion
 
 # # All Timepoints
