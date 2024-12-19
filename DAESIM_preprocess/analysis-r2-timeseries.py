@@ -503,12 +503,6 @@ region_bbox = {
     'x': (image_bbox['x'][0] - buffer, image_bbox['x'][1] + buffer),
 }
 
-
-
-region_bbox
-
-
-
 # Create GeoDataFrames for the image and region
 image_gdf = gpd.GeoDataFrame(
     {'geometry': [box(image_bbox['x'][0], image_bbox['y'][0], image_bbox['x'][1], image_bbox['y'][1])]},
@@ -519,7 +513,25 @@ region_gdf = gpd.GeoDataFrame(
     crs='EPSG:4326', 
 )
 
-image_gdf.crs
+# Prep the WorldCover colours
+world_cover_layers = {
+    "Tree": 10, # Green
+    "Grass": 30, # Yellow
+    "Crop": 40, # pink
+    "Urban": 50, # red
+    "Water": 80, # blue
+}
+colors_worldcover = ['green', 'yellow', 'violet', 'red', 'blue']
+values_worldcover = list(world_cover_layers.values())
+cmap_worldcover = mcolors.ListedColormap(colors)
+norm_worldcover = mcolors.BoundaryNorm(values + [max(values) + 10], cmap.N)  # Add an extra upper bound
+ds_worldcover = ds.sel(time=time, method='nearest')['worldcover']
+
+
+
+ds_worldcover
+
+
 
 # region
 # Set up 2x2 subplots
@@ -543,7 +555,7 @@ im = ds_masked.plot(
     vmax=median_value + (upper_bound - lower_bound) / 2,
     ax=ax
 )
-ax.set_title(f'Static View of the Productivy Proxy on {time}', fontsize=title_size)
+ax.set_title(f'{time}', fontsize=title_size)
 ax.set_xlabel('')
 ax.set_ylabel('')
 ax.set_xticks([])
@@ -555,39 +567,42 @@ cbar = ax.collections[0].colorbar
 cbar.set_label(f"Enhanced Vegetation Index ({productivity_variable})", fontsize=label_size)
 cbar.ax.tick_params(labelsize=annotations_size)
 
-# Plot 2: Topography Map
-ax = axes[1, 1]
-im = ax.imshow(dem, cmap='terrain', zorder=1, interpolation='bilinear')
-cbar = plt.colorbar(im, ax=ax, label='Elevation (m)')
-cbar.set_label('Elevation (m)', fontsize=label_size)
-cbar.ax.tick_params(labelsize=annotations_size)
-ax.contour(ridges, levels=[0.5], colors='red', linewidths=1.5, zorder=2)
-ax.contour(gullies, levels=[0.5], colors='blue', linewidths=1.5, zorder=3)
-ax.contour(dem, colors='black', linewidths=0.5, zorder=4, alpha=0.5)
-ax.set_title('Ridges and Gullies', fontsize=title_size)
+# Plot 2: WorldCover
+ax = axes[1, 0]
+
+# Define the colours
+colors = ['green', 'yellow', 'violet', 'red', 'blue']
+values = list(world_cover_layers.values())
+cmap = mcolors.ListedColormap(colors)
+norm = mcolors.BoundaryNorm(values + [max(values) + 10], cmap.N)  # Add an extra upper bound
+
+# Select the worldcover layer
+ds_worldcover = ds.sel(time=time, method='nearest')['worldcover']
+im = ds_worldcover.plot(
+    cmap=cmap,
+    norm=norm,
+    ax=ax,
+    add_colorbar=False
+)
+ax.set_title(f'WorldCover 2021', fontsize=title_size)
 ax.set_xlabel('')
 ax.set_ylabel('')
 ax.set_xticks([])
 ax.set_yticks([])
+xlim, ylim = ax.get_xlim(), ax.get_ylim()
+lat_lon_ratio = (ylim[1] - ylim[0]) / (xlim[1] - xlim[0])
 ax.set_aspect(lat_lon_ratio)
+handles = [plt.Line2D([0], [0], color=color, lw=4) for color in colors]
+labels = list(world_cover_layers.keys())
+ax.legend(handles, labels, loc='lower right', fontsize=annotations_size)
 
-# Plot 3: Larger region and bounding box
-ax = axes[1, 0]
-region_gdf.boundary.plot(ax=ax, edgecolor='black', linewidth=1, label='200km Region')
-image_gdf.boundary.plot(ax=ax, edgecolor='red', linewidth=2, label='10km Bounding Box')
-ax.set_xlim(region_bbox['x'][0], region_bbox['x'][1])
-ax.set_ylim(region_bbox['y'][0], region_bbox['y'][1])
-ctx.add_basemap(ax, source=ctx.providers.OpenStreetMap.Mapnik, crs=image_gdf.crs)
-ax.legend()
-ax.set_title('Location', fontsize=title_size)
-
-# Add the dummy white colorbar
+# Dummy white colour bar
 cbar = plt.colorbar(sm, ax=ax, orientation='vertical')
 cbar.set_ticks([])  
 cbar.set_label('')  
 cbar.outline.set_visible(False)
 
-# Plot 4: True Colour Image
+# Plot 3: True Colour Image
 ax = axes[0, 1]
 def normalize(arr):
     return (arr - arr.min()) / (arr.max() - arr.min())
@@ -624,6 +639,23 @@ cbar.set_ticks([])
 cbar.set_label('')  
 cbar.outline.set_visible(False)
 
+# Plot 4: Larger region and bounding box
+ax = axes[1, 1]
+region_gdf.boundary.plot(ax=ax, edgecolor='black', linewidth=1, label='200km Region')
+image_gdf.boundary.plot(ax=ax, edgecolor='red', linewidth=2, label='10km Bounding Box')
+ax.set_xlim(region_bbox['x'][0], region_bbox['x'][1])
+ax.set_ylim(region_bbox['y'][0], region_bbox['y'][1])
+ctx.add_basemap(ax, source=ctx.providers.OpenStreetMap.Mapnik, crs=image_gdf.crs)
+ax.legend()
+ax.set_title('Location', fontsize=title_size)
+
+# Add the dummy white colorbar
+cbar = plt.colorbar(sm, ax=ax, orientation='vertical')
+cbar.set_ticks([])  
+cbar.set_label('')  
+cbar.outline.set_visible(False)
+
+
 # Adjust layout and save
 plt.tight_layout()
 filename = os.path.join(scratch_dir, f"{stub}_spatial_variation.png")
@@ -631,5 +663,3 @@ plt.savefig(filename)
 plt.show()
 print("Saved:", filename)
 # endregion
-
-
