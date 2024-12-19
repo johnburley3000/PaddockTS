@@ -60,7 +60,9 @@ max_distance = distances[1]
 # Load the sentinel imagery xarray 
 filename = os.path.join(outdir, f"{stub}_ds2.pkl")
 with open(filename, 'rb') as file:
-    ds = pickle.load(file)
+    ds_original = pickle.load(file)
+
+ds = ds_original
 
 # %%time
 # Calculate the percentage of tree cover in each sentinel pixel, based on the global canopy height map
@@ -143,12 +145,6 @@ B2 = ds['nbart_blue']
 ds['EVI'] = 2.5 * ((B8 - B4) / (B8 + 6 * B4 - 7.5 * B2 + 1))
 productivity_variable = 'EVI'
 
-
-
-
-
-
-
 # region
 # Selecting an individual paddock
 # endregion
@@ -186,7 +182,7 @@ plt.show()
 print(filename)
 
 # Remove unnecessary variables from ds
-useful_variables = ['nbart_red', 'nbart_green', 'nbart_blue', 'EVI', 'tree_percent', 'percent_trees_0m-300m']
+useful_variables = ['nbart_red', 'nbart_green', 'nbart_blue', 'EVI', 'worldcover', 'tree_percent', 'percent_trees_0m-300m']
 ds_small = ds.isel(band=0)[useful_variables]
 
 # Select a paddock
@@ -224,13 +220,26 @@ ax.imshow(rgb, extent=(left, right, bottom, top))
 paddock_row.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=1)
 plt.show()
 
+
+
+# region
 # Recreate the adjacency mask for just this paddock
+paddock_geometry = paddock_row['geometry'].iloc[0]
 ds = ds_buffered
 tree_percent = ds_buffered['tree_percent'].values
 tree_mask = tree_percent > 0
 structuring_element = np.ones((3, 3))
 adjacent_mask = scipy.ndimage.binary_dilation(tree_mask, structure=structuring_element)
+
+# Exclude pixels outside the paddock for the rest of this analysis
+paddock_mask = geometry_mask(
+    [paddock_geometry],
+    out_shape=(ds.sizes["y"], ds.sizes["x"]),
+    transform=ds.rio.transform())
+adjacent_mask |= paddock_mask
+
 plt.imshow(adjacent_mask)
+# endregion
 
 # # All Timepoints
 
@@ -285,7 +294,8 @@ df_top10
 
 # # Max r2 timepoint
 
-time = df_top10.index[0].date()
+# time = df_top10.index[0].date()
+time = "2020-01-08"
 ds_timepoint = ds.sel(time=time, method='nearest')
 
 # region
@@ -317,19 +327,6 @@ x_values = x_values_outliers[(y_values_outliers > lower_bound) & (y_values_outli
 percent_tree_threshold = 10
 sheltered = y_values[np.where(x_values >= percent_tree_threshold)]
 unsheltered = y_values[np.where(x_values < percent_tree_threshold)]
-
-fig, axes = plt.subplots(2, 1, figsize=(14, 16)) 
-title_size = 30
-label_size = 26
-annotations_size = label_size
-ax1 = axes[0]
-hist = ax1.hist2d(
-    x_values, y_values, 
-    bins=100, 
-    norm=mcolors.LogNorm(),
-    cmap='viridis',
-)
-
 
 # region
 # Plot 1: 2D histogram 
