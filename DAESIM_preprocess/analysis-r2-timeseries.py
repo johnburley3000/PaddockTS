@@ -1,9 +1,3 @@
-# +
-# Aim of this notebook is to combine all the datasources into a single xarray
-
-# +
-# # !pip install contextily
-
 # # +
 # Standard library
 import os
@@ -103,11 +97,11 @@ ds = ds.isel(
     x=slice(1, -1) 
 )
 
+# region
 # Global canopy height tree_mask
 tree_percent = ds['tree_percent'].values[0]
 tree_mask = tree_percent > 0
 
-# region
 # Shelterscore showing the number of trees within a donut at a given distance away from the crop/pasture pixel
 structuring_element = np.ones((3, 3))  # This defines adjacency (including diagonals)
 adjacent_mask = scipy.ndimage.binary_dilation(tree_mask, structure=structuring_element)
@@ -192,7 +186,7 @@ plt.show()
 print(filename)
 
 # Remove unnecessary variables from ds
-useful_variables = ['nbart_red', 'nbart_green', 'nbart_blue', 'EVI', 'percent_trees_0m-300m']
+useful_variables = ['nbart_red', 'nbart_green', 'nbart_blue', 'EVI', 'tree_percent', 'percent_trees_0m-300m']
 ds_small = ds.isel(band=0)[useful_variables]
 
 # Select a paddock
@@ -209,7 +203,7 @@ expanded_maxx = maxx + buffer_distance
 expanded_maxy = maxy + buffer_distance
 rectangular_buffer = box(expanded_minx, expanded_miny, expanded_maxx, expanded_maxy)
 buffered_gdf = gpd.GeoDataFrame(geometry=[rectangular_buffer])
-buffered_gdf.iloc[0,0]
+# buffered_gdf.iloc[0,0]
 
 # %%time
 # Clip the xarray to this paddock
@@ -229,6 +223,14 @@ fig, ax = plt.subplots(figsize=(10, 10))
 ax.imshow(rgb, extent=(left, right, bottom, top))
 paddock_row.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=1)
 plt.show()
+
+# Recreate the adjacency mask for just this paddock
+ds = ds_buffered
+tree_percent = ds_buffered['tree_percent'].values
+tree_mask = tree_percent > 0
+structuring_element = np.ones((3, 3))
+adjacent_mask = scipy.ndimage.binary_dilation(tree_mask, structure=structuring_element)
+plt.imshow(adjacent_mask)
 
 # # All Timepoints
 
@@ -286,14 +288,20 @@ df_top10
 time = df_top10.index[0].date()
 ds_timepoint = ds.sel(time=time, method='nearest')
 
+# region
 # Calculate shelter score and productivity index for this timepoint
 ndvi = ds.sel(time=time, method='nearest')[productivity_variable]
-productivity_score1 = ndvi.where(~adjacent_mask) #  & (grassland | cropland))
+p = ndvi.where(~adjacent_mask) #  & (grassland | cropland))
 layer_name = f"percent_trees_0m-300m"
-s = ds[layer_name].values
+s = ds[layer_name]
+x = s.values.flatten()
+
+# Make sure that any nan values in the shelter score are also nan in the productivity_score
+p = p.where(~s.isnull())
+# endregion
 
 # Remove all pixels that are trees or adjacent to trees
-y = productivity_score1.values.flatten()
+y = p.values.flatten()
 y_values_outliers = y[~np.isnan(y)]   
 
 # Outlier boundary
@@ -302,7 +310,6 @@ upper_bound = max(np.percentile(y_values_outliers, 99.9), 1)
 
 # Find the shelter scores not obstructed by cloud cover or outliers
 y_values = y_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]
-x = s.flatten()
 x_values_outliers = x[~np.isnan(y)]
 x_values = x_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]
 
@@ -310,6 +317,19 @@ x_values = x_values_outliers[(y_values_outliers > lower_bound) & (y_values_outli
 percent_tree_threshold = 10
 sheltered = y_values[np.where(x_values >= percent_tree_threshold)]
 unsheltered = y_values[np.where(x_values < percent_tree_threshold)]
+
+fig, axes = plt.subplots(2, 1, figsize=(14, 16)) 
+title_size = 30
+label_size = 26
+annotations_size = label_size
+ax1 = axes[0]
+hist = ax1.hist2d(
+    x_values, y_values, 
+    bins=100, 
+    norm=mcolors.LogNorm(),
+    cmap='viridis',
+)
+
 
 # region
 # Plot 1: 2D histogram 
@@ -375,12 +395,12 @@ y_max = max(placement_unsheltered, placement_sheltered) + 0.1 * max(placement_un
 ax2.set_ylim(None, y_max)
 
 # Explanatory text for calculating percentage benefit
-shelter_vs_unsheltered = (np.median(sheltered) - np.median(unsheltered)) / np.median(unsheltered) * 100
-ax2.text(
-    0.53, y_max - 0.02,  # Position text in top left
-    f'    Sheltered vs unsheltered \n = ({medians[1]:.2f} - {medians[0]:.2f})/{medians[0]:.2f} = {shelter_vs_unsheltered:.2f}%',
-    fontsize=annotations_size, ha='left', va='top'
-)
+# shelter_vs_unsheltered = (np.median(sheltered) - np.median(unsheltered)) / np.median(unsheltered) * 100
+# ax2.text(
+#     0.53, y_max - 0.02,  # Position text in top left
+#     f'    Sheltered vs unsheltered \n = ({medians[1]:.2f} - {medians[0]:.2f})/{medians[0]:.2f} = {shelter_vs_unsheltered:.2f}%',
+#     fontsize=annotations_size, ha='left', va='top'
+# )
 
 # Create a dummy white colorbar to align the plots nicely
 white_cmap = LinearSegmentedColormap.from_list("white_cmap", ["white", "white"])
