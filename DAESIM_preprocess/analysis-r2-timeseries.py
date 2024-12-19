@@ -53,15 +53,15 @@ stubs = {
     "LCHV": "Lachlan Valley"
 }
 
-# region
 # Filepaths
-# outdir = os.path.join(gdata_dir, "Data/PadSeg/")
-# stub = "MILG"
-# endregion
+outdir = os.path.join(gdata_dir, "Data/PadSeg/")
+stub = "MILG"
 
-outdir = '/g/data/xe2/cb8590/Data/shelter/'
-stub = '34_0_148_5'
+# region
+# outdir = '/g/data/xe2/cb8590/Data/shelter/'
+# stub = '34_0_148_5'
 # -
+# endregion
 
 # %%time
 # Load the sentinel imagery xarray 
@@ -80,12 +80,13 @@ ds['tree_percent'] = binary_mask.rio.reproject_match(ds, resampling=Resampling.a
 # Add worldcover classes to the xarray
 world_cover_layers = {
     "Tree cover": 10, # Green
-    "Shrubland": 20, # Orange
+    # "Shrubland": 20, # Orange
     "Grassland": 30, # Yellow
     "Cropland": 40, # pink
     "Built-up": 50, # red
     "Permanent water bodies": 80, # blue
 }
+
 worldcover_path = os.path.join("/g/data/xe2/cb8590/WORLDCOVER/ESA_WORLDCOVER_10M_2021_V200/MAP/")
 MILG_id = "S36E147"
 filename = os.path.join(worldcover_path, f"ESA_WorldCover_10m_2021_v200_{MILG_id}_Map", f"ESA_WorldCover_10m_2021_v200_{MILG_id}_Map.tif")
@@ -513,26 +514,6 @@ region_gdf = gpd.GeoDataFrame(
     crs='EPSG:4326', 
 )
 
-# Prep the WorldCover colours
-world_cover_layers = {
-    "Tree": 10, # Green
-    "Grass": 30, # Yellow
-    "Crop": 40, # pink
-    "Urban": 50, # red
-    "Water": 80, # blue
-}
-colors_worldcover = ['green', 'yellow', 'violet', 'red', 'blue']
-values_worldcover = list(world_cover_layers.values())
-cmap_worldcover = mcolors.ListedColormap(colors)
-norm_worldcover = mcolors.BoundaryNorm(values + [max(values) + 10], cmap.N)  # Add an extra upper bound
-ds_worldcover = ds.sel(time=time, method='nearest')['worldcover']
-
-
-
-ds_worldcover
-
-
-
 # region
 # Set up 2x2 subplots
 fig, axes = plt.subplots(2, 2, figsize=(16, 16))
@@ -546,13 +527,15 @@ norm = Normalize(vmin=0, vmax=1)
 sm = ScalarMappable(norm=norm, cmap=white_cmap)
 
 # Plot 1: Productivity Map
+vmin = median_value - (upper_bound - lower_bound) / 2
+vmax = median_value + (upper_bound - lower_bound) / 2
 ax = axes[0, 0]
 cmap = plt.cm.coolwarm
 cmap.set_bad(color='green')  # Set NaN pixels to green
 im = ds_masked.plot(
     cmap=cmap,
-    vmin=median_value - (upper_bound - lower_bound) / 2,
-    vmax=median_value + (upper_bound - lower_bound) / 2,
+    vmin=vmin,
+    vmax=vmax,
     ax=ax
 )
 ax.set_title(f'{time}', fontsize=title_size)
@@ -568,9 +551,15 @@ cbar.set_label(f"Enhanced Vegetation Index ({productivity_variable})", fontsize=
 cbar.ax.tick_params(labelsize=annotations_size)
 
 # Plot 2: WorldCover
+# Abbreviate the WorldCover names to take less space on the plot
+world_cover_layers = {
+    "Tree": 10, # Green
+    "Grass": 30, # Yellow
+    "Crop": 40, # pink
+    "Urban": 50, # red
+    "Water": 80, # blue
+}
 ax = axes[1, 0]
-
-# Define the colours
 colors = ['green', 'yellow', 'violet', 'red', 'blue']
 values = list(world_cover_layers.values())
 cmap = mcolors.ListedColormap(colors)
@@ -663,3 +652,18 @@ plt.savefig(filename)
 plt.show()
 print("Saved:", filename)
 # endregion
+
+# True colour tiff
+filename = os.path.join(scratch_dir, f"RGB_{stub}_{time}.tif")
+ds_timepoint.attrs = {}
+rgb_stack = ds_timepoint[['nbart_red', 'nbart_green', 'nbart_blue']]
+rgb_stack.rio.to_raster(filename)
+print(filename)
+
+# Productivity Tiff
+filename = os.path.join(scratch_dir, f"{productivity_variable}_{stub}_{time}.tif")
+clipped = ds_masked.fillna(upper_bound + 0.1)
+clipped = clipped.clip(min=lower_bound, max=upper_bound)
+clipped.attrs = {}
+clipped.rio.to_raster(filename)
+print(filename)
