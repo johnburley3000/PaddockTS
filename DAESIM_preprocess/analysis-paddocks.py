@@ -201,7 +201,16 @@ ax.imshow(rgb, extent=(left, right, bottom, top))
 pol.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=1)
 for x, y, label in zip(pol.geometry.centroid.x, pol.geometry.centroid.y, pol['paddock']):
     ax.text(x, y, label, fontsize=12, ha='center', va='center', color='yellow')
-    
+
+scalebar = AnchoredSizeBar(
+    ax.transData, 1000, '1km', loc='lower center', pad=0.1, 
+    color='black', frameon=False, size_vertical=10,
+    fontproperties=fm.FontProperties(size=label_size),
+    bbox_to_anchor=(0.05, -0.05),  # Position below the plot
+    bbox_transform=ax.transAxes,
+)
+ax.add_artist(scalebar)
+
 ax.set_aspect(lat_lon_ratio)
 
 filename = os.path.join(scratch_dir, stub+'_paddock_map_auto.tif')
@@ -210,6 +219,10 @@ plt.axis('off')
 plt.show()
 print(filename)
 # endregion
+
+
+
+
 
 # Remove unnecessary variables from ds
 useful_variables = ['nbart_red', 'nbart_green', 'nbart_blue', 'EVI', 'worldcover', 'tree_percent', 'percent_trees_0m-300m']
