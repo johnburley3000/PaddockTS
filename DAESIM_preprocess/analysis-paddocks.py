@@ -191,6 +191,34 @@ lat_lon_ratio
 # endregion
 
 # region
+# Calculate bounding box of a larger region to get an idea of the location
+image_bbox = {
+    'y': query['y'],
+    'x': query['x'],
+}
+buffer = 1  
+region_bbox = {
+    'y': (image_bbox['y'][0] - buffer, image_bbox['y'][1] + buffer),
+    'x': (image_bbox['x'][0] - buffer, image_bbox['x'][1] + buffer),
+}
+
+# Create GeoDataFrames for the image and region
+image_gdf = gpd.GeoDataFrame(
+    {'geometry': [box(image_bbox['x'][0], image_bbox['y'][0], image_bbox['x'][1], image_bbox['y'][1])]},
+    crs='EPSG:4326', 
+)
+region_gdf = gpd.GeoDataFrame(
+    {'geometry': [box(region_bbox['x'][0], region_bbox['y'][0], region_bbox['x'][1], region_bbox['y'][1])]},
+    crs='EPSG:4326', 
+)
+# endregion
+
+# Font sizes
+title_size = 22
+label_size = 18
+annotations_size = 14
+
+# region
 # Plotting a larger region and bounding box with contextily
 fig, ax = plt.subplots(1, 1, figsize=(10, 10))
 
@@ -202,15 +230,9 @@ ctx.add_basemap(ax, source=ctx.providers.OpenStreetMap.Mapnik, crs=image_gdf.crs
 ax.legend()
 ax.set_title('Location', fontsize=title_size)
 
-# Add the dummy white colorbar
-cbar = plt.colorbar(sm, ax=ax, orientation='vertical')
-cbar.set_ticks([])  
-cbar.set_label('')  
-cbar.outline.set_visible(False)
-
 # Adjust layout and save
 plt.tight_layout()
-filename = os.path.join(scratch_dir, f"{stub}_spatial_variation.png")
+filename = os.path.join(scratch_dir, f"{stub}_location.png")
 plt.savefig(filename)
 plt.show()
 print("Saved:", filename)
@@ -238,10 +260,10 @@ scalebar = AnchoredSizeBar(
 ax.add_artist(scalebar)
 
 ax.set_aspect(lat_lon_ratio)
-
-filename = os.path.join(scratch_dir, stub+'_paddock_map_auto.tif')
-plt.savefig(filename, dpi=300, bbox_inches='tight')
 plt.axis('off')
+
+filename = os.path.join(scratch_dir, stub+'_paddock_map_auto.png')
+plt.savefig(filename, dpi=300, bbox_inches='tight')
 plt.show()
 print(filename)
 # endregion
@@ -295,7 +317,10 @@ handles = [plt.Line2D([0], [0], color=color, lw=4) for color in colors]
 labels = list(world_cover_layers.keys())
 ax.legend(handles, labels, loc='lower right', fontsize=annotations_size)
 
+filename = os.path.join(scratch_dir, stub+'_worldcover.png')
+plt.savefig(filename, dpi=300, bbox_inches='tight')
 plt.show()
+print(filename)
 # endregion
 
 # Remove unnecessary variables from ds
@@ -316,7 +341,6 @@ expanded_maxx = maxx + buffer_distance
 expanded_maxy = maxy + buffer_distance
 rectangular_buffer = box(expanded_minx, expanded_miny, expanded_maxx, expanded_maxy)
 buffered_gdf = gpd.GeoDataFrame(geometry=[rectangular_buffer])
-# buffered_gdf.iloc[0,0]
 
 # %%time
 # Clip the xarray to this paddock
@@ -338,7 +362,7 @@ paddock_mask = geometry_mask(
     transform=ds.rio.transform())
 adjacent_mask |= paddock_mask
 
-plt.imshow(adjacent_mask)
+# plt.imshow(adjacent_mask)
 # endregion
 
 # # All Timepoints
@@ -356,6 +380,9 @@ for i, time in enumerate(ds.time.values):
     y = productivity_score.values.flatten()
     y_values_outliers = y[~np.isnan(y)]   
 
+    if len(y_values_outliers) == 0:
+        continue
+
     # Remove outliers
     lower_bound = 0
     upper_bound = max(np.percentile(y_values_outliers, 99.9), 1)
@@ -365,6 +392,7 @@ for i, time in enumerate(ds.time.values):
     
     sheltered = y_values[np.where(x_values >= tree_cover_threshold)]
     unsheltered = y_values[np.where(x_values < tree_cover_threshold)]
+    
     percentage_benefit = (np.median(sheltered) - np.median(unsheltered))/np.median(unsheltered)
     sample_size = min(len(sheltered), len(unsheltered))
     
@@ -391,17 +419,20 @@ df_benefits.index = pd.to_datetime(df_benefits.index)
 
 filename = os.path.join(scratch_dir, f"{stub}_df_benefits.csv")
 df_benefits.to_csv(filename)
-print(filename)
+print("Saved: ", filename)
 # endregion
 
 df_top10 = df_benefits.nlargest(10, 'r2')
-df_top10
+# df_top10
 
-# # Max r2 timepoint
+# # Single Timepoint
 
 # time = df_top10.index[0].date()
 time = "2020-01-08"
+# time = "2017-05-08"
 ds_timepoint = ds.sel(time=time, method='nearest')
+
+tree_cover_threshold = 2
 
 # region
 # Calculate shelter score and productivity index for this timepoint
@@ -413,11 +444,10 @@ x = s.values.flatten()
 
 # Make sure that any nan values in the shelter score are also nan in the productivity_score
 p = p.where(~s.isnull())
-# endregion
 
 # Remove all pixels that are trees or adjacent to trees
 y = p.values.flatten()
-y_values_outliers = y[~np.isnan(y)]   
+y_values_outliers = y[~np.isnan(y)]  
 
 # Outlier boundary
 lower_bound = 0
@@ -429,9 +459,9 @@ x_values_outliers = x[~np.isnan(y)]
 x_values = x_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]
 
 # Calculate sheltered and unsheltered pixels
-percent_tree_threshold = 10
-sheltered = y_values[np.where(x_values >= percent_tree_threshold)]
-unsheltered = y_values[np.where(x_values < percent_tree_threshold)]
+sheltered = y_values[np.where(x_values >= tree_cover_threshold)]
+unsheltered = y_values[np.where(x_values < tree_cover_threshold)]
+# endregion
 
 # region
 # Plot 1: 2D histogram 
@@ -465,7 +495,7 @@ ax1.legend(fontsize=label_size)
 
 # Add vertical black dotted line at the tree cover threshold
 ax1.axvline(
-    percent_tree_threshold, 
+    tree_cover_threshold, 
     color='black', 
     linestyle='dotted', 
     linewidth=2, 
@@ -476,7 +506,7 @@ ax1.axvline(
 ax2 = axes[1]
 box_data = [unsheltered, sheltered]
 im = ax2.boxplot(box_data, labels=['Unsheltered', 'Sheltered'], showfliers=False)
-ax2.set_title(f'Shelter threshold of {percent_tree_threshold}% tree cover within {max_distance * pixel_size}m', fontsize=title_size)
+ax2.set_title(f'Shelter threshold of {tree_cover_threshold}% tree cover within {max_distance * pixel_size}m', fontsize=title_size)
 ax2.set_ylabel('EVI', fontsize=label_size)
 ax2.tick_params(axis='both', labelsize=annotations_size)
 
@@ -516,7 +546,7 @@ cbar.outline.set_visible(False)
 # Save the plots
 plt.tight_layout()
 plt.subplots_adjust(hspace=0.3) 
-filename = os.path.join(scratch_dir, f"{stub}_hist_and_boxplot.png")
+filename = os.path.join(scratch_dir, f"{stub}_Paddock{paddock_id}_{time}_regression.png")
 plt.savefig(filename)
 plt.show()
 print("Saved", filename)
@@ -595,7 +625,7 @@ plt.tight_layout()
 plt.subplots_adjust(hspace=0.2)
 
 # Save as a single image
-filename_combined = os.path.join(scratch_dir, f"{stub}_time_series.png")
+filename_combined = os.path.join(scratch_dir, f"{stub}_Paddock{paddock_id}_time_series.png")
 plt.savefig(filename_combined)
 plt.show()
 print("Saved", filename_combined)
@@ -654,6 +684,7 @@ y_values_outliers = y[~np.isnan(y)]
 x = s.flatten()
 x_values_outliers = x[~np.isnan(y)]  
 
+# region
 # Remove outliers
 lower_bound = np.percentile(y_values_outliers, 1)
 upper_bound = np.percentile(y_values_outliers, 99)
@@ -663,29 +694,9 @@ x = s.flatten()
 x_values_outliers = x[~np.isnan(y)]
 x_values = x_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]
 
-unsheltered = y_values[np.where(x_values < percent_tree_threshold)]
+unsheltered = y_values[np.where(x_values < tree_cover_threshold)]
 median_value = np.median(unsheltered)
-
-# Calculate bounding box of a larger region to get an idea of the location
-image_bbox = {
-    'y': query['y'],
-    'x': query['x'],
-}
-buffer = 1  
-region_bbox = {
-    'y': (image_bbox['y'][0] - buffer, image_bbox['y'][1] + buffer),
-    'x': (image_bbox['x'][0] - buffer, image_bbox['x'][1] + buffer),
-}
-
-# Create GeoDataFrames for the image and region
-image_gdf = gpd.GeoDataFrame(
-    {'geometry': [box(image_bbox['x'][0], image_bbox['y'][0], image_bbox['x'][1], image_bbox['y'][1])]},
-    crs='EPSG:4326', 
-)
-region_gdf = gpd.GeoDataFrame(
-    {'geometry': [box(region_bbox['x'][0], region_bbox['y'][0], region_bbox['x'][1], region_bbox['y'][1])]},
-    crs='EPSG:4326', 
-)
+# endregion
 
 # region
 # Calculate aspect ratio of this paddock buffer
@@ -704,17 +715,11 @@ latitude_rad = math.radians(latitude_deg)
 lat_distance_km = lat_diff_deg * (math.pi * earth_radius_km / 180)
 lon_distance_km = lon_diff_deg * (math.cos(latitude_rad) * (math.pi * earth_radius_km / 180))
 lat_lon_ratio = lat_distance_km/lon_distance_km
-lat_lon_ratio
 # endregion
-
-lat_distance_km
 
 # region
 # Productivity Map
 fig, ax = plt.subplots(1, 1, figsize=(10, 10))
-title_size = 22
-label_size = 18
-annotations_size = 14
 
 vmin = median_value - (upper_bound - lower_bound) / 2
 vmax = median_value + (upper_bound - lower_bound) / 2
@@ -745,7 +750,7 @@ colorbar_ax = fig.add_axes([1, 0.125, 0.03, 0.75])  # [x-position, y-position, w
 cbar = fig.colorbar(im, cax=colorbar_ax)
 
 # Add labels and ticks
-cbar.set_label(f"Enhanced Vegetation Index ({productivity_variable})", fontsize=label_size)
+cbar.set_label(f"{productivity_variable}", fontsize=label_size)
 cbar.ax.tick_params(labelsize=annotations_size)
 
 # Add legend for tree pixels
@@ -761,6 +766,10 @@ ax.add_artist(scalebar)
 
 ax.set_aspect(lat_lon_ratio)
 plt.tight_layout()
+
+filename = os.path.join(scratch_dir, f"{stub}_Paddock{paddock_id}_{productivity_variable}.png")
+plt.savefig(filename)
+print("Saved", filename)
 plt.show()
 # endregion
 
@@ -768,7 +777,6 @@ plt.show()
 # Visualise a panchromatic image of this paddock
 fig, ax = plt.subplots(1, 1, figsize=(10, 10))
 
-time = "2020-01-08"
 ds_timepoint = ds_buffered.sel(time=time, method='nearest')
 red = ds_timepoint['nbart_red']
 green = ds_timepoint['nbart_green']
@@ -796,18 +804,21 @@ ax.set_xticks([])
 ax.set_yticks([])
 
 ax.set_aspect(lat_lon_ratio)
+filename = os.path.join(scratch_dir, f"{stub}_Paddock{paddock_id}_RGB.png")
+plt.savefig(filename)
+print("Saved", filename)
 plt.show()
 # endregion
 # region
 # True colour tiff
-filename = os.path.join(scratch_dir, f"RGB_{stub}_{time}.tif")
+filename = os.path.join(scratch_dir, f"{stub}_Paddock{paddock_id}_RGB_{time}.tif")
 ds_timepoint.attrs = {}
 rgb_stack = ds_timepoint[['nbart_red', 'nbart_green', 'nbart_blue']]
 rgb_stack.rio.to_raster(filename)
 print(filename)
 
 # Productivity Tiff
-filename = os.path.join(scratch_dir, f"{productivity_variable}_{stub}_{time}.tif")
+filename = os.path.join(scratch_dir, f"{stub}_Paddock{paddock_id}_{productivity_variable}_{time}.tif")
 clipped = ds_masked.fillna(upper_bound + 0.1)
 clipped = clipped.clip(min=lower_bound, max=upper_bound)
 clipped.attrs = {}
