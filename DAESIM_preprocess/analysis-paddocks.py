@@ -23,6 +23,7 @@ import matplotlib.colors as mcolors
 import matplotlib.patches as mpatches
 from matplotlib.ticker import MaxNLocator, FormatStrFormatter
 from matplotlib.font_manager import FontProperties
+import matplotlib.font_manager as fm
 from matplotlib.colors import LinearSegmentedColormap, Normalize
 from matplotlib.cm import ScalarMappable
 from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
@@ -184,10 +185,9 @@ latitude_rad = math.radians(latitude_deg)
 lat_distance_km = lat_diff_deg * (math.pi * earth_radius_km / 180)
 lon_distance_km = lon_diff_deg * (math.cos(latitude_rad) * (math.pi * earth_radius_km / 180))
 
-lat_lon_ratio = lon_distance_km/lat_distance_km
-# lat_lon_ratio = lat_distance_km/lon_distance_km
+lat_lon_ratio = lat_distance_km/lon_distance_km
+lat_lon_ratio
 
-# lat_lon_ratio = 0.5
 # endregion
 
 # region
@@ -201,9 +201,8 @@ ax.imshow(rgb, extent=(left, right, bottom, top))
 pol.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=1)
 for x, y, label in zip(pol.geometry.centroid.x, pol.geometry.centroid.y, pol['paddock']):
     ax.text(x, y, label, fontsize=12, ha='center', va='center', color='yellow')
-
+    
 ax.set_aspect(lat_lon_ratio)
-
 
 filename = os.path.join(scratch_dir, stub+'_paddock_map_auto.tif')
 plt.savefig(filename, dpi=300, bbox_inches='tight')
@@ -235,8 +234,6 @@ buffered_gdf = gpd.GeoDataFrame(geometry=[rectangular_buffer])
 # %%time
 # Clip the xarray to this paddock
 ds_buffered = ds_small.rio.clip(buffered_gdf.geometry, drop=True, invert=False)
-
-
 
 # region
 # Recreate the adjacency mask for just this paddock
@@ -514,8 +511,6 @@ print("Saved", filename_combined)
 
 # # Spatial Variation
 
-
-
 # Load and calculate topography layers
 filename = os.path.join(outdir, f"{stub}_terrain.tif")
 grid, dem, fdir, acc = pysheds_accumulation(filename)
@@ -601,6 +596,28 @@ region_gdf = gpd.GeoDataFrame(
 )
 
 # region
+# Calculate aspect ratio of this paddock buffer
+paddock_row_4326 = paddock_row.to_crs(epsg=4326)
+
+minx, miny, maxx, maxy = paddock_row_4326['geometry'].iloc[0].bounds
+buffer_distance = max_distance * pixel_size
+expanded_minx = minx - buffer_distance
+expanded_miny = miny - buffer_distance
+expanded_maxx = maxx + buffer_distance
+expanded_maxy = maxy + buffer_distance
+
+lat_diff_deg = expanded_maxy - expanded_miny
+lon_diff_deg = expanded_maxx - expanded_minx
+latitude_rad = math.radians(latitude_deg)
+lat_distance_km = lat_diff_deg * (math.pi * earth_radius_km / 180)
+lon_distance_km = lon_diff_deg * (math.cos(latitude_rad) * (math.pi * earth_radius_km / 180))
+lat_lon_ratio = lat_distance_km/lon_distance_km
+lat_lon_ratio
+# endregion
+
+lat_distance_km
+
+# region
 # Productivity Map
 fig, ax = plt.subplots(1, 1, figsize=(10, 10))
 title_size = 22
@@ -630,7 +647,6 @@ ax.set_xticks([])
 ax.set_yticks([])
 xlim, ylim = ax.get_xlim(), ax.get_ylim()
 lat_lon_ratio = (ylim[1] - ylim[0]) / (xlim[1] - xlim[0])
-ax.set_aspect(lat_lon_ratio)
 
 # Add a color bar axis manually
 colorbar_ax = fig.add_axes([1, 0.125, 0.03, 0.75])  # [x-position, y-position, width, height]
@@ -644,10 +660,22 @@ cbar.ax.tick_params(labelsize=annotations_size)
 tree_patch = mpatches.Patch(color='green', label='Tree')  # Custom legend entry
 ax.legend(handles=[tree_patch], loc='upper left', fontsize=label_size)
 
+scalebar = AnchoredSizeBar(
+    ax.transData, 1000, '1km', loc='lower center', pad=0.1, 
+    color='dimgrey', frameon=False, size_vertical=10, 
+    fontproperties=fm.FontProperties(size=label_size)
+)
+ax.add_artist(scalebar)
+
+ax.set_aspect(lat_lon_ratio)
 plt.tight_layout()
 plt.show()
+# endregion
 
 
+
+
+# region
 # Visualise a panchromatic image of this paddock
 fig, ax = plt.subplots(1, 1, figsize=(10, 10))
 
@@ -662,15 +690,29 @@ left, bottom, right, top = bounds
 
 ax.set_aspect(lat_lon_ratio)
 ax.set_title(f'Paddock {paddock_id} on {time}', fontsize=title_size)
+
+ax.imshow(rgb, extent=(left, right, bottom, top))
+paddock_row.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=5)
+
+scalebar = AnchoredSizeBar(
+    ax.transData, 1000, '1km', loc='lower center', pad=0.1, 
+    color='white', frameon=False, size_vertical=10, 
+    fontproperties=fm.FontProperties(size=label_size)
+)
+ax.add_artist(scalebar)
+
 ax.set_xlabel('')
 ax.set_ylabel('')
 ax.set_xticks([])
 ax.set_yticks([])
 
-ax.imshow(rgb, extent=(left, right, bottom, top))
-paddock_row.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=5)
+ax.set_aspect(lat_lon_ratio)
 plt.show()
 # endregion
+
+
+
+
 
 # region
 # Set up 2x2 subplots
