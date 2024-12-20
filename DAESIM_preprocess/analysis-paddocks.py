@@ -357,12 +357,17 @@ for i, time in enumerate(ds.time.values):
     }
     benefits.append(benefit)
 
-len(benefits)
-
+# region
 df_benefits = pd.DataFrame(benefits)
 df_benefits['date'] = df_benefits['time'].dt.date
 df_benefits = df_benefits.set_index('date')
 df_benefits.index = pd.to_datetime(df_benefits.index)
+
+filename = os.path.join(scratch_dir, f"{stub}_df_benefits.csv")
+df_benefits.to_csv(filename)
+print(filename)
+# endregion
+
 df_top10 = df_benefits.nlargest(10, 'r2')
 df_top10
 
