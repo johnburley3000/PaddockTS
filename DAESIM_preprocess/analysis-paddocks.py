@@ -220,9 +220,57 @@ plt.show()
 print(filename)
 # endregion
 
+# region
+# WorldCover Plot
+fig, ax = plt.subplots(1, 1, figsize=(10, 10))
 
+# Abbreviate the WorldCover names to take less space on the plot
+world_cover_layers = {
+    "Tree": 10, # Green
+    "Grass": 30, # Yellow
+    "Crop": 40, # pink
+    "Urban": 50, # red
+    "Water": 80, # blue
+}
+colors = ['green', 'yellow', 'violet', 'red', 'blue']
+values = list(world_cover_layers.values())
+cmap = mcolors.ListedColormap(colors)
+norm = mcolors.BoundaryNorm(values + [max(values) + 10], cmap.N)  # Add an extra upper bound
 
+# Select the worldcover layer
+ds_worldcover = ds.sel(time=time, method='nearest')['worldcover']
+im = ds_worldcover.plot(
+    cmap=cmap,
+    norm=norm,
+    ax=ax,
+    add_colorbar=False
+)
+ax.set_title(f'WorldCover 2021', fontsize=title_size)
+ax.set_xlabel('')
+ax.set_ylabel('')
+ax.set_xticks([])
+ax.set_yticks([])
 
+pol.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=1)
+for x, y, label in zip(pol.geometry.centroid.x, pol.geometry.centroid.y, pol['paddock']):
+    ax.text(x, y, label, fontsize=12, ha='center', va='center', color='purple')
+
+scalebar = AnchoredSizeBar(
+    ax.transData, 1000, '1km', loc='lower center', pad=0.1, 
+    color='black', frameon=False, size_vertical=10,
+    fontproperties=fm.FontProperties(size=label_size),
+    bbox_to_anchor=(0.05, -0.05),  # Position below the plot
+    bbox_transform=ax.transAxes,
+)
+ax.add_artist(scalebar)
+
+ax.set_aspect(lat_lon_ratio)
+handles = [plt.Line2D([0], [0], color=color, lw=4) for color in colors]
+labels = list(world_cover_layers.keys())
+ax.legend(handles, labels, loc='lower right', fontsize=annotations_size)
+
+plt.show()
+# endregion
 
 # Remove unnecessary variables from ds
 useful_variables = ['nbart_red', 'nbart_green', 'nbart_blue', 'EVI', 'worldcover', 'tree_percent', 'percent_trees_0m-300m']
@@ -685,9 +733,6 @@ plt.tight_layout()
 plt.show()
 # endregion
 
-
-
-
 # region
 # Visualise a panchromatic image of this paddock
 fig, ax = plt.subplots(1, 1, figsize=(10, 10))
@@ -722,10 +767,22 @@ ax.set_yticks([])
 ax.set_aspect(lat_lon_ratio)
 plt.show()
 # endregion
+# region
+# True colour tiff
+filename = os.path.join(scratch_dir, f"RGB_{stub}_{time}.tif")
+ds_timepoint.attrs = {}
+rgb_stack = ds_timepoint[['nbart_red', 'nbart_green', 'nbart_blue']]
+rgb_stack.rio.to_raster(filename)
+print(filename)
 
-
-
-
+# Productivity Tiff
+filename = os.path.join(scratch_dir, f"{productivity_variable}_{stub}_{time}.tif")
+clipped = ds_masked.fillna(upper_bound + 0.1)
+clipped = clipped.clip(min=lower_bound, max=upper_bound)
+clipped.attrs = {}
+clipped.rio.to_raster(filename)
+print(filename)
+# endregion
 
 # region
 # Set up 2x2 subplots
@@ -772,42 +829,7 @@ cbar.set_ticks([])
 cbar.set_label('')  
 cbar.outline.set_visible(False)
 
-# Plot 3: True Colour Image
-ax = axes[0, 1]
-def normalize(arr):
-    return (arr - arr.min()) / (arr.max() - arr.min())
-red = ds_timepoint['nbart_red']
-green = ds_timepoint['nbart_green']
-blue = ds_timepoint['nbart_blue']
-rgb = np.stack([normalize(red), normalize(green), normalize(blue)], axis=-1)
-ax.imshow(rgb)
-ax.set_xlabel('')
-ax.set_ylabel('')
-ax.set_xticks([])
-ax.set_yticks([])
-ax.set_aspect(lat_lon_ratio)
-width_km = 10  # Scale bar settings
-pixels_per_km = ds.sizes['x'] / width_km
-fontprops = FontProperties(size=12)
-scalebar = AnchoredSizeBar(
-    ax.transData,
-    pixels_per_km,
-    '1 km',
-    'lower left',
-    pad=0.5,
-    color='white',
-    frameon=False,
-    size_vertical=2,
-    fontproperties=fontprops,
-)
-ax.add_artist(scalebar)
-ax.set_title('True Colour', fontsize=title_size)
 
-# Dummy white colour bar
-cbar = plt.colorbar(sm, ax=ax, orientation='vertical')
-cbar.set_ticks([])  
-cbar.set_label('')  
-cbar.outline.set_visible(False)
 
 # Plot 4: Larger region and bounding box
 ax = axes[1, 1]
@@ -834,17 +856,4 @@ plt.show()
 print("Saved:", filename)
 # endregion
 
-# True colour tiff
-filename = os.path.join(scratch_dir, f"RGB_{stub}_{time}.tif")
-ds_timepoint.attrs = {}
-rgb_stack = ds_timepoint[['nbart_red', 'nbart_green', 'nbart_blue']]
-rgb_stack.rio.to_raster(filename)
-print(filename)
 
-# Productivity Tiff
-filename = os.path.join(scratch_dir, f"{productivity_variable}_{stub}_{time}.tif")
-clipped = ds_masked.fillna(upper_bound + 0.1)
-clipped = clipped.clip(min=lower_bound, max=upper_bound)
-clipped.attrs = {}
-clipped.rio.to_raster(filename)
-print(filename)
