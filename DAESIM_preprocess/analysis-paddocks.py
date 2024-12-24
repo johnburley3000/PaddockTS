@@ -663,21 +663,6 @@ def add_numpy_band(ds, variable, array, affine, resampling_method):
 
 # region
 def plot_maps(ds, tree_mask, stub, paddock_id):
-    filename = os.path.join(outdir, f"{stub}_terrain.tif")
-    grid, dem, fdir, acc = pysheds_accumulation(filename)
-    num_catchments = 20
-    gullies, full_branches = catchment_gullies(grid, fdir, acc, num_catchments)
-    ridges = catchment_ridges(grid, fdir, acc, full_branches)
-    slope = calculate_slope(filename)
-    
-    # Add the topography bands
-    ds = add_tiff_band(ds, "terrain", Resampling.average, outdir, stub)
-    ds = add_numpy_band(ds, "ridges", ridges.astype(int), grid.affine, Resampling.max)
-    ds = add_numpy_band(ds, "gullies", gullies.astype(int), grid.affine, Resampling.max)
-    
-    dem = ds['terrain']
-    ridges = ds['ridges']
-    gullies = ds['gullies']
     
     # Calculate the productivity and shelter scores
     ds_productivity = ds.sel(time=time, method='nearest')[productivity_variable]
@@ -765,7 +750,7 @@ def plot_maps(ds, tree_mask, stub, paddock_id):
     )
     ax.add_artist(scalebar)
     
-    ax.set_aspect(lat_lon_ratio)
+    # ax.set_aspect(lat_lon_ratio)
     # plt.tight_layout()
     
     filename = os.path.join(scratch_dir, f"{stub}_Paddock{paddock_id}_{productivity_variable}_{time}.png")
@@ -802,7 +787,7 @@ def plot_maps(ds, tree_mask, stub, paddock_id):
     ax.set_xticks([])
     ax.set_yticks([])
     
-    ax.set_aspect(lat_lon_ratio)
+    # ax.set_aspect(lat_lon_ratio)
     filename = os.path.join(scratch_dir, f"{stub}_Paddock{paddock_id}_RGB_{time}.png")
     plt.savefig(filename)
     print("Saved", filename)
