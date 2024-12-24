@@ -824,20 +824,22 @@ def plot_maps(ds, tree_mask, stub, paddock_id):
 
 
 
-paddock_id = 28
-adjacent_mask, tree_mask, ds_buffered = calculate_adjacency_mask(pol, ds_small, paddock_id)
-df_benefits = calculate_shelter_effects(ds_buffered, adjacent_mask)
-time = "2020-01-08"   
-plot_histogram(ds_buffered, time)
-if len(df_benefits) > 0:
-    plot_timeseries(ds_buffered, df_benefits, stub)
-plot_maps(ds_buffered, tree_mask, stub, paddock_id)
+# region
+# paddock_id = 28
+# # adjacent_mask, tree_mask, ds_buffered = calculate_adjacency_mask(pol, ds_small, paddock_id)
+# df_benefits = calculate_shelter_effects(ds_buffered, adjacent_mask)
+# time = "2020-01-08"   
+# plot_histogram(ds_buffered, time)
+# if len(df_benefits) > 0:
+#     plot_timeseries(ds_buffered, df_benefits, stub)
+# plot_maps(ds_buffered, tree_mask, stub, paddock_id)
+# endregion
 
 
 
 # %%time
 # Select a paddock
-paddock_ids = pol['paddock'].values[28:40]
+paddock_ids = pol['paddock'].values[40:]
 for i, paddock_id in enumerate(paddock_ids):
     print(f"{i+1}/{len(paddock_ids)}", "Paddock ID:", paddock_id)
     adjacent_mask, tree_mask, ds_buffered = calculate_adjacency_mask(pol, ds_small, paddock_id)
