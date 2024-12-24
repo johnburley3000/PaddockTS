@@ -369,10 +369,11 @@ def calculate_adjacency_mask(pol, ds_small, paddock_id):
 
     return adjacent_mask, tree_mask, ds_buffered, 
 
-paddock_id = paddock_ids[0]
-adjacent_mask, tree_mask, ds_buffered = calculate_adjacency_mask(pol, ds_small, paddock_id)
+# paddock_id = paddock_ids[0]
+# adjacent_mask, tree_mask, ds_buffered = calculate_adjacency_mask(pol, ds_small, paddock_id)
 # plt.imshow(adjacent_mask)
 # endregion
+
 
 # region
 def calculate_shelter_effects(ds, adjacent_mask, tree_cover_threshold=1):
@@ -438,8 +439,9 @@ def calculate_shelter_effects(ds, adjacent_mask, tree_cover_threshold=1):
 
     return df_benefits
 
-df_benefits = calculate_shelter_effects(ds_buffered, adjacent_mask)
+# df_benefits = calculate_shelter_effects(ds_buffered, adjacent_mask)
 # endregion
+
 
 # region
 def plot_histogram(ds, time, tree_cover_threshold=1):
@@ -492,11 +494,12 @@ def plot_histogram(ds, time, tree_cover_threshold=1):
     cbar.ax.tick_params(labelsize=annotations_size)
     
     # Linear regression line
-    res = stats.linregress(x_values, y_values)
-    x_fit = np.linspace(min(x_values), max(x_values), 500)
-    y_fit = res.intercept + res.slope * x_fit
-    ax1.plot(x_fit, y_fit, 'r-', label=f"$R^2$ = {res.rvalue**2:.2f}")
-    ax1.legend(fontsize=label_size)
+    if len(np.unique(x_values)) > 1:
+        res = stats.linregress(x_values, y_values)
+        x_fit = np.linspace(min(x_values), max(x_values), 500)
+        y_fit = res.intercept + res.slope * x_fit
+        ax1.plot(x_fit, y_fit, 'r-', label=f"$R^2$ = {res.rvalue**2:.2f}")
+        ax1.legend(fontsize=label_size)
     
     # Add vertical black dotted line at the tree cover threshold
     ax1.axvline(
@@ -639,8 +642,9 @@ def plot_timeseries(ds, df_benefits, stub):
     plt.savefig(filename_combined)
     print("Saved", filename_combined)
 
-plot_timeseries(ds_buffered, df_benefits, stub)
+# plot_timeseries(ds_buffered, df_benefits, stub)
 # endregion
+
 
 # region
 def add_tiff_band(ds, variable, resampling_method, outdir, stub):
@@ -820,13 +824,7 @@ def plot_maps(ds, tree_mask, stub, paddock_id):
 
 
 
-df_benefits
-
-plot_timeseries(ds_buffered, df_benefits, stub)
-
-
-paddock_id = 11
-print(f"{i+1}/{len(paddock_ids)}", "Paddock ID:", paddock_id)
+paddock_id = 28
 adjacent_mask, tree_mask, ds_buffered = calculate_adjacency_mask(pol, ds_small, paddock_id)
 df_benefits = calculate_shelter_effects(ds_buffered, adjacent_mask)
 time = "2020-01-08"   
@@ -837,11 +835,9 @@ plot_maps(ds_buffered, tree_mask, stub, paddock_id)
 
 
 
-
-
 # %%time
 # Select a paddock
-paddock_ids = pol['paddock'].values[10:20]
+paddock_ids = pol['paddock'].values[28:40]
 for i, paddock_id in enumerate(paddock_ids):
     print(f"{i+1}/{len(paddock_ids)}", "Paddock ID:", paddock_id)
     adjacent_mask, tree_mask, ds_buffered = calculate_adjacency_mask(pol, ds_small, paddock_id)
