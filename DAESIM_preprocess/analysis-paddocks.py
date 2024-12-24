@@ -323,15 +323,20 @@ plt.show()
 print(filename)
 # endregion
 
+# region
+### I want to convert all lines below here into functions to run these in a loop for each paddock 
+# endregion
+
 # Remove unnecessary variables from ds
 useful_variables = ['nbart_red', 'nbart_green', 'nbart_blue', 'EVI', 'worldcover', 'tree_percent', 'percent_trees_0m-300m']
 ds_small = ds.isel(band=0)[useful_variables]
 
-# %%time
-# Select a paddock
-paddock_ids = pol['paddock'].values
-# paddock_ids = [66]
-for paddock_id in paddock_ids:
+paddock_ids = [66]
+# paddock_ids = pol['paddock'].values
+# for paddock_id in paddock_ids:
+
+# region
+def calculate_adjacency_mask(pol, ds_small, paddock_id):
     paddock_row = pol[pol['paddock'] == paddock_id]
     paddock_geometry = paddock_row['geometry'].iloc[0]
     
@@ -350,7 +355,6 @@ for paddock_id in paddock_ids:
     
     # Recreate the adjacency mask for just this paddock
     paddock_geometry = paddock_row['geometry'].iloc[0]
-    ds = ds_buffered
     tree_percent = ds_buffered['tree_percent'].values
     tree_mask = tree_percent > 0
     structuring_element = np.ones((3, 3))
@@ -359,14 +363,19 @@ for paddock_id in paddock_ids:
     # Exclude pixels outside the paddock for the rest of this analysis
     paddock_mask = geometry_mask(
         [paddock_geometry],
-        out_shape=(ds.sizes["y"], ds.sizes["x"]),
-        transform=ds.rio.transform())
+        out_shape=(ds_buffered.sizes["y"], ds_buffered.sizes["x"]),
+        transform=ds_buffered.rio.transform())
     adjacent_mask |= paddock_mask
-    
-    # plt.imshow(adjacent_mask)
-    
-    # Calculate effects of shelter for this padddock at all timepoints
-    
+
+    return adjacent_mask, tree_mask, ds_buffered, 
+
+paddock_id = paddock_ids[0]
+adjacent_mask, tree_mask, ds_buffered = calculate_adjacency_mask(pol, ds_small, paddock_id)
+# plt.imshow(adjacent_mask)
+# endregion
+
+# region
+def calculate_shelter_effects(ds, adjacent_mask, tree_cover_threshold=5):
     benefits = []
     layer_name = f"percent_trees_{pixel_size * min_distance}m-{pixel_size * max_distance}m"
     shelter_score = ds[layer_name]
@@ -419,16 +428,17 @@ for paddock_id in paddock_ids:
     filename = os.path.join(scratch_dir, f"{stub}_Paddock{paddock_id}_benefits.csv")
     df_benefits.to_csv(filename)
     print("Saved: ", filename)
+
+    return df_benefits
+
+df_benefits = calculate_shelter_effects(ds_buffered, adjacent_mask)
+# endregion
+
+# region
+def plot_histogram(ds, time, tree_cover_threshold=1):
     
-    #### Single timepoint
-    
-    # time = df_top10.index[0].date()
-    time = "2020-01-08"
-    # time = "2017-05-08"
     ds_timepoint = ds.sel(time=time, method='nearest')
-    
-    tree_cover_threshold = 2
-    
+        
     # Calculate shelter score and productivity index for this timepoint
     ndvi = ds.sel(time=time, method='nearest')[productivity_variable]
     p = ndvi.where(~adjacent_mask) #  & (grassland | cropland))
@@ -543,9 +553,13 @@ for paddock_id in paddock_ids:
     plt.show()
     print("Saved", filename)
     
-    # Temporal Variation
-    
-    # Load weather data
+# time = df_top10.index[0].date()
+time = "2020-01-08"   
+plot_histogram(ds_buffered, time)
+# endregion
+
+# region
+def plot_timeseries(ds, stub):
     filename_ozwald = os.path.join(outdir, f"{stub}_ozwald_8day.nc")
     filename_silo = os.path.join(outdir, f"{stub}_silo_daily.nc")
     ds_ozwald = xr.open_dataset(filename_ozwald)
@@ -616,41 +630,45 @@ for paddock_id in paddock_ids:
     # Save as a single image
     filename_combined = os.path.join(scratch_dir, f"{stub}_Paddock{paddock_id}_time_series.png")
     plt.savefig(filename_combined)
-    # plt.show()
     print("Saved", filename_combined)
-    
-    # Spatial Variation
-    
-    # Load and calculate topography layers
+
+plot_timeseries(ds_buffered, stub)
+# endregion
+
+# region
+def add_tiff_band(ds, variable, resampling_method, outdir, stub):
+    """Add a new band to the xarray from a tiff file using the given resampling method"""
+    filename = os.path.join(outdir, f"{stub}_{variable}.tif")
+    array = rxr.open_rasterio(filename)
+    reprojected = array.rio.reproject_match(ds, resampling=resampling_method)
+    ds[variable] = reprojected.isel(band=0).drop_vars('band')
+    return ds
+
+def add_numpy_band(ds, variable, array, affine, resampling_method):
+    """Add a new band to the xarray from a numpy array and affine using the given resampling method"""
+    da = xr.DataArray(
+        array, 
+        dims=["y", "x"], 
+        attrs={
+            "transform": affine,
+            "crs": "EPSG:3857"
+        }
+    )
+    da.rio.write_crs("EPSG:3857", inplace=True)
+    reprojected = da.rio.reproject_match(ds, resampling=resampling_method)
+    ds[variable] = reprojected
+    return ds
+# endregion
+
+
+# region
+def plot_maps(ds, tree_mask, stub, paddock_id):
     filename = os.path.join(outdir, f"{stub}_terrain.tif")
     grid, dem, fdir, acc = pysheds_accumulation(filename)
     num_catchments = 20
     gullies, full_branches = catchment_gullies(grid, fdir, acc, num_catchments)
     ridges = catchment_ridges(grid, fdir, acc, full_branches)
     slope = calculate_slope(filename)
-    
-    def add_tiff_band(ds, variable, resampling_method, outdir, stub):
-        """Add a new band to the xarray from a tiff file using the given resampling method"""
-        filename = os.path.join(outdir, f"{stub}_{variable}.tif")
-        array = rxr.open_rasterio(filename)
-        reprojected = array.rio.reproject_match(ds, resampling=resampling_method)
-        ds[variable] = reprojected.isel(band=0).drop_vars('band')
-        return ds
-    
-    def add_numpy_band(ds, variable, array, affine, resampling_method):
-        """Add a new band to the xarray from a numpy array and affine using the given resampling method"""
-        da = xr.DataArray(
-            array, 
-            dims=["y", "x"], 
-            attrs={
-                "transform": affine,
-                "crs": "EPSG:3857"
-            }
-        )
-        da.rio.write_crs("EPSG:3857", inplace=True)
-        reprojected = da.rio.reproject_match(ds, resampling=resampling_method)
-        ds[variable] = reprojected
-        return ds
     
     # Add the topography bands
     ds = add_tiff_band(ds, "terrain", Resampling.average, outdir, stub)
@@ -684,6 +702,7 @@ for paddock_id in paddock_ids:
     median_value = np.median(unsheltered)
     
     # Calculate aspect ratio of this paddock buffer
+    paddock_row = pol[pol['paddock'] == paddock_id]
     paddock_row_4326 = paddock_row.to_crs(epsg=4326)
     
     minx, miny, maxx, maxy = paddock_row_4326['geometry'].iloc[0].bounds
@@ -804,4 +823,37 @@ for paddock_id in paddock_ids:
     clipped.rio.to_raster(filename)
     print("Saved", filename)
 
+plot_maps(ds_buffered, tree_mask, stub, paddock_id)
+# endregion
 
+paddock_id = 1
+
+adjacent_mask, tree_mask, ds_buffered = calculate_adjacency_mask(pol, ds_small, paddock_id)
+
+plt.imshow(adjacent_mask)
+
+df_benefits = calculate_shelter_effects(ds_buffered, adjacent_mask, tree_cover_threshold=1)
+
+df_benefits
+
+time = "2020-01-08"   
+plot_histogram(ds_buffered, time, tree_cover_threshold=1)
+
+plot_timeseries(ds_buffered, stub)
+
+plot_maps(ds_buffered, tree_mask, stub, paddock_id)
+
+
+
+# %%time
+# Select a paddock
+paddock_ids = pol['paddock'].values
+# paddock_ids = [66]
+for i, paddock_id in enumerate(paddock_ids):
+    print(f"{i+1}/{len(paddock_ids)}", "Paddock ID:", paddock_id)
+    adjacent_mask, tree_mask, ds_buffered = calculate_adjacency_mask(pol, ds_small, paddock_id)
+    df_benefits = calculate_shelter_effects(ds_buffered, adjacent_mask)
+    time = "2020-01-08"   
+    plot_histogram(ds_buffered, time)
+    plot_timeseries(ds_buffered, stub)
+    plot_maps(ds_buffered, tree_mask, stub, paddock_id)
