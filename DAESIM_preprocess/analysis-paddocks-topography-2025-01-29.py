@@ -887,38 +887,28 @@ aspect_colors = ['blue', 'green', 'yellow', 'orange', 'red', 'purple', 'brown', 
 cmap = mcolors.ListedColormap(aspect_colors)
 norm = mcolors.BoundaryNorm(boundaries=aspect_categories, ncolors=len(aspect_categories), clip=True)
 
+# Extracting a single timepoint for EVI and RGB plots
 ds_timepoint = ds_buffered.sel(time=time, method='nearest')
 
-# endregion
-
-# region
-# EVI
-
-ds_productivity = ds_buffered.sel(time=time, method='nearest')[productivity_variable]
-
-fig, ax = plt.subplots(1, 1, figsize=(8, 6))
-im = ds_productivity.plot(ax=ax)
-paddock_row.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=5)
-# endregion
-
-# region
-# RGB
-fig, ax = plt.subplots(1, 1, figsize=(10, 10))
-
+# Setting up the RGB layers
 red = ds_timepoint['nbart_red']
 green = ds_timepoint['nbart_green']
 blue = ds_timepoint['nbart_blue']
 rgb = np.stack([normalize(red), normalize(green), normalize(blue)], axis=-1)
 bounds = ds_buffered[productivity_variable].rio.bounds()
 left, bottom, right, top = bounds
+# endregion
 
-ax.set_aspect(lat_lon_ratio)
-ax.set_title(f'Paddock {paddock_id} on {time}', fontsize=title_size)
-
-ax.imshow(rgb, extent=(left, right, bottom, top))
+# EVI
+ds_productivity = ds_buffered.sel(time=time, method='nearest')[productivity_variable]
+fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+im = ds_productivity.plot(ax=ax)
 paddock_row.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=5)
 
-# endregion
+# RGB
+fig, ax = plt.subplots(1, 1, figsize=(10, 10))
+ax.imshow(rgb, extent=(left, right, bottom, top))
+paddock_row.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=5)
 
 # Terrain
 fig, ax = plt.subplots(1, 1, figsize=(8, 6))
