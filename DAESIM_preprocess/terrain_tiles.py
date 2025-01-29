@@ -120,8 +120,8 @@ def terrain_tiles(lat=-34.3890427, lon=148.469499, buffer=0.005, outdir="", stub
 if __name__ == '__main__':
     # Choosing location
     lat, lon = -34.3890427, 148.469499
-    buffer = 0.005  # 0.01 degrees is about 1km in each direction, so 2km total
-    stub = "MILG_1km"
+    buffer = 0.05  # 0.01 degrees is about 1km in each direction, so 2km total
+    stub = "MILG"
 
     # Specify output destinations
     outdir = os.path.join(gdata_dir, "Data/PadSeg/")
@@ -133,3 +133,5 @@ if __name__ == '__main__':
     # Visualise the downloaded data
     filename = os.path.join(outdir, f"{stub}_terrain.tif")
     visualise_tif(filename, "Terrain Tiles")
+
+
