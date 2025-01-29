@@ -900,6 +900,18 @@ blue = ds_timepoint['nbart_blue']
 rgb = np.stack([normalize(red), normalize(green), normalize(blue)], axis=-1)
 bounds = ds_buffered[productivity_variable].rio.bounds()
 left, bottom, right, top = bounds
+
+# Aspect labels
+directions = {
+        1: "East",
+        2: "Southeast",
+        4: "South",
+        8: "Southwest",
+        16: "West",
+        32: "Northwest",
+        64: "North",
+        128: "Northeast",
+}
 # endregion
 
 # region
@@ -951,8 +963,10 @@ def add_cbar(im, title="", label_size=16):
     cbar = im.colorbar
     cbar.set_label(title, fontsize=label_size)
     cbar.ax.tick_params(labelsize=label_size)
-# endregion
+    return cbar
 
+
+# endregion
 
 # region
 # Plotting the maps in subplots
@@ -1006,7 +1020,9 @@ ax = axes[2,0]
 im = ds_buffered['aspect'].plot(ax=ax, cmap=cmap, norm=norm, add_colorbar=True)
 paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
 ax.set_title(f"Aspect", fontsize=title_size)
-add_cbar(im, "", label_size)
+cbar = add_cbar(im, "", label_size)
+cbar.set_ticks(list(directions.keys()))
+cbar.set_ticklabels(list(directions.values())) 
 
 # Slope
 ax = axes[2,1]
