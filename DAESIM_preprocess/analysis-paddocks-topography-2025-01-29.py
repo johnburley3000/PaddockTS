@@ -114,11 +114,12 @@ def add_numpy_band(ds, variable, array, affine, resampling_method):
     return ds
 # endregion
 
+
 # Add the soil layers
-# ds = add_tiff_band(ds, "Clay", Resampling.average, outdir, stub)
-# ds = add_tiff_band(ds, "Silt", Resampling.average, outdir, stub)
-# ds = add_tiff_band(ds, "Sand", Resampling.average, outdir, stub)
-# ds = add_tiff_band(ds, "pH_CaCl2", Resampling.average, outdir, stub)
+ds = add_tiff_band(ds, "Clay", Resampling.average, outdir, stub)
+ds = add_tiff_band(ds, "Silt", Resampling.average, outdir, stub)
+ds = add_tiff_band(ds, "Sand", Resampling.average, outdir, stub)
+ds = add_tiff_band(ds, "pH_CaCl2", Resampling.average, outdir, stub)
 
 
 # Calculate the topographic layers
@@ -131,10 +132,6 @@ ds = add_tiff_band(ds, "terrain", Resampling.average, outdir, stub)
 ds = add_numpy_band(ds, "slope", slope, grid.affine, Resampling.average)
 ds = add_numpy_band(ds, "topographic_index", acc, grid.affine, Resampling.max)
 ds = add_numpy_band(ds, "aspect", fdir, grid.affine, Resampling.nearest)
-
-# region
-# ds['terrain'].plot()
-# endregion
 
 # The resampling often messes up the boundary, so we trim the outside pixels after adding all the resampled bounds
 ds = ds.isel(
@@ -914,4 +911,10 @@ paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
 plt.colorbar(im, ax=ax, ticks=categories, label='Aspect')
 plt.show()
 
+fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+im = ds_buffered['slope'].plot(ax=ax, cmap='grey')
+paddock_row.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=5)
 
+fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+im = ds_buffered['slope'].plot(ax=ax, cmap='grey')
+paddock_row.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=5)
