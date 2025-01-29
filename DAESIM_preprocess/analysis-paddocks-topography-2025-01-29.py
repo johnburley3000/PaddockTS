@@ -875,6 +875,9 @@ def plot_maps(ds, tree_mask, stub, paddock_id):
 plot_maps(ds_buffered, tree_mask, stub, paddock_id)
 # endregion
 # region
+# Prepping variables for the plots
+ds = ds_buffered
+
 from matplotlib import colors  # Careful because I have a variable named 'colors' earlier in this script
 
 dem = ds_buffered['terrain']
@@ -889,7 +892,6 @@ norm = mcolors.BoundaryNorm(boundaries=aspect_categories, ncolors=len(aspect_cat
 
 # Extracting a single timepoint for EVI and RGB plots
 ds_timepoint = ds_buffered.sel(time=time, method='nearest')
-ds_productivity = ds_buffered.sel(time=time, method='nearest')[productivity_variable]
 
 # Setting up the RGB layers
 red = ds_timepoint['nbart_red']
@@ -901,39 +903,122 @@ left, bottom, right, top = bounds
 # endregion
 
 # region
-# Maps
-fig, axes = plt.subplots(3, 2, figsize=(8, 12))
+# Calculate the productivity and shelter scores
+ds_productivity = ds.sel(time=time, method='nearest')[productivity_variable]
+ds_masked = ds_productivity.where(~adjacent_mask)
+layer_name = f"percent_trees_0m-300m"
+s = ds[layer_name].values
+y = ds_masked.values.flatten()
+y_values_outliers = y[~np.isnan(y)]  
+x = s.flatten()
+x_values_outliers = x[~np.isnan(y)]  
+
+# Remove outliers
+lower_bound = np.percentile(y_values_outliers, 1)
+upper_bound = np.percentile(y_values_outliers, 99)
+
+y_values = y_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]    
+x = s.flatten()
+x_values_outliers = x[~np.isnan(y)]
+x_values = x_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]
+
+unsheltered = y_values[np.where(x_values < tree_cover_threshold)]
+median_value = np.median(unsheltered)
+
+# Calculate colour bar boundaries
+vmin_EVI = median_value - (upper_bound - lower_bound) / 2
+vmax_EVI = median_value + (upper_bound - lower_bound) / 2
+cmap_EVI = plt.cm.coolwarm
+cmap_EVI.set_bad(color='green')  # Set NaN pixels to green
+
+ds_trees = ds_productivity.where(~tree_mask)
+# endregion
+
+# region
+# Prep formatting functions
+def remove_axis_labels(ax):
+    ax.set_xlabel('')
+    ax.set_ylabel('')
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+# Create a dummy white colorbar to align the plots nicely
+white_cmap = LinearSegmentedColormap.from_list("white_cmap", ["white", "white"])
+white_norm = Normalize(vmin=0, vmax=1)
+sm_white = ScalarMappable(norm=white_norm, cmap=white_cmap)
+
+def add_cbar(im, title="", label_size=16):
+    cbar = im.colorbar
+    cbar.set_label(title, fontsize=label_size)
+    cbar.ax.tick_params(labelsize=label_size)
+# endregion
+
+
+# region
+# Plotting the maps in subplots
+fig, axes = plt.subplots(3, 2, figsize=(12, 12))
+
+# Fontsizes
+title_size = 20
+label_size = 16
 
 # EVI
 ax = axes[0,0]
-im = ds_productivity.plot(ax=ax, add_colorbar=False)
-paddock_row.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=5)
+im = ds_trees.plot(ax=ax, cmap=cmap_EVI, vmin=vmin_EVI, vmax=vmax_EVI, add_colorbar=True)
+paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
+ax.set_title(f"Productivity Proxy", fontsize=title_size)
+add_cbar(im, "EVI", label_size)
 
 # RGB
 ax = axes[0,1]
 ax.imshow(rgb, extent=(left, right, bottom, top))
 paddock_row.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=5)
+ax.set_title(f"Satellite Imagery", fontsize=title_size)
 
-# # Topographic Index
+scalebar = AnchoredSizeBar(
+    ax.transData, 1000, '1km', loc='lower center', pad=0.1, 
+    color='white', frameon=False, size_vertical=10, 
+    fontproperties=fm.FontProperties(size=label_size)
+)
+ax.add_artist(scalebar)
+
+cbar = plt.colorbar(sm_white, ax=ax, orientation='vertical')
+cbar.set_ticks([])  
+cbar.set_label('')  
+cbar.outline.set_visible(False)
+
+# Terrain
 ax = axes[1,0]
-im = ds_buffered['terrain'].plot(ax=ax, cmap='terrain', add_colorbar=False)
-paddock_row.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=5)
+im = ds_buffered['terrain'].plot(ax=ax, cmap='terrain', add_colorbar=True)
+paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
+ax.set_title(f"Elevation", fontsize=title_size)
+add_cbar(im, "Metres", label_size)
 
 # Topographic Index
 ax = axes[1,1]
-acc.plot(ax=ax, cmap='cubehelix', norm=colors.LogNorm(1, acc.max()), add_colorbar=False)
+im = acc.plot(ax=ax, cmap='cubehelix', norm=colors.LogNorm(1, acc.max()), add_colorbar=True)
 paddock_row.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=5)
+ax.set_title(f"Topographic Index", fontsize=title_size)
+add_cbar(im, "Upstream Cells", label_size)
 
 # Aspect
 ax = axes[2,0]
-im = ds_buffered['aspect'].plot(ax=ax, cmap=cmap, norm=norm, add_colorbar=False)
+im = ds_buffered['aspect'].plot(ax=ax, cmap=cmap, norm=norm, add_colorbar=True)
 paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
-# plt.colorbar(im, ax=ax, ticks=aspect_categories, label='Aspect')
+ax.set_title(f"Aspect", fontsize=title_size)
+add_cbar(im, "", label_size)
 
 # Slope
 ax = axes[2,1]
-im = ds_buffered['slope'].plot(ax=ax, cmap='YlOrBr', add_colorbar=False)
+im = ds_buffered['slope'].plot(ax=ax, cmap='YlOrBr', add_colorbar=True)
 paddock_row.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=5)
+ax.set_title(f"Slope", fontsize=title_size)
+add_cbar(im, "Degrees", label_size)
+
+# Remove axes
+for row in axes:
+    for ax in row:
+        remove_axis_labels(ax)
 
 plt.tight_layout()
 plt.show()
