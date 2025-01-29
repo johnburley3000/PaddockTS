@@ -603,50 +603,6 @@ plot_histogram(ds_buffered, time)
 # endregion
 
 # region
-# def merge_ozwald_silo(ds_ozwald, ds_silo):
-#     """Combine soil moisture data from ozwald with temp, rainfall, evaporation from SILO"""
-
-#     # Find the maximum and minimum soil moisture to see some variation
-#     ssoil_sum = ds_ozwald['Ssoil'].sum(dim='time')
-    
-#     max_row = int(ssoil_sum.argmax() // ssoil_sum.shape[0])
-#     max_col = int(ssoil_sum.argmax() % ssoil_sum.shape[0])
-#     min_row = int(ssoil_sum.argmin() // ssoil_sum.shape[0])
-#     min_col = int(ssoil_sum.argmin() % ssoil_sum.shape[0])
-    
-#     ssoil_maxpoint = ds_ozwald.isel(longitude=max_row, latitude=max_col)
-#     ssoil_minpoint = ds_ozwald.isel(longitude=min_row, latitude=min_col)
-    
-#     ssoil_maxpoint = ssoil_maxpoint.rename({'Ssoil': 'Maximum Soil Moisture'})
-#     ssoil_minpoint = ssoil_minpoint.rename({'Ssoil': 'Minimum Soil Moisture'})
-    
-#     if (ds_silo['lat'].values.size == 1 and ds_silo['lon'].values.size == 1):
-#         ds_silo_point = ds_silo
-#     # Making the assumption that the four 5km SILO pixels are similar, so just choosing the first one. Later will want to be more precise using ANU Climate at 1km resolution
-#     else:
-#         ds_silo_point = ds_silo.isel(lat=0, lon=0)
-    
-#     # Combine the datasets along the time dimension
-#     ds_merged = xr.merge([ds_silo_point, ssoil_maxpoint, ssoil_minpoint], compat='override')
-#     df = ds_merged.to_dataframe().reset_index()
-#     df = df.drop(columns=["lat", "lon", "crs", "latitude", "longitude"])
-#     df = df.set_index('time')
-    
-#     # Rename the columns 
-#     abbreviations = {
-#         "daily_rain" : "Rainfall",
-#         "max_temp" : "Maximum temperature",
-#         "min_temp" : "Minimum temperature",
-#         "et_morton_actual": "Actual Evapotranspiration",
-#         "et_morton_potential":"Potential Evapotranspiration"
-#         }
-#     df.rename(columns=abbreviations, inplace=True)
-#     df.rename_axis("date", inplace=True)
-
-#     return df
-# endregion
-
-# region
 def plot_timeseries(ds, df_benefits, stub):
     filename_ozwald = os.path.join(outdir, f"{stub}_ozwald_8day.nc")
     filename_silo = os.path.join(outdir, f"{stub}_silo_daily.nc")
@@ -722,166 +678,14 @@ def plot_timeseries(ds, df_benefits, stub):
 
 plot_timeseries(ds_buffered, df_benefits, stub)
 # endregion
-
-
-
-# region
-def plot_maps(ds, tree_mask, stub, paddock_id):
-    
-    # Calculate the productivity and shelter scores
-    ds_productivity = ds.sel(time=time, method='nearest')[productivity_variable]
-    ds_masked = ds_productivity.where(~adjacent_mask)
-    layer_name = f"percent_trees_0m-300m"
-    s = ds[layer_name].values
-    y = ds_masked.values.flatten()
-    y_values_outliers = y[~np.isnan(y)]  
-    x = s.flatten()
-    x_values_outliers = x[~np.isnan(y)]  
-    
-    # Remove outliers
-    lower_bound = np.percentile(y_values_outliers, 1)
-    upper_bound = np.percentile(y_values_outliers, 99)
-    
-    y_values = y_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]    
-    x = s.flatten()
-    x_values_outliers = x[~np.isnan(y)]
-    x_values = x_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]
-    
-    unsheltered = y_values[np.where(x_values < tree_cover_threshold)]
-    median_value = np.median(unsheltered)
-    
-    # Calculate aspect ratio of this paddock buffer
-    paddock_row = pol[pol['paddock'] == paddock_id]
-    paddock_row_4326 = paddock_row.to_crs(epsg=4326)
-    
-    minx, miny, maxx, maxy = paddock_row_4326['geometry'].iloc[0].bounds
-    buffer_distance = max_distance * pixel_size
-    expanded_minx = minx - buffer_distance
-    expanded_miny = miny - buffer_distance
-    expanded_maxx = maxx + buffer_distance
-    expanded_maxy = maxy + buffer_distance
-    
-    lat_diff_deg = expanded_maxy - expanded_miny
-    lon_diff_deg = expanded_maxx - expanded_minx
-    latitude_rad = math.radians(latitude_deg)
-    lat_distance_km = lat_diff_deg * (math.pi * earth_radius_km / 180)
-    lon_distance_km = lon_diff_deg * (math.cos(latitude_rad) * (math.pi * earth_radius_km / 180))
-    lat_lon_ratio = lat_distance_km/lon_distance_km
-    
-    # Productivity Map
-    fig, ax = plt.subplots(1, 1, figsize=(10, 10))
-    
-    vmin = median_value - (upper_bound - lower_bound) / 2
-    vmax = median_value + (upper_bound - lower_bound) / 2
-    cmap = plt.cm.coolwarm
-    cmap.set_bad(color='green')  # Set NaN pixels to green
-    
-    ds_trees = ds_productivity.where(~tree_mask)
-    
-    im = ds_trees.plot(
-        cmap=cmap,
-        vmin=vmin,
-        vmax=vmax,
-        ax=ax,
-        add_colorbar=False  # Suppress the automatic color bar
-    )
-    paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
-    
-    ax.set_title(f'Paddock {paddock_id} on {time}', fontsize=title_size)
-    ax.set_xlabel('')
-    ax.set_ylabel('')
-    ax.set_xticks([])
-    ax.set_yticks([])
-    xlim, ylim = ax.get_xlim(), ax.get_ylim()
-    lat_lon_ratio = (ylim[1] - ylim[0]) / (xlim[1] - xlim[0])
-    
-    # Add a color bar axis manually
-    colorbar_ax = fig.add_axes([1, 0.125, 0.03, 0.75])  # [x-position, y-position, width, height]
-    cbar = fig.colorbar(im, cax=colorbar_ax)
-    
-    # Add labels and ticks
-    cbar.set_label(f"{productivity_variable}", fontsize=label_size)
-    cbar.ax.tick_params(labelsize=annotations_size)
-    
-    # Add legend for tree pixels
-    tree_patch = mpatches.Patch(color='green', label='Tree')  # Custom legend entry
-    ax.legend(handles=[tree_patch], loc='upper left', fontsize=label_size)
-    
-    scalebar = AnchoredSizeBar(
-        ax.transData, 1000, '1km', loc='lower center', pad=0.1, 
-        color='dimgrey', frameon=False, size_vertical=10, 
-        fontproperties=fm.FontProperties(size=label_size)
-    )
-    ax.add_artist(scalebar)
-    
-    # ax.set_aspect(lat_lon_ratio)
-    # plt.tight_layout()
-    
-    filename = os.path.join(scratch_dir, f"{stub}_Paddock{paddock_id}_{productivity_variable}_{time}.png")
-    plt.savefig(filename)
-    print("Saved", filename)
-    # plt.show()
-    
-    # Visualise a panchromatic image of this paddock
-    fig, ax = plt.subplots(1, 1, figsize=(10, 10))
-    
-    ds_timepoint = ds_buffered.sel(time=time, method='nearest')
-    red = ds_timepoint['nbart_red']
-    green = ds_timepoint['nbart_green']
-    blue = ds_timepoint['nbart_blue']
-    rgb = np.stack([normalize(red), normalize(green), normalize(blue)], axis=-1)
-    bounds = ds_buffered[productivity_variable].rio.bounds()
-    left, bottom, right, top = bounds
-    
-    ax.set_aspect(lat_lon_ratio)
-    ax.set_title(f'Paddock {paddock_id} on {time}', fontsize=title_size)
-    
-    ax.imshow(rgb, extent=(left, right, bottom, top))
-    paddock_row.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=5)
-    
-    scalebar = AnchoredSizeBar(
-        ax.transData, 1000, '1km', loc='lower center', pad=0.1, 
-        color='white', frameon=False, size_vertical=10, 
-        fontproperties=fm.FontProperties(size=label_size)
-    )
-    ax.add_artist(scalebar)
-    
-    ax.set_xlabel('')
-    ax.set_ylabel('')
-    ax.set_xticks([])
-    ax.set_yticks([])
-    
-    # ax.set_aspect(lat_lon_ratio)
-    filename = os.path.join(scratch_dir, f"{stub}_Paddock{paddock_id}_RGB_{time}.png")
-    plt.savefig(filename)
-    print("Saved", filename)
-    # plt.show()
-    
-    # True colour tiff
-    filename = os.path.join(scratch_dir, f"{stub}_Paddock{paddock_id}_RGB_{time}.tif")
-    ds_timepoint.attrs = {}
-    rgb_stack = ds_timepoint[['nbart_red', 'nbart_green', 'nbart_blue']]
-    rgb_stack.rio.to_raster(filename)
-    print("Saved", filename)
-    
-    # Productivity Tiff
-    filename = os.path.join(scratch_dir, f"{stub}_Paddock{paddock_id}_{productivity_variable}_{time}.tif")
-    clipped = ds_masked.fillna(upper_bound + 0.1)
-    clipped = clipped.clip(min=lower_bound, max=upper_bound)
-    clipped.attrs = {}
-    clipped.rio.to_raster(filename)
-    print("Saved", filename)
-
-plot_maps(ds_buffered, tree_mask, stub, paddock_id)
-# endregion
 # region
 # Prepping variables for the plots
 ds = ds_buffered
 
 from matplotlib import colors  # Careful because I have a variable named 'colors' earlier in this script
 
-dem = ds_buffered['terrain']
-acc = ds_buffered['topographic_index']
+dem = ds['terrain']
+acc = ds['topographic_index']
 paddock_row = pol[pol['paddock'] == paddock_id]
 
 # Create a ListedColormap and BoundaryNorm for aspect plot
@@ -964,9 +768,8 @@ def add_cbar(im, title="", label_size=16):
     cbar.set_label(title, fontsize=label_size)
     cbar.ax.tick_params(labelsize=label_size)
     return cbar
-
-
 # endregion
+
 
 # region
 # Plotting the maps in subplots
@@ -1039,3 +842,27 @@ for row in axes:
 plt.tight_layout()
 plt.show()
 # endregion
+
+# region
+# True colour tiff
+filename = os.path.join(scratch_dir, f"{stub}_Paddock{paddock_id}_RGB_{time}.tif")
+ds_timepoint.attrs = {}
+rgb_stack = ds_timepoint[['nbart_red', 'nbart_green', 'nbart_blue']]
+rgb_stack.rio.to_raster(filename)
+print("Saved", filename)
+
+# Productivity tiff
+filename = os.path.join(scratch_dir, f"{stub}_Paddock{paddock_id}_{productivity_variable}_{time}.tif")
+clipped = ds_masked.fillna(upper_bound + 0.1)
+clipped = clipped.clip(min=lower_bound, max=upper_bound)
+clipped.attrs = {}
+clipped.rio.to_raster(filename)
+print("Saved", filename)
+# endregion
+
+# Topography tiffs
+topographic_variables = ['terrain', 'topographic_index', 'aspect', 'slope']
+for topographic_variable in topographic_variables:
+    filename = os.path.join(scratch_dir, f"{stub}_Paddock{paddock_id}_{topographic_variable}.tif")
+    ds_buffered[topographic_variable].rio.to_raster(filename)
+    print("Saved", filename)
