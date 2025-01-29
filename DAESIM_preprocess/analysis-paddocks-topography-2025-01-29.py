@@ -882,15 +882,20 @@ def plot_maps(ds, tree_mask, stub, paddock_id):
 
 plot_maps(ds_buffered, tree_mask, stub, paddock_id)
 # endregion
+# region
+from matplotlib import colors  # Careful because I have a variable named 'colors' earlier in this script
+
 dem = ds_buffered['terrain']
+acc = ds_buffered['topographic_index']
 paddock_row = pol[pol['paddock'] == paddock_id]
 
+# endregion
 
 fig, ax = plt.subplots(1, 1, figsize=(8, 6))
 im = ds_buffered['terrain'].plot(ax=ax, cmap='terrain')
 paddock_row.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=5)
 
-fig, ax = plt.subplots(1, 1, figsize=(10, 10))
-ds_productivity = ds_buffered.sel(time=time, method='nearest')['EVI']
-im = ds_productivity.plot(ax=ax)
+fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+acc.plot(ax=ax, cmap='cubehelix',
+               norm=colors.LogNorm(1, acc.max()))
 paddock_row.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=5)
