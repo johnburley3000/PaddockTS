@@ -364,7 +364,8 @@ print(filename)
 
 # Remove unnecessary variables from ds
 useful_variables = ['nbart_red', 'nbart_green', 'nbart_blue', 'EVI', 'worldcover', 'tree_percent', 'percent_trees_0m-300m'
-                    , 'terrain', 'slope', 'topographic_index', 'aspect']
+                    , 'terrain', 'slope', 'topographic_index', 'aspect'
+                    , 'Clay', 'Silt', 'Sand', 'pH_CaCl2']
 ds_small = ds.isel(band=0)[useful_variables]
 
 paddock_ids = [66]
@@ -409,12 +410,6 @@ paddock_id = paddock_ids[0]
 adjacent_mask, tree_mask, ds_buffered = calculate_adjacency_mask(pol, ds_small, paddock_id)
 plt.imshow(adjacent_mask)
 # endregion
-
-
-
-
-
-
 
 # region
 def calculate_shelter_effects(ds, adjacent_mask, tree_cover_threshold=1):
@@ -889,16 +884,48 @@ paddock_row = pol[pol['paddock'] == paddock_id]
 # Create a ListedColormap and BoundaryNorm for aspect plot
 aspect_categories = [1, 2, 4, 8, 16, 32, 64, 128]
 aspect_colors = ['blue', 'green', 'yellow', 'orange', 'red', 'purple', 'brown', 'pink']  # Colors for each category
-# aspect_colors = ['#EE82EE', '#00008B', '#ADD8E6', '#006400', '#90EE90', '#FFFF00', '#FFA500', '#DC143C']
 cmap = mcolors.ListedColormap(aspect_colors)
-norm = mcolors.BoundaryNorm(boundaries=categories, ncolors=len(categories), clip=True)
+norm = mcolors.BoundaryNorm(boundaries=aspect_categories, ncolors=len(aspect_categories), clip=True)
+
+ds_timepoint = ds_buffered.sel(time=time, method='nearest')
 
 # endregion
 
+# region
+# EVI
+
+ds_productivity = ds_buffered.sel(time=time, method='nearest')[productivity_variable]
+
+fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+im = ds_productivity.plot(ax=ax)
+paddock_row.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=5)
+# endregion
+
+# region
+# RGB
+fig, ax = plt.subplots(1, 1, figsize=(10, 10))
+
+red = ds_timepoint['nbart_red']
+green = ds_timepoint['nbart_green']
+blue = ds_timepoint['nbart_blue']
+rgb = np.stack([normalize(red), normalize(green), normalize(blue)], axis=-1)
+bounds = ds_buffered[productivity_variable].rio.bounds()
+left, bottom, right, top = bounds
+
+ax.set_aspect(lat_lon_ratio)
+ax.set_title(f'Paddock {paddock_id} on {time}', fontsize=title_size)
+
+ax.imshow(rgb, extent=(left, right, bottom, top))
+paddock_row.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=5)
+
+# endregion
+
+# Terrain
 fig, ax = plt.subplots(1, 1, figsize=(8, 6))
 im = ds_buffered['terrain'].plot(ax=ax, cmap='terrain')
 paddock_row.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=5)
 
+# Topographic Index
 fig, ax = plt.subplots(1, 1, figsize=(8, 6))
 acc.plot(ax=ax, cmap='cubehelix',
                norm=colors.LogNorm(1, acc.max()))
@@ -908,13 +935,32 @@ paddock_row.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=5)
 fig, ax = plt.subplots(1, 1, figsize=(8, 6))
 im = ds_buffered['aspect'].plot(ax=ax, cmap=cmap, norm=norm, add_colorbar=False)
 paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
-plt.colorbar(im, ax=ax, ticks=categories, label='Aspect')
+plt.colorbar(im, ax=ax, ticks=aspect_categories, label='Aspect')
 plt.show()
 
+# Slope
 fig, ax = plt.subplots(1, 1, figsize=(8, 6))
 im = ds_buffered['slope'].plot(ax=ax, cmap='grey')
 paddock_row.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=5)
 
+soil_cmap = 'YlOrBr'
+
+# Clay
 fig, ax = plt.subplots(1, 1, figsize=(8, 6))
-im = ds_buffered['slope'].plot(ax=ax, cmap='grey')
+im = ds_buffered['Clay'].plot(ax=ax, cmap=soil_cmap, vmin=0, vmax=100)
+paddock_row.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=5)
+
+# Silt 
+fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+im = ds_buffered['Silt'].plot(ax=ax, cmap=soil_cmap, vmin=0, vmax=100)
+paddock_row.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=5)
+
+# Sand
+fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+im = ds_buffered['Sand'].plot(ax=ax, cmap=soil_cmap, vmin=0, vmax=100)
+paddock_row.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=5)
+
+# # Electrical Conductivity
+fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+im = ds_buffered['pH_CaCl2'].plot(ax=ax, cmap=plt.cm.plasma.reversed(), vmin=4, vmax=8)
 paddock_row.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=5)
