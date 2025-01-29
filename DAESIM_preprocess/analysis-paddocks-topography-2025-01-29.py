@@ -889,6 +889,13 @@ dem = ds_buffered['terrain']
 acc = ds_buffered['topographic_index']
 paddock_row = pol[pol['paddock'] == paddock_id]
 
+# Create a ListedColormap and BoundaryNorm for aspect plot
+aspect_categories = [1, 2, 4, 8, 16, 32, 64, 128]
+aspect_colors = ['blue', 'green', 'yellow', 'orange', 'red', 'purple', 'brown', 'pink']  # Colors for each category
+# aspect_colors = ['#EE82EE', '#00008B', '#ADD8E6', '#006400', '#90EE90', '#FFFF00', '#FFA500', '#DC143C']
+cmap = mcolors.ListedColormap(aspect_colors)
+norm = mcolors.BoundaryNorm(boundaries=categories, ncolors=len(categories), clip=True)
+
 # endregion
 
 fig, ax = plt.subplots(1, 1, figsize=(8, 6))
@@ -899,3 +906,12 @@ fig, ax = plt.subplots(1, 1, figsize=(8, 6))
 acc.plot(ax=ax, cmap='cubehelix',
                norm=colors.LogNorm(1, acc.max()))
 paddock_row.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=5)
+
+# Aspect
+fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+im = ds_buffered['aspect'].plot(ax=ax, cmap=cmap, norm=norm, add_colorbar=False)
+paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
+plt.colorbar(im, ax=ax, ticks=categories, label='Aspect')
+plt.show()
+
+
