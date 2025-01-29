@@ -114,8 +114,11 @@ def merge_ozwald_silo(ds_ozwald, ds_silo):
     ssoil_maxpoint = ssoil_maxpoint.rename({'Ssoil': 'Maximum Soil Moisture'})
     ssoil_minpoint = ssoil_minpoint.rename({'Ssoil': 'Minimum Soil Moisture'})
     
-    # Making the assumption that the four 5km SILO pixels are similar, so just choosing the first one. Later will want to be more precise using ANU Climate at 1km resolution. 
-    ds_silo_point = ds_silo.isel(lat=0, lon=0)
+    if (ds_silo['lat'].values.size == 1 and ds_silo['lon'].values.size == 1):
+        ds_silo_point = ds_silo
+    # Making the assumption that the four 5km SILO pixels are similar, so just choosing the first one. Later will want to be more precise using ANU Climate at 1km resolution
+    else:
+        ds_silo_point = ds_silo.isel(lat=0, lon=0)
     
     # Combine the datasets along the time dimension
     ds_merged = xr.merge([ds_silo_point, ssoil_maxpoint, ssoil_minpoint], compat='override')
