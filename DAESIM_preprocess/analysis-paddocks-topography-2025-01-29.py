@@ -889,6 +889,7 @@ norm = mcolors.BoundaryNorm(boundaries=aspect_categories, ncolors=len(aspect_cat
 
 # Extracting a single timepoint for EVI and RGB plots
 ds_timepoint = ds_buffered.sel(time=time, method='nearest')
+ds_productivity = ds_buffered.sel(time=time, method='nearest')[productivity_variable]
 
 # Setting up the RGB layers
 red = ds_timepoint['nbart_red']
@@ -899,58 +900,41 @@ bounds = ds_buffered[productivity_variable].rio.bounds()
 left, bottom, right, top = bounds
 # endregion
 
+# region
+# Maps
+fig, axes = plt.subplots(3, 2, figsize=(8, 12))
+
 # EVI
-ds_productivity = ds_buffered.sel(time=time, method='nearest')[productivity_variable]
-fig, ax = plt.subplots(1, 1, figsize=(8, 6))
-im = ds_productivity.plot(ax=ax)
+ax = axes[0,0]
+im = ds_productivity.plot(ax=ax, add_colorbar=False)
 paddock_row.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=5)
 
 # RGB
-fig, ax = plt.subplots(1, 1, figsize=(10, 10))
+ax = axes[0,1]
 ax.imshow(rgb, extent=(left, right, bottom, top))
 paddock_row.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=5)
 
-# Terrain
-fig, ax = plt.subplots(1, 1, figsize=(8, 6))
-im = ds_buffered['terrain'].plot(ax=ax, cmap='terrain')
+# # Topographic Index
+ax = axes[1,0]
+im = ds_buffered['terrain'].plot(ax=ax, cmap='terrain', add_colorbar=False)
 paddock_row.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=5)
 
 # Topographic Index
-fig, ax = plt.subplots(1, 1, figsize=(8, 6))
-acc.plot(ax=ax, cmap='cubehelix',
-               norm=colors.LogNorm(1, acc.max()))
+ax = axes[1,1]
+acc.plot(ax=ax, cmap='cubehelix', norm=colors.LogNorm(1, acc.max()), add_colorbar=False)
 paddock_row.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=5)
 
 # Aspect
-fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+ax = axes[2,0]
 im = ds_buffered['aspect'].plot(ax=ax, cmap=cmap, norm=norm, add_colorbar=False)
 paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
-plt.colorbar(im, ax=ax, ticks=aspect_categories, label='Aspect')
-plt.show()
+# plt.colorbar(im, ax=ax, ticks=aspect_categories, label='Aspect')
 
 # Slope
-fig, ax = plt.subplots(1, 1, figsize=(8, 6))
-im = ds_buffered['slope'].plot(ax=ax, cmap='grey')
+ax = axes[2,1]
+im = ds_buffered['slope'].plot(ax=ax, cmap='YlOrBr', add_colorbar=False)
 paddock_row.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=5)
 
-soil_cmap = 'YlOrBr'
-
-# Clay
-fig, ax = plt.subplots(1, 1, figsize=(8, 6))
-im = ds_buffered['Clay'].plot(ax=ax, cmap=soil_cmap, vmin=0, vmax=100)
-paddock_row.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=5)
-
-# Silt 
-fig, ax = plt.subplots(1, 1, figsize=(8, 6))
-im = ds_buffered['Silt'].plot(ax=ax, cmap=soil_cmap, vmin=0, vmax=100)
-paddock_row.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=5)
-
-# Sand
-fig, ax = plt.subplots(1, 1, figsize=(8, 6))
-im = ds_buffered['Sand'].plot(ax=ax, cmap=soil_cmap, vmin=0, vmax=100)
-paddock_row.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=5)
-
-# # Electrical Conductivity
-fig, ax = plt.subplots(1, 1, figsize=(8, 6))
-im = ds_buffered['pH_CaCl2'].plot(ax=ax, cmap=plt.cm.plasma.reversed(), vmin=4, vmax=8)
-paddock_row.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=5)
+plt.tight_layout()
+plt.show()
+# endregion
