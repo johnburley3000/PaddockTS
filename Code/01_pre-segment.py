@@ -131,21 +131,26 @@ def export_for_segmentation(ds, inp, out_stub):
         print("Input image is wrong shape! No action taken")
         
 def main(args):
-    client = create_local_dask_cluster(return_client=True)
-    dc = datacube.Datacube(app='Vegetation_phenology')
-    query = define_query(args.lat, args.lon, args.buffer, (args.start_time, args.end_time))
-    ds = load_and_process_data(dc, query)
-    client.close()
+    # client = create_local_dask_cluster(return_client=True)
+    # dc = datacube.Datacube(app='Vegetation_phenology')
+    # query = define_query(args.lat, args.lon, args.buffer, (args.start_time, args.end_time))
+    # ds = load_and_process_data(dc, query)
+    # client.close()
+
+    filename = os.path.join(args.outdir, f"{args.stub}_ds2.pkl")
+    with open(filename, 'rb') as file:
+        ds = pickle.load(file)
+
     f2 = transform(ds)
     im = rescale(f2)
     export_for_segmentation(ds, im, args.outdir+args.stub)
     # save ds for later
-    with open(os.path.join(args.outdir, args.stub + '_ds2.pkl'), 'wb') as handle:
-        pickle.dump(ds, handle, protocol=pickle.HIGHEST_PROTOCOL)
-    logging.info(f"Data saved successfully to {args.outdir}")
-    # save query for record keeping
-    with open(os.path.join(args.outdir, args.stub + '_ds2_query.pkl'), 'wb') as f:
-        pickle.dump(query, f)
+    # with open(os.path.join(args.outdir, args.stub + '_ds2.pkl'), 'wb') as handle:
+    #     pickle.dump(ds, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    # logging.info(f"Data saved successfully to {args.outdir}")
+    # # save query for record keeping
+    # with open(os.path.join(args.outdir, args.stub + '_ds2_query.pkl'), 'wb') as f:
+    #     pickle.dump(query, f)
 
 if __name__ == "__main__":
     args = parse_arguments()

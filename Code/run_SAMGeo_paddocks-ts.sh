@@ -10,6 +10,7 @@
 
 # Print out input variables to the error log
 echo "Running SamGeo script and extract paddock ts script using the following input variables:"
+echo "wd: $wd"
 echo "stub: $stub"
 echo "outdir: $dir"
 echo "min_area_ha: $min_area_ha"
