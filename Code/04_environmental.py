@@ -23,12 +23,12 @@ os.chdir(paddockTS_dir)
 sys.path.append(paddockTS_dir)
 
 from DAESIM_preprocess.terrain_tiles import terrain_tiles
-# from DAESIM_preprocess.slga_soils import slga_soils, asris_urls
-# from DAESIM_preprocess.ozwald_yearly import ozwald_yearly_average
+from DAESIM_preprocess.slga_soils import slga_soils, asris_urls
+from DAESIM_preprocess.ozwald_yearly import ozwald_yearly_average
 from DAESIM_preprocess.ozwald_8day import ozwald_8day, ozwald_8day_abbreviations
-# from DAESIM_preprocess.ozwald_daily import ozwald_daily, ozwald_daily_abbreviations
+from DAESIM_preprocess.ozwald_daily import ozwald_daily, ozwald_daily_abbreviations
 from DAESIM_preprocess.silo_daily import silo_daily
-# from DAESIM_preprocess.canopy_height import canopy_height
+from DAESIM_preprocess.canopy_height import canopy_height
 
 
 # Adjust logging configuration for the script
@@ -73,13 +73,13 @@ def main(args):
     # ozwald_yearly_average(["Tmax", "Tmin", "Pg"], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir)
     # ozwald_daily(["VPeff", "Uavg"], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir)
 
-    variables = ['Ssoil']
-    ozwald_8day(variables, lat, lon, buffer, start_year, end_year, outdir, stub)
+    # variables = ['Ssoil']
+    # ozwald_8day(variables, lat, lon, buffer, start_year, end_year, outdir, stub)
 
-    variables = ["daily_rain", "max_temp", "min_temp", "et_morton_actual", "et_morton_potential"]
-    ds_silo_daily = silo_daily(variables, lat, lon, buffer, start_year, end_year, outdir, stub)
+    # variables = ["daily_rain", "max_temp", "min_temp", "et_morton_actual", "et_morton_potential"]
+    # ds_silo_daily = silo_daily(variables, lat, lon, buffer, start_year, end_year, outdir, stub)
 
-    # canopy_height(lat, lon, buffer, outdir, stub, tmpdir)
+    canopy_height(lat, lon, buffer, outdir, stub, tmpdir)
 
 if __name__ == "__main__":
     args = parse_arguments()
