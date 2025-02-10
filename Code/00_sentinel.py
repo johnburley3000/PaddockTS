@@ -79,7 +79,7 @@ def load_and_process_data(dc, query):
         products=['ga_s2am_ard_3', 'ga_s2bm_ard_3'],
         cloud_mask='s2cloudless',
         min_gooddata=0.9,
-        measurements=['nbart_red', 'nbart_green', 'nbart_blue', 'nbart_nir_1'],
+        measurements=['nbart_red', 'nbart_green', 'nbart_blue', 'nbart_nir_1', 'nbart_swir_2', 'nbart_swir_3'],
         **query
     )
     return ds
