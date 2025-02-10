@@ -464,6 +464,106 @@ useful_variables = ['nbart_red', 'nbart_green', 'nbart_blue', 'EVI', 'worldcover
                     # , 'Clay', 'Silt', 'Sand', 'pH_CaCl2']
 ds_small = ds.isel(band=0)[useful_variables]
 
+# region
+# Compare the different productivity scores across the whole region
+
+# Extracting a single timepoint for RGB and productivity plots
+ds_timepoint = ds.sel(time=time, method='nearest')
+layer_name = f"percent_trees_0m-300m"
+s = ds[layer_name].values
+x = s.flatten()
+
+productivity_variables = ['EVI', 'bg', 'pv', 'npv']
+productivity_stats = dict()
+for productivity_variable in productivity_variables:
+
+    # Calculate the productivity and shelter scores
+    ds_productivity = ds.sel(time=time, method='nearest')[productivity_variable]
+    ds_masked = ds_productivity.where(~adjacent_mask)
+    y = ds_masked.values.flatten()
+    y_values_outliers = y[~np.isnan(y)]  
+    x_values_outliers = x[~np.isnan(y)]  
+    lower_bound = np.percentile(y_values_outliers, 1)
+    upper_bound = np.percentile(y_values_outliers, 99)
+    y_values = y_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]    
+    x_values_outliers = x[~np.isnan(y)]
+    x_values = x_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]
+    unsheltered = y_values[np.where(x_values < tree_cover_threshold)]
+    median_value = np.median(unsheltered)
+    
+    vmin_EVI = median_value - (upper_bound - lower_bound) / 2
+    vmax_EVI = median_value + (upper_bound - lower_bound) / 2
+    ds_trees = ds_productivity.where(~tree_mask)
+
+    productivity_stats[productivity_variable] = {
+        "vmin_EVI": vmin_EVI,
+        "vmax_EVI": vmax_EVI,
+        "ds_trees": ds_trees
+    }
+
+# Plotting the maps in subplots
+fig, axes = plt.subplots(2, 2, figsize=(12, 12))
+fig.suptitle(f"Paddock {paddock_id} on {time}", fontsize=26)
+
+# Fontsizes
+title_size = 20
+label_size = 16
+annotation_size = 12
+
+# Axes
+ax = axes[0,0]
+productivity_variable = "EVI"
+
+vmin_EVI = productivity_stats[productivity_variable]['vmin_EVI']
+vmax_EVI = productivity_stats[productivity_variable]['vmax_EVI']
+ds_trees = productivity_stats[productivity_variable]['ds_trees']
+im = ds_trees.plot(ax=ax, cmap=cmap_EVI, vmin=vmin_EVI, vmax=vmax_EVI, add_colorbar=True)
+ax.set_title(f"Productivity Proxy", fontsize=title_size)
+add_cbar(im, productivity_variable, label_size)
+
+ax = axes[0,1]
+productivity_variable = "bg"
+
+vmin_EVI = productivity_stats[productivity_variable]['vmin_EVI']
+vmax_EVI = productivity_stats[productivity_variable]['vmax_EVI']
+ds_trees = productivity_stats[productivity_variable]['ds_trees']
+im = ds_trees.plot(ax=ax, cmap=cmap_EVI, vmin=vmin_EVI, vmax=vmax_EVI, add_colorbar=True)
+ax.set_title(f"Productivity Proxy", fontsize=title_size)
+add_cbar(im, productivity_variable, label_size)
+
+ax = axes[1,0]
+productivity_variable = "pv"
+
+vmin_EVI = productivity_stats[productivity_variable]['vmin_EVI']
+vmax_EVI = productivity_stats[productivity_variable]['vmax_EVI']
+ds_trees = productivity_stats[productivity_variable]['ds_trees']
+im = ds_trees.plot(ax=ax, cmap=cmap_EVI, vmin=vmin_EVI, vmax=vmax_EVI, add_colorbar=True)
+ax.set_title(f"Productivity Proxy", fontsize=title_size)
+add_cbar(im, productivity_variable, label_size)
+
+ax = axes[1,1]
+productivity_variable = "npv"
+
+vmin_EVI = productivity_stats[productivity_variable]['vmin_EVI']
+vmax_EVI = productivity_stats[productivity_variable]['vmax_EVI']
+ds_trees = productivity_stats[productivity_variable]['ds_trees']
+im = ds_trees.plot(ax=ax, cmap=cmap_EVI, vmin=vmin_EVI, vmax=vmax_EVI, add_colorbar=True)
+ax.set_title(f"Productivity Proxy", fontsize=title_size)
+add_cbar(im, productivity_variable, label_size)
+
+# Remove axes
+for row in axes:
+    for ax in row:
+        remove_axis_labels(ax)
+
+plt.tight_layout()
+filename = os.path.join(scratch_dir, f"{stub}_Paddock_productivities_{time}.png")
+plt.savefig(filename)
+plt.show()
+print("Saved", filename)
+
+# endregion
+
 paddock_ids = [66]
 # paddock_ids = pol['paddock'].values
 # for paddock_id in paddock_ids:
