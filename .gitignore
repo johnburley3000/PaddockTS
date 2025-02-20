@@ -1,6 +1,6 @@
 ## Things not to try and sync through github
 coordinates.txt
-DAESim_preprocess/credentials.json
+*credentials.json
 
 Results/*
 Data/*
