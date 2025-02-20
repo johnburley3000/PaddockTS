@@ -9,12 +9,12 @@ dir=/g/data/xe2/John/Data/PadSeg/
 tmpdir=/scratch/xe2/jb5097/tmp  
 
 # params to specify Region/Timeframe of interest
-stub=TEST5 # e.g. <site name>_<buffer>_<years>
+stub=TEST6 # e.g. <site name>_<buffer>_<years>
 lat=-37.1856746323413
 lon=143.8202752762509
 buffer=0.01 #this distance in all directions from (lat,lon). 0.01 degrees is ~1km in each direction which woul mean 2kmx2km total
-start='2019-06-01'
-end='2019-10-31'
+start='2019-04-01'
+end='2019-12-31'
 
 # specify which SAMgeo model to use (see here: https://github.com/facebookresearch/segment-anything?tab=readme-ov-file#model-checkpoints)
 samgeo_model='sam_vit_h_4b8939.pth'
@@ -45,7 +45,7 @@ fi
 # Setup DEA environment modules for running the Python script
 module use /g/data/v10/public/modules/modulefiles
 module load dea/20231204
-python Code/01_getSentinel2_DEA.py \
+python Code/01_get_Sentinel2_DEA.py \
     --stub $stub \
     --outdir $dir \
     --lat $lat \
@@ -67,13 +67,18 @@ python Code/download_S1.py $stub $dir
 # Note: some processed steps required. 
 
 ## 3. calculate indices (and vegetation fractional cover)
-# This seems to screw up if the modles and envs are not loaded in the right order.
+# This seems to screw up if the modules and python env are not loaded in the right order. Dependency on tensorflow2.15.0 will become an issue for portability
 deactivate
 module load tensorflow/2.15.0
 source /g/data/xe2/John/geospatenv/bin/activate
-python3 Code/02_indices-vegfrac.py --stub TEST5 --outdir /g/data/xe2/John/Data/PadSeg
+python3 Code/02_indices-vegfrac.py --stub $stub --outdir $dir
+module purge
+deactivate
+# Results:
+# (<stub>_ds2.pkl) updated with vegetation indices and vegetation fractional cover.
 
 ## 4. Segment paddocks
+source /g/data/xe2/John/geospatenv/bin/activate
 python3 Code/03_segment_paddocks.py $stub $dir \
     --model $tmpdir/$samgeo_model \
     --min_area_ha $min_area_ha \
@@ -86,10 +91,37 @@ python3 Code/03_segment_paddocks.py $stub $dir \
 # a shapefile of the paddocks after filtering (<stub>_filt.gpkg) [CHANGE THIS TO <stub>_segment_filt.gpkg]
 
 ## 5. Get environmental variables
+deactivate
+module load gdal/3.6.4
+source /g/data/xe2/John/geospatenv/bin/activate
+python3 Code/04_environmental.py \
+    --stub $stub \
+    --outdir $dir \
+    --tmpdir $tmpdir \
+    --lat $lat \
+    --lon $lon \
+    --buffer $buffer \
+    --start_time $start \
+    --end_time $end
+module purge
+deactivate
+# Results:
+# <describe here>
+
+## Checkpoint plots.
+module load ffmpeg/4.3.1 
+source /g/data/xe2/John/geospatenv/bin/activate
+python3 Code/checkpoint_plots.py $stub $dir
+# Results:
+# Set of plots with <stub>_<plot-description>.tif
 
 ## 6. Calculate paddock time series
+# IN PREP.
 
-## 7. Generate outputs
+## Feature Extraction???
+# This is where we will implement functions to estimate things like SoS, EoS, flowering time, from the paddock-level time series data. 
 
+## 7. Generate more outputs
+# IN PREP.
 
 
