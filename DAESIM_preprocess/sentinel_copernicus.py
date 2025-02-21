@@ -12,15 +12,36 @@
 # Example notebook demo-ing Sentinel Hub: https://github.com/eu-cdse/notebook-samples/blob/c0e0ade601973c5d4e4bf66a13c0b76ebb099805/sentinelhub/migration_from_scihub_guide.ipynb
 # Copernicus API reference is here: https://documentation.dataspace.copernicus.eu/APIs/SentinelHub/ApiReference.html
 # SentinelHub ReadTheDocs is here: https://sentinelhub-py.readthedocs.io/en/latest/examples/process_request.html
-# -
+# SentinelHub Usage allowance is here: https://shapps.dataspace.copernicus.eu/dashboard/#/
+# Note: Free allowance is 30,000 units = (5km x 5km x 3 bands) x 300 timepoints x 100 locations
 
+# +
 import json
 import requests
 import xarray as xr
 import numpy as np
 import rasterio
+import datetime
+import os
 
+import matplotlib.pyplot as plt
+
+
+# +
 from sentinelhub import (SHConfig, DataCollection, SentinelHubCatalog, SentinelHubRequest, BBox, bbox_to_dimensions, CRS, MimeType, Geometry)
+
+from sentinelhub import (
+    CRS,
+    BBox,
+    DataCollection,
+    DownloadRequest,
+    MimeType,
+    MosaickingOrder,
+    SentinelHubDownloadClient,
+    SentinelHubRequest,
+    bbox_to_dimensions,
+)
+# -
 
 # For using their plotting function
 from typing import Any, Optional, Tuple
@@ -83,50 +104,7 @@ aoi_bbox = BBox(bbox=aoi_coords_wgs84, crs=CRS.WGS84)
 aoi_size = bbox_to_dimensions(aoi_bbox, resolution=resolution)
 
 print(f'Image shape at {resolution} m resolution: {aoi_size} pixels')
-# +
-catalog = SentinelHubCatalog(config=config)
-search_iterator = catalog.search(
-    DataCollection.SENTINEL2_L2A,
-    bbox=aoi_bbox,
-    time=time_interval,
-    fields={"include": ["id", "properties.datetime"], "exclude": []},
-
-)
-results = list(search_iterator)
-results
 # -
-
-# %%time
-catalog.get_feature(DataCollection.SENTINEL2_L2A, 'S2A_MSIL2A_20220701T001121_N0510_R073_T55HFC_20240625T103645.SAFE')
-
-
-
-
-
-
-
-# +
-# Adding a 4th band
-# evalscript_true_color = """
-#     //VERSION=3
-
-#     function setup() {
-#         return {
-#             input: [{
-#                 bands: ["B02", "B03", "B04", "B08"]
-#             }],
-#             output: {
-#                 bands: 4
-#             }
-#         };
-#     }
-
-#     function evaluatePixel(sample) {
-#         return [sample.B04, sample.B03, sample.B02, sample.B08];
-#     }
-# """
-# -
-
 evalscript_true_color = """
     //VERSION=3
 
@@ -156,7 +134,7 @@ request_true_color = SentinelHubRequest(
                 name="s2", service_url="https://sh.dataspace.copernicus.eu"
             ),
             time_interval=time_interval,
-            other_args={"dataFilter": {"mosaickingOrder": "leastCC"}}           )
+            other_args={"dataFilter": {"mosaickingOrder": "leastCC"}})
     ],
     responses=[SentinelHubRequest.output_response("default", MimeType.PNG)],
     bbox=aoi_bbox,
@@ -188,7 +166,72 @@ plot_image(true_color_imgs[0], factor=3.5 / 255, clip_range=(0, 1))
 # -
 
 
+# +
+# Multitimestamp data
+
+# +
+start = datetime.datetime(2019, 1, 1)
+end = datetime.datetime(2019, 12, 31)
+n_chunks = 13
+tdelta = (end - start) / n_chunks
+edges = [(start + i * tdelta).date().isoformat() for i in range(n_chunks)]
+slots = [(edges[i], edges[i + 1]) for i in range(len(edges) - 1)]
+
+print("Monthly time windows:\n")
+for slot in slots:
+    print(slot)
 
 
+# -
 
 
+def get_true_color_request(time_interval):
+    return SentinelHubRequest(
+        evalscript=evalscript_true_color,
+        input_data=[
+            SentinelHubRequest.input_data(
+                data_collection=DataCollection.SENTINEL2_L2A.define_from(
+                name="s2", service_url="https://sh.dataspace.copernicus.eu"
+            ),
+                time_interval=time_interval,
+                mosaicking_order=MosaickingOrder.LEAST_CC,
+            )
+        ],
+        responses=[SentinelHubRequest.output_response("default", MimeType.PNG)],
+        bbox=betsiboka_bbox,
+        size=betsiboka_size,
+        config=config,
+    )
+
+
+# +
+betsiboka_coords_wgs84 = (46.16, -16.15, 46.51, -15.58)
+resolution = 60
+betsiboka_bbox = BBox(bbox=betsiboka_coords_wgs84, crs=CRS.WGS84)
+betsiboka_size = bbox_to_dimensions(betsiboka_bbox, resolution=resolution)
+
+print(f"Image shape at {resolution} m resolution: {betsiboka_size} pixels")
+
+# +
+# create a list of requests
+list_of_requests = [get_true_color_request(slot) for slot in slots]
+list_of_requests = [request.download_list[0] for request in list_of_requests]
+
+# download data with multiple threads
+data = SentinelHubDownloadClient(config=config).download(list_of_requests, max_threads=5)
+
+# +
+# some stuff for pretty plots
+ncols = 4
+nrows = 3
+aspect_ratio = betsiboka_size[0] / betsiboka_size[1]
+subplot_kw = {"xticks": [], "yticks": [], "frame_on": False}
+
+fig, axs = plt.subplots(ncols=ncols, nrows=nrows, figsize=(5 * ncols * aspect_ratio, 5 * nrows), subplot_kw=subplot_kw)
+
+for idx, image in enumerate(data):
+    ax = axs[idx // ncols][idx % ncols]
+    ax.imshow(np.clip(image * 2.5 / 255, 0, 1))
+    ax.set_title(f"{slots[idx][0]}  -  {slots[idx][1]}", fontsize=10)
+
+plt.tight_layout()
