@@ -18,27 +18,18 @@
 
 # +
 import json
-import requests
-import xarray as xr
 import numpy as np
-import rasterio
-import datetime
-import os
-
 import matplotlib.pyplot as plt
-# -
-
-
 from sentinelhub import (
     CRS,
     BBox,
     DataCollection,
-    DownloadRequest,
     MimeType,
-    MosaickingOrder,
     SentinelHubDownloadClient,
     SentinelHubRequest,
-    bbox_to_dimensions, SHConfig, SentinelHubCatalog, Geometry
+    bbox_to_dimensions, 
+    SHConfig, 
+    SentinelHubCatalog, 
 )
 
 # +
@@ -65,6 +56,7 @@ aoi_coords_wgs84 = [148.46449900000002, -34.394042000000006, 148.474499, -34.384
 time_interval = ('2022-07-01', '2022-10-20')
 max_cloud_percent = 10
 resolution = 10
+
 # Calculate the bounding box and resolution
 aoi_bbox = BBox(bbox=aoi_coords_wgs84, crs=CRS.WGS84)
 aoi_size = bbox_to_dimensions(aoi_bbox, resolution=resolution)
