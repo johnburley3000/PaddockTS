@@ -106,7 +106,9 @@ python3 Code/04_environmental.py \
 module purge
 deactivate
 # Results:
-# <describe here>
+# a tiff file of elevation that can be viewed in QGIS or loaded into python with rasterio (<stub>_terrain.tif)
+# a netcdf file of daily rainfall, temperature and evaporation (<stub>_silo_daily.nc)
+# a netcdf file of 8 day soil moisture (<stub>_ozwald_8day.nc)
 
 ## Checkpoint plots.
 module load ffmpeg/4.3.1 

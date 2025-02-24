@@ -74,6 +74,8 @@ def main(args):
     # ozwald_daily(["VPeff", "Uavg"], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir)
 
     # Not working for JB... ValueError: must supply at least one object to concatenate
+    # Working for CB... maybe missing access to the ub8 project?
+
     # variables = ['Ssoil']
     # ozwald_8day(variables, lat, lon, buffer, start_year, end_year, outdir, stub)
 
