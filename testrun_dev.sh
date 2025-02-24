@@ -9,12 +9,12 @@ dir=/g/data/xe2/John/Data/PadSeg/
 tmpdir=/scratch/xe2/jb5097/tmp  
 
 # params to specify Region/Timeframe of interest
-stub=TEST6 # e.g. <site name>_<buffer>_<years>
+stub=TEST8 # e.g. <site name>_<buffer>_<years>
 lat=-37.1856746323413
 lon=143.8202752762509
 buffer=0.01 #this distance in all directions from (lat,lon). 0.01 degrees is ~1km in each direction which woul mean 2kmx2km total
-start='2019-04-01'
-end='2019-12-31'
+start='2023-01-01'
+end='2024-12-31'
 
 # specify which SAMgeo model to use (see here: https://github.com/facebookresearch/segment-anything?tab=readme-ov-file#model-checkpoints)
 samgeo_model='sam_vit_h_4b8939.pth'
@@ -65,11 +65,12 @@ python Code/download_S1.py $stub $dir
 # Results: 
 # Pickle file representing an xarray object of time series Sentinel1 data downloaded from RIO (<stub>_ds1.pkl)
 # Note: some processed steps required. 
+# Issue: I get random network errors on some runs. Seems that certain scenes are included in the order but then can't be accessed, so it quits. 
 
 ## 3. calculate indices (and vegetation fractional cover)
 # This seems to screw up if the modules and python env are not loaded in the right order. Dependency on tensorflow2.15.0 will become an issue for portability
 deactivate
-module load tensorflow/2.15.0
+module load tensorflow/2.15.0 # req for veg frac model
 source /g/data/xe2/John/geospatenv/bin/activate
 python3 Code/02_indices-vegfrac.py --stub $stub --outdir $dir
 module purge
@@ -109,7 +110,7 @@ deactivate
 # <describe here>
 
 ## Checkpoint plots.
-module load ffmpeg/4.3.1 
+module load ffmpeg/4.3.1 # for .mp4 generation
 source /g/data/xe2/John/geospatenv/bin/activate
 python3 Code/checkpoint_plots.py $stub $dir
 # Results:
@@ -123,5 +124,3 @@ python3 Code/checkpoint_plots.py $stub $dir
 
 ## 7. Generate more outputs
 # IN PREP.
-
-
