@@ -76,8 +76,8 @@ def main(args):
     # Not working for JB... ValueError: must supply at least one object to concatenate
     # Working for CB... maybe missing access to the ub8 project?
 
-    # variables = ['Ssoil']
-    # ozwald_8day(variables, lat, lon, buffer, start_year, end_year, outdir, stub)
+    variables = ['Ssoil']
+    ozwald_8day(variables, lat, lon, buffer, start_year, end_year, outdir, stub, thredds=True)
 
     variables = ["daily_rain", "max_temp", "min_temp", "et_morton_actual", "et_morton_potential"]
     ds_silo_daily = silo_daily(variables, lat, lon, buffer, start_year, end_year, outdir, stub)

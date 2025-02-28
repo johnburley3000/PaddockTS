@@ -34,7 +34,8 @@ ozwald_8day_abbreviations = {
 }
 
 
-# I couldn't get Thredds working from a PBS script for some reason
+# This function uses the public facing Thredds API, so does not need to be run on NCI
+# However it doesn't work in a PBS script from my tests
 def ozwald_8day_singleyear_thredds(var="Ssoil", latitude=-34.3890427, longitude=148.469499, buffer=0.01, year="2021", stub="Test", tmp_dir=scratch_dir):
     
     # buffer = 0.0000000001    # Using a buffer less than the grid size of 500m (0.005 degrees) gives you a single point
@@ -56,13 +57,14 @@ def ozwald_8day_singleyear_thredds(var="Ssoil", latitude=-34.3890427, longitude=
     with open(filename, 'wb') as f:
         f.write(response.content)
         
-    print("Downloaded", filename)
+    print("Downloaded from Thredds", filename)
 
     ds = xr.open_dataset(filename, engine='netcdf4')
     return ds
 
 
-def ozwald_8day_singleyear(var="Ssoil", latitude=-34.3890427, longitude=148.469499, buffer=0.1, year="2021"):
+# This function accesses files directly, so is much faster but needs to be run on NCI with access to the ub8 project
+def ozwald_8day_singleyear_nci(var="Ssoil", latitude=-34.3890427, longitude=148.469499, buffer=0.1, year="2021"):
     """Select the region of interest from the Australia wide NetCDF file"""
     filename = os.path.join("/g/data/ub8/au/OzWALD/8day", var, f"OzWALD.{var}.{year}.nc")
 
@@ -77,26 +79,31 @@ def ozwald_8day_singleyear(var="Ssoil", latitude=-34.3890427, longitude=148.4694
     # If the region is too small, then just find a single point
     if ds_region[var].shape[1] == 0:
         ds_region = ds.sel(latitude=latitude, longitude=longitude, method="nearest")
+
+    print("Loaded from gdata", filename)
         
     return ds_region
 
 
-def ozwald_8day_multiyear(var="Ssoil", latitude=-34.3890427, longitude=148.469499, buffer=0.01, years=["2020", "2021"]):
+def ozwald_8day_multiyear(var="Ssoil", latitude=-34.3890427, longitude=148.469499, buffer=0.01, years=["2020", "2021"], thredds=True):
     dss = []
     for year in years:
-        ds_year = ozwald_8day_singleyear(var, latitude, longitude, buffer, year)
+        if thredds:
+            ds_year = ozwald_8day_singleyear_thredds(var, latitude, longitude, buffer, year)
+        else:
+            ds_year = ozwald_8day_singleyear_nci(var, latitude, longitude, buffer, year)
         if ds_year:
             dss.append(ds_year)
     ds_concat = xr.concat(dss, dim='time')
     return ds_concat
 
 
-def ozwald_8day(variables=["Ssoil", "GPP"], lat=-34.3890427, lon=148.469499, buffer=0.01, start_year="2020", end_year="2021", outdir=scratch_dir, stub="Test"):
+def ozwald_8day(variables=["Ssoil", "GPP"], lat=-34.3890427, lon=148.469499, buffer=0.01, start_year="2020", end_year="2021", outdir=scratch_dir, stub="Test", thredds=True):
     """Download 8day variables from OzWald"""
     dss = []
     years = [str(year) for year in list(range(int(start_year), int(end_year) + 1))]
     for variable in variables:
-        ds_variable = ozwald_8day_multiyear(variable, lat, lon, buffer, years)
+        ds_variable = ozwald_8day_multiyear(variable, lat, lon, buffer, years, thredds=thredds)
         dss.append(ds_variable)
     ds_concat = xr.merge(dss)
     
@@ -109,6 +116,11 @@ def ozwald_8day(variables=["Ssoil", "GPP"], lat=-34.3890427, lon=148.469499, buf
 
 # %%time
 if __name__ == '__main__':
-    ds = ozwald_8day()
+    ds = ozwald_8day(thredds=True)
     print(ds)
+
+    ds = ozwald_8day(thredds=False)
+    print(ds)
+
+
 
