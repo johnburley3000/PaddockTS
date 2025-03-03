@@ -1,26 +1,22 @@
 # +
 import os
 os.chdir(os.path.join(os.path.expanduser('~'), "Projects/PaddockTS"))
-from DAESIM_preprocess.topography import show_acc, show_aspect, show_slope, show_ridge_gullies, pysheds_accumulation, catchment_gullies, catchment_ridges, calculate_slope
+from DAESIM_preprocess.topography import pysheds_accumulation, calculate_slope
 from DAESIM_preprocess.util import scratch_dir
 
-import argparse
-import logging
+import numpy as np
 import pickle
 import xarray as xr
+import rioxarray as rxr
 import geopandas as gpd
+from scipy.ndimage import gaussian_filter
+
+import rasterio
 from rasterio.enums import Resampling
 import matplotlib.pyplot as plt
-
-# -
-
-import numpy as np
-from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
 import matplotlib.font_manager as fm
 from matplotlib import colors
-from scipy.ndimage import gaussian_filter
-import rasterio
-from rasterio.transform import from_origin
+from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
 
 
 stub = "TEST6"
@@ -37,7 +33,6 @@ pol = gpd.read_file(outdir+stub+'_filt.gpkg')
 pol['paddock'] = range(1,len(pol)+1)
 pol['paddock'] = pol.paddock.astype('category')
 
-# +
 # Gaussian smooth the dem before processing with pysheds (because values are stored as ints in terrain tiles)
 filename = os.path.join(outdir, f"{stub}_terrain.tif")
 with rasterio.open(filename) as src:
@@ -57,7 +52,6 @@ with rasterio.open(filename, 'w', driver='GTiff', height=height, width=width,
                    nodata=nodata) as dst:
     dst.write(dem_smooth, 1) 
 print(f"Smoothed DEM saved to {filename}")
-# -
 
 # Load the terrain and calculate topographic variables
 grid, dem, fdir, acc = pysheds_accumulation(filename)
@@ -88,12 +82,6 @@ def add_numpy_band(ds, variable, array, affine, resampling_method):
     ds[variable] = reprojected
     return ds
 
-
-# +
-# fdir_positive = fdir
-# fdir_positive[fdir == -2] = 0
-# -
-
 # Align & resample & reproject the topographic variables to match the imagery stack
 ds = add_numpy_band(ds, "terrain", dem, grid.affine, Resampling.average)
 ds = add_numpy_band(ds, "topographic_index", acc, grid.affine, Resampling.max)
@@ -106,8 +94,6 @@ ds = ds.isel(
     x=slice(1, -1) 
 )
 
-# +
-
 filepath = os.path.join(scratch_dir, stub + "_elevation_QGIS.tif")
 ds['terrain'].rio.to_raster(filepath)
 print(filepath)
@@ -116,40 +102,20 @@ filepath = os.path.join(scratch_dir, stub + "_topographic_index_QGIS.tif")
 ds['topographic_index'].rio.to_raster(filepath)
 print(filepath)
 
+# Need to specify the datatype for the aspect to save correctly
 filepath = os.path.join(scratch_dir, stub + "_aspect_QGIS.tif")
-ds['aspect'].rio.to_raster(filepath)
+ds['aspect'].rio.to_raster(
+    filepath,
+    dtype="int8", 
+    nodata=-1, 
+)
 print(filepath)
 
 filepath = os.path.join(scratch_dir, stub + "_slope_QGIS.tif")
 ds['slope'].rio.to_raster(filepath)
 print(filepath)
 
-# -
 
-# Make sure to use integer data type
-filepath = os.path.join(scratch_dir, stub + "_aspect_QGIS.tif")
-ds['aspect'].rio.to_raster(
-    filepath,
-    dtype="int8",  # For values [-1...128]
-    nodata=-1,     # Assuming -1 is your "no data" value
-    # compress="LZW"
-)
-print(filepath)
-
-# +
-# Install the package first (if not already installed)
-# # !pip install matplotlib-scalebar
-
-
-# Add after your other plotting code but before plt.savefig
-scalebar = ScaleBar(1, 'km', dimension='si-length') # 1 unit in plot = 1 km
-ax.add_artist(scalebar)
-# -
-
-from mpl_toolkits.axes_grid1.inset_locator import inset_axes
-
-
-# +
 # Elevation Plot
 fig, ax = plt.subplots(figsize=(8, 6))
 left, bottom, right, top = ds.rio.bounds()
@@ -193,8 +159,8 @@ filepath = os.path.join(scratch_dir, stub + "_elevation_preview.png")
 plt.savefig(filepath)
 print(filepath)
 
-# +
-# Water Accumulation
+
+# Water Accumulation plot
 fig, ax = plt.subplots(figsize=(8,6))
 
 im = ax.imshow(acc,
@@ -248,7 +214,8 @@ plt.tight_layout()
 filepath = os.path.join(scratch_dir, stub + "_aspect_preview.png")
 plt.savefig(filepath)
 print(filepath)
-# +
+
+
 # Slope
 fig, ax = plt.subplots(figsize=(6, 5))
 im = ax.imshow(slope, cmap="Purples", origin="upper", extent=(left, right, bottom, top))
