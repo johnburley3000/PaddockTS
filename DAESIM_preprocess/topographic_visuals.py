@@ -1,8 +1,6 @@
-# +
 import os
 os.chdir(os.path.join(os.path.expanduser('~'), "Projects/PaddockTS"))
 from DAESIM_preprocess.topography import pysheds_accumulation, calculate_slope
-from DAESIM_preprocess.util import scratch_dir
 
 import numpy as np
 import pickle
@@ -21,6 +19,9 @@ from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
 
 stub = "TEST6"
 outdir = "/g/data/xe2/cb8590/Data/PadSeg/"
+
+from DAESIM_preprocess.util import scratch_dir
+tmpdir = scratch_dir
 
 # Load the imagery stack
 filename = os.path.join(outdir, f"{stub}_ds2.pkl")
@@ -57,6 +58,13 @@ print(f"Smoothed DEM saved to {filename}")
 grid, dem, fdir, acc = pysheds_accumulation(filename)
 slope = calculate_slope(filename)
 
+# Make the flow directions sequential for easier plotting later
+arcgis_dirs = np.array([1, 2, 4, 8, 16, 32, 64, 128]) 
+sequential_dirs = np.array([1, 2, 3, 4, 5, 6, 7, 8])  
+fdir_equal_spacing = np.zeros_like(fdir)  
+for arcgis_dir, sequential_dir in zip(arcgis_dirs, sequential_dirs):
+    fdir_equal_spacing[fdir == arcgis_dir] = sequential_dir 
+
 
 def add_tiff_band(ds, variable, resampling_method, outdir, stub):
     """Add a new band to the xarray from a tiff file using the given resampling method"""
@@ -88,22 +96,24 @@ ds = add_numpy_band(ds, "topographic_index", acc, grid.affine, Resampling.max)
 ds = add_numpy_band(ds, "aspect", fdir, grid.affine, Resampling.nearest)
 ds = add_numpy_band(ds, "slope", slope, grid.affine, Resampling.average)
 
-# Clip everything by 1 cell because this algorithms can mess up at the boundary
+# Clip everything by 1 cell because these algorithms can mess up at the boundary
 ds = ds.isel(
     y=slice(1, -1),
     x=slice(1, -1) 
 )
 
-filepath = os.path.join(scratch_dir, stub + "_elevation_QGIS.tif")
+
+# Save the layers as tiff files for viewing in QGIS
+filepath = os.path.join(tmpdir, stub + "_elevation_QGIS.tif")
 ds['terrain'].rio.to_raster(filepath)
 print(filepath)
 
-filepath = os.path.join(scratch_dir, stub + "_topographic_index_QGIS.tif")
+filepath = os.path.join(tmpdir, stub + "_topographic_index_QGIS.tif")
 ds['topographic_index'].rio.to_raster(filepath)
 print(filepath)
 
 # Need to specify the datatype for the aspect to save correctly
-filepath = os.path.join(scratch_dir, stub + "_aspect_QGIS.tif")
+filepath = os.path.join(tmpdir, stub + "_aspect_QGIS.tif")
 ds['aspect'].rio.to_raster(
     filepath,
     dtype="int8", 
@@ -111,41 +121,30 @@ ds['aspect'].rio.to_raster(
 )
 print(filepath)
 
-filepath = os.path.join(scratch_dir, stub + "_slope_QGIS.tif")
+filepath = os.path.join(tmpdir, stub + "_slope_QGIS.tif")
 ds['slope'].rio.to_raster(filepath)
 print(filepath)
 
-
-# Elevation Plot
-fig, ax = plt.subplots(figsize=(8, 6))
+# Prep the plotting boundaries to align rasters with polygons
 left, bottom, right, top = ds.rio.bounds()
 
-# Display the DEM with origin='lower' to match contour behavior
+
+###### Elevation Plot #########
+fig, ax = plt.subplots(figsize=(8, 6))
 im = ax.imshow(dem, cmap='terrain', zorder=1, interpolation='bilinear', 
                extent=(left, right, bottom, top))
-
-# Plot polygon
-pol.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=1)
-
-# Add polygon labels
-for x, y, label in zip(pol.geometry.centroid.x, pol.geometry.centroid.y, pol['paddock']):
-    ax.text(x, y, label, fontsize=10, ha='center', va='center', color='black')
-
 plt.title("Elevation")
 plt.colorbar(im, ax=ax, label='height above sea level (m)')
 
-# Specify the contour intervals
-interval = 10
-contour_levels = np.arange(np.floor(np.min(dem)), np.ceil(np.max(dem)), interval)
-
 # Create the contour plot (correctly aligned with imshow)
+interval = 10  # Contour interval (m)
+contour_levels = np.arange(np.floor(np.min(dem)), np.ceil(np.max(dem)), interval)
 contours = ax.contour(dem, levels=contour_levels, colors='black', 
                       linewidths=0.5, zorder=4, alpha=0.5, 
                       extent=(left, right, bottom, top), origin='upper')
+ax.clabel(contours, inline=True, fontsize=8, fmt='%1.0f')   # Add contour labels
 
-# Add contour labels
-ax.clabel(contours, inline=True, fontsize=8, fmt='%1.0f')
-
+# Scale bar
 scalebar = AnchoredSizeBar(
     ax.transData, 1000, '1km', loc='lower left', pad=0.1, 
     color='white', frameon=False, size_vertical=10, 
@@ -153,86 +152,74 @@ scalebar = AnchoredSizeBar(
 )
 ax.add_artist(scalebar)
 
-plt.tight_layout()
+# Add the polygons
+pol.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=1)
+for x, y, label in zip(pol.geometry.centroid.x, pol.geometry.centroid.y, pol['paddock']):
+    ax.text(x, y, label, fontsize=10, ha='center', va='center', color='black')
 
-filepath = os.path.join(scratch_dir, stub + "_elevation_preview.png")
+# Save the preview
+plt.tight_layout()
+filepath = os.path.join(tmpdir, stub + "_elevation_preview.png")
 plt.savefig(filepath)
 print(filepath)
 
 
-# Water Accumulation plot
+########## Topographic Index Plot ##############
 fig, ax = plt.subplots(figsize=(8,6))
-
 im = ax.imshow(acc,
                cmap='cubehelix',
                norm=colors.LogNorm(1, acc.max()),
                interpolation='bilinear', 
                extent=(left, right, bottom, top))
-
-# Plot polygon
-pol.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=1)
-
-# Add polygon labels
-for x, y, label in zip(pol.geometry.centroid.x, pol.geometry.centroid.y, pol['paddock']):
-    ax.text(x, y, label, fontsize=10, ha='center', va='center', color='yellow')
-
 plt.title("Topographic Index")
 plt.colorbar(im, ax=ax, label='upstream cells')
 
-filepath = os.path.join(scratch_dir, stub + "_topographic_index_preview.png")
+# Add the polygons
+pol.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=1)
+for x, y, label in zip(pol.geometry.centroid.x, pol.geometry.centroid.y, pol['paddock']):
+    ax.text(x, y, label, fontsize=10, ha='center', va='center', color='yellow')
+
+# Save the preview
+filepath = os.path.join(tmpdir, stub + "_topographic_index_preview.png")
 plt.savefig(filepath)
 print(filepath)
-# -
 
-# Make the flow directions sequential for easier plotting
-arcgis_dirs = np.array([1, 2, 4, 8, 16, 32, 64, 128]) 
-sequential_dirs = np.array([1, 2, 3, 4, 5, 6, 7, 8])  
-fdir_equal_spacing = np.zeros_like(fdir)  
-for arcgis_dir, sequential_dir in zip(arcgis_dirs, sequential_dirs):
-    fdir_equal_spacing[fdir == arcgis_dir] = sequential_dir 
 
-# +
-# Plot Aspect with compass direction labels
+########### Aspect Plot ###############
 fig, ax = plt.subplots(figsize=(6, 5))
 im = ax.imshow(fdir_equal_spacing, cmap="hsv", origin="upper", extent=(left, right, bottom, top))
-
-# Plot polygon
-pol.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=1)
-
-# Add polygon labels
-for x, y, label in zip(pol.geometry.centroid.x, pol.geometry.centroid.y, pol['paddock']):
-    ax.text(x, y, label, fontsize=12, ha='center', va='center', color='black')
-
-cbar = fig.colorbar(im, ax=ax)
-
-cbar.set_ticks(sequential_dirs)  
-cbar.set_ticklabels(["E", "SE", "S", "SW", "W", 'NW', "N", "NE"])  
-
 ax.set_title("Aspect")
 plt.tight_layout()
 
-filepath = os.path.join(scratch_dir, stub + "_aspect_preview.png")
+# Colour bar with compass directions
+cbar = fig.colorbar(im, ax=ax)
+cbar.set_ticks(sequential_dirs)  
+cbar.set_ticklabels(["E", "SE", "S", "SW", "W", 'NW', "N", "NE"])  
+
+# Add polygons
+pol.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=1)
+for x, y, label in zip(pol.geometry.centroid.x, pol.geometry.centroid.y, pol['paddock']):
+    ax.text(x, y, label, fontsize=12, ha='center', va='center', color='black')
+
+filepath = os.path.join(tmpdir, stub + "_aspect_preview.png")
 plt.savefig(filepath)
 print(filepath)
 
 
-# Slope
+####### Slope Plot ##########
 fig, ax = plt.subplots(figsize=(6, 5))
 im = ax.imshow(slope, cmap="Purples", origin="upper", extent=(left, right, bottom, top))
-
-# Plot polygon
-pol.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=1)
-
-# Add polygon labels
-for x, y, label in zip(pol.geometry.centroid.x, pol.geometry.centroid.y, pol['paddock']):
-    ax.text(x, y, label, fontsize=12, ha='center', va='center', color='black')
-
+plt.title("Slope")
+plt.tight_layout()
 cbar = fig.colorbar(im, ax=ax)
 cbar.set_label("degrees")
 
-plt.title("Slope")
-plt.tight_layout()
+# Add Polygons
+pol.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=1)
+for x, y, label in zip(pol.geometry.centroid.x, pol.geometry.centroid.y, pol['paddock']):
+    ax.text(x, y, label, fontsize=12, ha='center', va='center', color='black')
 
-filepath = os.path.join(scratch_dir, stub + "_slope_preview.png")
+# Save the preview
+filepath = os.path.join(tmpdir, stub + "_slope_preview.png")
 plt.savefig(filepath)
 print(filepath)
