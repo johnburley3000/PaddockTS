@@ -42,6 +42,11 @@ filename = os.path.join(outdir, f"{stub}_terrain.tif")
 grid, dem, fdir, acc = pysheds_accumulation(filename)
 slope = calculate_slope(filename)
 
+# Calculate a continuous aspect (the 'fdir' is categorical)
+dzdx, dzdy = np.gradient(dem)
+aspect = np.arctan2(-dzdy, -dzdx) * (180 / np.pi)
+aspect[aspect < 0] += 360  
+
 
 def add_tiff_band(ds, variable, resampling_method, outdir, stub):
     """Add a new band to the xarray from a tiff file using the given resampling method"""
@@ -127,6 +132,36 @@ for x, y, label in zip(pol.geometry.centroid.x, pol.geometry.centroid.y, pol['pa
 
 
 plt.colorbar(im, ax=ax, label='Upstream Cells')
+# -
+
+# Make the flow directions sequential for easier plotting
+arcgis_dirs = np.array([1, 2, 4, 8, 16, 32, 64, 128]) 
+sequential_dirs = np.arange(1, 9)  
+fdir_equal_spacing = np.zeros_like(fdir)  
+for arcgis_dir, sequential_dir in zip(arcgis_dirs, sequential_dirs):
+    fdir_equal_spacing[fdir == arcgis_dir] = sequential_dir 
+
+# +
+# Plot Aspect with compass direction labels
+fig, ax = plt.subplots(figsize=(6, 5))
+im = ax.imshow(fdir_equal_spacing, cmap="twilight", origin="upper", extent=(left, right, bottom, top))
+
+# Plot polygon
+pol.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=1)
+
+# Add polygon labels
+for x, y, label in zip(pol.geometry.centroid.x, pol.geometry.centroid.y, pol['paddock']):
+    ax.text(x, y, label, fontsize=12, ha='center', va='center', color='yellow')
+
+cbar = fig.colorbar(im, ax=ax)
+cbar.set_label("Aspect")
+
+cbar.set_ticks(sequential_dirs)  
+cbar.set_ticklabels(["E", "SE", "S", "SW", "W", 'NW', "N", "NE"])  
+
+ax.set_title("Aspect with Compass Directions")
+plt.tight_layout()
+plt.show()
 # -
 
 
