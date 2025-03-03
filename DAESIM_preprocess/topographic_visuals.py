@@ -2,6 +2,7 @@
 import os
 os.chdir(os.path.join(os.path.expanduser('~'), "Projects/PaddockTS"))
 from DAESIM_preprocess.topography import show_acc, show_aspect, show_slope, show_ridge_gullies, pysheds_accumulation, catchment_gullies, catchment_ridges, calculate_slope
+from DAESIM_preprocess.util import scratch_dir
 
 import argparse
 import logging
@@ -17,9 +18,9 @@ import numpy as np
 from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
 import matplotlib.font_manager as fm
 from matplotlib import colors
-from scipy.ndimage import zoom
-import rasterio
 from scipy.ndimage import gaussian_filter
+import rasterio
+from rasterio.transform import from_origin
 
 
 stub = "TEST6"
@@ -37,25 +38,24 @@ pol['paddock'] = range(1,len(pol)+1)
 pol['paddock'] = pol.paddock.astype('category')
 
 # +
-# Gaussian smooth the dem before processing with pysheds, because values are stored as ints in terrain tiles
+# Gaussian smooth the dem before processing with pysheds (because values are stored as ints in terrain tiles)
 filename = os.path.join(outdir, f"{stub}_terrain.tif")
 with rasterio.open(filename) as src:
-    dem = src.read(1)  # Read DEM data
-    transform = src.transform  # Get geospatial transformation
-    crs = src.crs  # Get the coordinate reference system
-    nodata = src.nodata  # Get the NoData value, if any
-    width = src.width  # Get the width (number of columns)
-    height = src.height  # Get the height (number of rows)
+    dem = src.read(1)  
+    transform = src.transform  
+    crs = src.crs
+    nodata = src.nodata 
+    width = src.width 
+    height = src.height 
 
-# Apply Gaussian smoothing to the DEM
-sigma = 10  # Standard deviation for Gaussian filter, adjust to control smoothing
+sigma = 10  # Adjust this value to control how much smoothing gets applied
+
 dem_smooth = gaussian_filter(dem.astype(float), sigma=sigma)
-
 filename = os.path.join(outdir, f"{stub}_terrain_smoothed.tif")
 with rasterio.open(filename, 'w', driver='GTiff', height=height, width=width,
                    count=1, dtype=dem_smooth.dtype, crs=crs, transform=transform,
                    nodata=nodata) as dst:
-    dst.write(dem_smooth, 1)  # Write the smoothed DEM to band 1
+    dst.write(dem_smooth, 1) 
 print(f"Smoothed DEM saved to {filename}")
 # -
 
@@ -89,11 +89,65 @@ def add_numpy_band(ds, variable, array, affine, resampling_method):
     return ds
 
 
+# +
+# fdir_positive = fdir
+# fdir_positive[fdir == -2] = 0
+# -
+
 # Align & resample & reproject the topographic variables to match the imagery stack
 ds = add_numpy_band(ds, "terrain", dem, grid.affine, Resampling.average)
-ds = add_numpy_band(ds, "slope", slope, grid.affine, Resampling.average)
 ds = add_numpy_band(ds, "topographic_index", acc, grid.affine, Resampling.max)
 ds = add_numpy_band(ds, "aspect", fdir, grid.affine, Resampling.nearest)
+ds = add_numpy_band(ds, "slope", slope, grid.affine, Resampling.average)
+
+# Clip everything by 1 cell because this algorithms can mess up at the boundary
+ds = ds.isel(
+    y=slice(1, -1),
+    x=slice(1, -1) 
+)
+
+# +
+
+filepath = os.path.join(scratch_dir, stub + "_elevation_QGIS.tif")
+ds['terrain'].rio.to_raster(filepath)
+print(filepath)
+
+filepath = os.path.join(scratch_dir, stub + "_topographic_index_QGIS.tif")
+ds['topographic_index'].rio.to_raster(filepath)
+print(filepath)
+
+filepath = os.path.join(scratch_dir, stub + "_aspect_QGIS.tif")
+ds['aspect'].rio.to_raster(filepath)
+print(filepath)
+
+filepath = os.path.join(scratch_dir, stub + "_slope_QGIS.tif")
+ds['slope'].rio.to_raster(filepath)
+print(filepath)
+
+# -
+
+# Make sure to use integer data type
+filepath = os.path.join(scratch_dir, stub + "_aspect_QGIS.tif")
+ds['aspect'].rio.to_raster(
+    filepath,
+    dtype="int8",  # For values [-1...128]
+    nodata=-1,     # Assuming -1 is your "no data" value
+    # compress="LZW"
+)
+print(filepath)
+
+# +
+# Install the package first (if not already installed)
+# # !pip install matplotlib-scalebar
+
+
+# Add after your other plotting code but before plt.savefig
+scalebar = ScaleBar(1, 'km', dimension='si-length') # 1 unit in plot = 1 km
+ax.add_artist(scalebar)
+# -
+
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+
 
 # +
 # Elevation Plot
@@ -111,8 +165,8 @@ pol.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=1)
 for x, y, label in zip(pol.geometry.centroid.x, pol.geometry.centroid.y, pol['paddock']):
     ax.text(x, y, label, fontsize=10, ha='center', va='center', color='black')
 
-# Add colorbar
-plt.colorbar(im, ax=ax, label='Elevation (m)')
+plt.title("Elevation")
+plt.colorbar(im, ax=ax, label='height above sea level (m)')
 
 # Specify the contour intervals
 interval = 10
@@ -126,8 +180,18 @@ contours = ax.contour(dem, levels=contour_levels, colors='black',
 # Add contour labels
 ax.clabel(contours, inline=True, fontsize=8, fmt='%1.0f')
 
-# plt.axis('off')
+scalebar = AnchoredSizeBar(
+    ax.transData, 1000, '1km', loc='lower left', pad=0.1, 
+    color='white', frameon=False, size_vertical=10, 
+    fontproperties=fm.FontProperties(size=14)
+)
+ax.add_artist(scalebar)
+
 plt.tight_layout()
+
+filepath = os.path.join(scratch_dir, stub + "_elevation_preview.png")
+plt.savefig(filepath)
+print(filepath)
 
 # +
 # Water Accumulation
@@ -146,8 +210,12 @@ pol.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=1)
 for x, y, label in zip(pol.geometry.centroid.x, pol.geometry.centroid.y, pol['paddock']):
     ax.text(x, y, label, fontsize=10, ha='center', va='center', color='yellow')
 
+plt.title("Topographic Index")
+plt.colorbar(im, ax=ax, label='upstream cells')
 
-plt.colorbar(im, ax=ax, label='Upstream Cells')
+filepath = os.path.join(scratch_dir, stub + "_topographic_index_preview.png")
+plt.savefig(filepath)
+print(filepath)
 # -
 
 # Make the flow directions sequential for easier plotting
@@ -174,13 +242,16 @@ cbar = fig.colorbar(im, ax=ax)
 cbar.set_ticks(sequential_dirs)  
 cbar.set_ticklabels(["E", "SE", "S", "SW", "W", 'NW', "N", "NE"])  
 
-ax.set_title("Aspect with Compass Directions")
+ax.set_title("Aspect")
 plt.tight_layout()
-plt.show()
+
+filepath = os.path.join(scratch_dir, stub + "_aspect_preview.png")
+plt.savefig(filepath)
+print(filepath)
 # +
 # Slope
 fig, ax = plt.subplots(figsize=(6, 5))
-im = ax.imshow(slope, cmap="Greys", origin="upper", extent=(left, right, bottom, top))
+im = ax.imshow(slope, cmap="Purples", origin="upper", extent=(left, right, bottom, top))
 
 # Plot polygon
 pol.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=1)
@@ -190,8 +261,11 @@ for x, y, label in zip(pol.geometry.centroid.x, pol.geometry.centroid.y, pol['pa
     ax.text(x, y, label, fontsize=12, ha='center', va='center', color='black')
 
 cbar = fig.colorbar(im, ax=ax)
-cbar.set_label("Slope (degrees)")
+cbar.set_label("degrees")
 
+plt.title("Slope")
 plt.tight_layout()
-plt.show()
 
+filepath = os.path.join(scratch_dir, stub + "_slope_preview.png")
+plt.savefig(filepath)
+print(filepath)
