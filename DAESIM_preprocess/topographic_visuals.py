@@ -19,6 +19,8 @@ import matplotlib.font_manager as fm
 from matplotlib import colors
 from scipy.ndimage import zoom
 import rasterio
+from scipy.ndimage import gaussian_filter
+
 
 stub = "TEST6"
 outdir = "/g/data/xe2/cb8590/Data/PadSeg/"
@@ -34,8 +36,30 @@ pol = gpd.read_file(outdir+stub+'_filt.gpkg')
 pol['paddock'] = range(1,len(pol)+1)
 pol['paddock'] = pol.paddock.astype('category')
 
-# Load the terrain and calculate topographic variables
+# +
+# Gaussian smooth the dem before processing with pysheds, because values are stored as ints in terrain tiles
 filename = os.path.join(outdir, f"{stub}_terrain.tif")
+with rasterio.open(filename) as src:
+    dem = src.read(1)  # Read DEM data
+    transform = src.transform  # Get geospatial transformation
+    crs = src.crs  # Get the coordinate reference system
+    nodata = src.nodata  # Get the NoData value, if any
+    width = src.width  # Get the width (number of columns)
+    height = src.height  # Get the height (number of rows)
+
+# Apply Gaussian smoothing to the DEM
+sigma = 10  # Standard deviation for Gaussian filter, adjust to control smoothing
+dem_smooth = gaussian_filter(dem.astype(float), sigma=sigma)
+
+filename = os.path.join(outdir, f"{stub}_terrain_smoothed.tif")
+with rasterio.open(filename, 'w', driver='GTiff', height=height, width=width,
+                   count=1, dtype=dem_smooth.dtype, crs=crs, transform=transform,
+                   nodata=nodata) as dst:
+    dst.write(dem_smooth, 1)  # Write the smoothed DEM to band 1
+print(f"Smoothed DEM saved to {filename}")
+# -
+
+# Load the terrain and calculate topographic variables
 grid, dem, fdir, acc = pysheds_accumulation(filename)
 slope = calculate_slope(filename)
 
@@ -146,7 +170,6 @@ for x, y, label in zip(pol.geometry.centroid.x, pol.geometry.centroid.y, pol['pa
     ax.text(x, y, label, fontsize=12, ha='center', va='center', color='black')
 
 cbar = fig.colorbar(im, ax=ax)
-cbar.set_label("Aspect")
 
 cbar.set_ticks(sequential_dirs)  
 cbar.set_ticklabels(["E", "SE", "S", "SW", "W", 'NW', "N", "NE"])  
@@ -156,12 +179,6 @@ plt.tight_layout()
 plt.show()
 # +
 # Slope
-with rasterio.open(tiff_file) as src:
-    dem = src.read(1)  
-    transform = src.transform 
-gradient_y, gradient_x = np.gradient(dem, transform[4], transform[0])
-slope = np.arctan(np.sqrt(gradient_x**2 + gradient_y**2)) * (180 / np.pi)
-
 fig, ax = plt.subplots(figsize=(6, 5))
 im = ax.imshow(slope, cmap="Greys", origin="upper", extent=(left, right, bottom, top))
 
@@ -178,52 +195,3 @@ cbar.set_label("Slope (degrees)")
 plt.tight_layout()
 plt.show()
 
-
-# +
-with rasterio.open(tiff_file) as src:
-    dem = src.read(1)  
-    transform = src.transform 
-gradient_y, gradient_x = np.gradient(dem, transform[4], transform[0])
-slope = np.arctan(np.sqrt(gradient_x**2 + gradient_y**2)) * (180 / np.pi)
-
-fig, ax = plt.subplots(figsize=(6, 5))
-im = ax.imshow(slope, cmap="Greys", origin="upper", extent=(left, right, bottom, top))
-
-
-# +
-
-from scipy.ndimage import gaussian_filter
-
-# -
-
-with rasterio.open(filename) as src:
-    dem = src.read(1)  
-    transform = src.transform 
-gradient_y, gradient_x = np.gradient(dem, transform[4], transform[0])
-slope = np.arctan(np.sqrt(gradient_x**2 + gradient_y**2)) * (180 / np.pi)
-
-# +
-# Open the DEM file
-with rasterio.open(filename) as src:
-    dem = src.read(1)  # Read DEM data
-    transform = src.transform  # Get geospatial transformation
-
-# Apply Gaussian smoothing to the DEM
-sigma = 10  # Standard deviation for Gaussian filter, adjust to control smoothing
-dem_smooth = gaussian_filter(dem.astype(float), sigma=sigma)
-
-# Recalculate gradients and slope with smoothed DEM
-gradient_y, gradient_x = np.gradient(dem_smooth, transform[4], transform[0])
-slope = np.arctan(np.sqrt(gradient_x**2 + gradient_y**2)) * (180 / np.pi)
-
-# Plotting the slope
-fig, ax = plt.subplots(figsize=(6, 5))
-im = ax.imshow(slope, cmap="Greys", origin="upper", extent=(transform[2], transform[2] + transform[0] * dem.shape[1], transform[5] + transform[4] * dem.shape[0], transform[5]))
-plt.colorbar(im, ax=ax, label="Slope (degrees)")
-plt.show()
-
-# -
-
-plt.imshow(dem_smooth)
-
-plt.imshow(dem)
