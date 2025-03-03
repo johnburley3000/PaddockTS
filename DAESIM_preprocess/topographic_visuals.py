@@ -128,13 +128,13 @@ print(filepath)
 # Prep the plotting boundaries to align rasters with polygons
 left, bottom, right, top = ds.rio.bounds()
 
-
+# +
 ###### Elevation Plot #########
 fig, ax = plt.subplots(figsize=(8, 6))
 im = ax.imshow(dem, cmap='terrain', zorder=1, interpolation='bilinear', 
                extent=(left, right, bottom, top))
 plt.title("Elevation")
-plt.colorbar(im, ax=ax, label='height above sea level (m)')
+plt.colorbar(im, ax=ax, label='height above sea level (m)')# +
 
 # Create the contour plot (correctly aligned with imshow)
 interval = 10  # Contour interval (m)
@@ -162,8 +162,9 @@ plt.tight_layout()
 filepath = os.path.join(tmpdir, stub + "_elevation_preview.png")
 plt.savefig(filepath)
 print(filepath)
+# -
 
-
+# +
 ########## Topographic Index Plot ##############
 fig, ax = plt.subplots(figsize=(8,6))
 im = ax.imshow(acc,
@@ -183,8 +184,9 @@ for x, y, label in zip(pol.geometry.centroid.x, pol.geometry.centroid.y, pol['pa
 filepath = os.path.join(tmpdir, stub + "_topographic_index_preview.png")
 plt.savefig(filepath)
 print(filepath)
+# -
 
-
+# +
 ########### Aspect Plot ###############
 fig, ax = plt.subplots(figsize=(6, 5))
 im = ax.imshow(fdir_equal_spacing, cmap="hsv", origin="upper", extent=(left, right, bottom, top))
@@ -204,8 +206,9 @@ for x, y, label in zip(pol.geometry.centroid.x, pol.geometry.centroid.y, pol['pa
 filepath = os.path.join(tmpdir, stub + "_aspect_preview.png")
 plt.savefig(filepath)
 print(filepath)
+# -
 
-
+# +
 ####### Slope Plot ##########
 fig, ax = plt.subplots(figsize=(6, 5))
 im = ax.imshow(slope, cmap="Purples", origin="upper", extent=(left, right, bottom, top))
@@ -223,3 +226,4 @@ for x, y, label in zip(pol.geometry.centroid.x, pol.geometry.centroid.y, pol['pa
 filepath = os.path.join(tmpdir, stub + "_slope_preview.png")
 plt.savefig(filepath)
 print(filepath)
+# -
