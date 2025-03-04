@@ -4,12 +4,15 @@
 
 ## Config:
 # specify working directory and storage directory:
-wd=/home/106/jb5097/Projects/PaddockTS
-dir=/g/data/xe2/John/Data/PadSeg/
-tmpdir=/scratch/xe2/jb5097/tmp  
+# wd=/home/106/jb5097/Projects/PaddockTS
+# dir=/g/data/xe2/John/Data/PadSeg/
+# tmpdir=/scratch/xe2/jb5097/tmp  
+wd=/home/147/cb8590/Projects/PaddockTS
+dir=/g/data/xe2/cb8590/Data/PadSeg/
+tmpdir=/scratch/xe2/cb8590/tmp  
 
 # params to specify Region/Timeframe of interest
-stub=TEST6 # e.g. <site name>_<buffer>_<years>
+stub=TEST7 # e.g. <site name>_<buffer>_<years>
 lat=-37.1856746323413
 lon=143.8202752762509
 buffer=0.01 #this distance in all directions from (lat,lon). 0.01 degrees is ~1km in each direction which woul mean 2kmx2km total

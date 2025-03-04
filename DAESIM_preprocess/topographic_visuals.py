@@ -162,7 +162,6 @@ plt.tight_layout()
 filepath = os.path.join(tmpdir, stub + "_elevation_preview.png")
 plt.savefig(filepath)
 print(filepath)
-# -
 
 # +
 ########## Topographic Index Plot ##############
@@ -184,7 +183,6 @@ for x, y, label in zip(pol.geometry.centroid.x, pol.geometry.centroid.y, pol['pa
 filepath = os.path.join(tmpdir, stub + "_topographic_index_preview.png")
 plt.savefig(filepath)
 print(filepath)
-# -
 
 # +
 ########### Aspect Plot ###############
@@ -206,7 +204,6 @@ for x, y, label in zip(pol.geometry.centroid.x, pol.geometry.centroid.y, pol['pa
 filepath = os.path.join(tmpdir, stub + "_aspect_preview.png")
 plt.savefig(filepath)
 print(filepath)
-# -
 
 # +
 ####### Slope Plot ##########
@@ -226,4 +223,3 @@ for x, y, label in zip(pol.geometry.centroid.x, pol.geometry.centroid.y, pol['pa
 filepath = os.path.join(tmpdir, stub + "_slope_preview.png")
 plt.savefig(filepath)
 print(filepath)
-# -
