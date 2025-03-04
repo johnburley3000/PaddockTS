@@ -4,12 +4,14 @@
 
 ## Config:
 # specify working directory and storage directory:
-# wd=/home/106/jb5097/Projects/PaddockTS
-# dir=/g/data/xe2/John/Data/PadSeg/
-# tmpdir=/scratch/xe2/jb5097/tmp  
-wd=/home/147/cb8590/Projects/PaddockTS
-dir=/g/data/xe2/cb8590/Data/PadSeg/
-tmpdir=/scratch/xe2/cb8590/tmp  
+wd=/home/106/jb5097/Projects/PaddockTS
+dir=/g/data/xe2/John/Data/PadSeg/
+tmpdir=/scratch/xe2/jb5097/tmp  
+
+# Config for Chris
+# wd=/home/147/cb8590/Projects/PaddockTS
+# dir=/g/data/xe2/cb8590/Data/PadSeg/
+# tmpdir=/scratch/xe2/cb8590/tmp  
 
 # params to specify Region/Timeframe of interest
 stub=TEST7 # e.g. <site name>_<buffer>_<years>
