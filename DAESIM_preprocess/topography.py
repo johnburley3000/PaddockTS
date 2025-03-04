@@ -248,7 +248,7 @@ def show_slope(slope, outdir=scratch_dir, stub="Test"):
 if __name__ == '__main__':
     filepath = "/g/data/xe2/cb8590/Data/PadSeg/MILG_terrain.tif"
     grid, dem, fdir, acc = pysheds_accumulation(filepath)
-    # show_acc(acc)
+    show_acc(acc)
     show_aspect(fdir)
     
     # num_catchments = 10

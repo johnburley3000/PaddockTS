@@ -8,6 +8,11 @@ wd=/home/106/jb5097/Projects/PaddockTS
 dir=/g/data/xe2/John/Data/PadSeg/
 tmpdir=/scratch/xe2/jb5097/tmp  
 
+# Config for Chris
+# wd=/home/147/cb8590/Projects/PaddockTS
+# dir=/g/data/xe2/cb8590/Data/PadSeg/
+# tmpdir=/scratch/xe2/cb8590/tmp  
+
 # params to specify Region/Timeframe of interest
 stub=TEST8 # e.g. <site name>_<buffer>_<years>
 lat=-37.1856746323413
@@ -110,6 +115,17 @@ deactivate
 # a tiff file of elevation that can be viewed in QGIS or loaded into python with rasterio (<stub>_terrain.tif)
 # a netcdf file of daily rainfall, temperature and evaporation (<stub>_silo_daily.nc)
 # a netcdf file of 8 day soil moisture (<stub>_ozwald_8day.nc)
+
+## 5.5 Topographic plots
+# This generates topographic visuals based on the imagery stack, paddock boundaries, and terrain tiff.
+deactivate
+module load gdal/3.6.4
+source /g/data/xe2/John/geospatenv/bin/activate
+python3 Code/topographic_plots.py $stub $dir
+module purge
+deactivate
+# Results:
+# a tiff file & png of: (gaussian smoothed) elevation, topographic index, slope, and aspect
 
 ## Checkpoint plots.
 module load ffmpeg/4.3.1 # for .mp4 generation
