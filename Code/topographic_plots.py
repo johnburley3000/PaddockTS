@@ -1,7 +1,13 @@
 
 
 import os
-os.chdir(os.path.join(os.path.expanduser('~'), "Projects/PaddockTS"))
+import sys
+
+# Change directory and insert it into the python path
+paddockTS_dir = os.path.join(os.path.expanduser('~'), "Projects/PaddockTS")
+os.chdir(paddockTS_dir)
+sys.path.append(paddockTS_dir)
+
 from DAESIM_preprocess.topography import pysheds_accumulation, calculate_slope
 
 import numpy as np

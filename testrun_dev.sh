@@ -110,6 +110,17 @@ deactivate
 # a netcdf file of daily rainfall, temperature and evaporation (<stub>_silo_daily.nc)
 # a netcdf file of 8 day soil moisture (<stub>_ozwald_8day.nc)
 
+## 5.5 Topographic plots
+# This generates topographic visuals based on the imagery stack, paddock boundaries, and terrain tiff.
+deactivate
+module load gdal/3.6.4
+source /g/data/xe2/John/geospatenv/bin/activate
+python3 Code/topographic_plots.py $stub $dir
+module purge
+deactivate
+# Results:
+# a tiff file & png of: (gaussian smoothed) elevation, topographic index, slope, and aspect
+
 ## Checkpoint plots.
 module load ffmpeg/4.3.1 
 source /g/data/xe2/John/geospatenv/bin/activate
