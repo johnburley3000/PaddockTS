@@ -85,11 +85,11 @@ def ozwald_8day_singleyear_nci(var="Ssoil", latitude=-34.3890427, longitude=148.
     return ds_region
 
 
-def ozwald_8day_multiyear(var="Ssoil", latitude=-34.3890427, longitude=148.469499, buffer=0.01, years=["2020", "2021"], thredds=True):
+def ozwald_8day_multiyear(var="Ssoil", latitude=-34.3890427, longitude=148.469499, buffer=0.01, years=["2020", "2021"], stub="Test", tmp_dir=scratch_dir, thredds=True):
     dss = []
     for year in years:
         if thredds:
-            ds_year = ozwald_8day_singleyear_thredds(var, latitude, longitude, buffer, year)
+            ds_year = ozwald_8day_singleyear_thredds(var, latitude, longitude, buffer, year, stub, tmp_dir)
         else:
             ds_year = ozwald_8day_singleyear_nci(var, latitude, longitude, buffer, year)
         if ds_year:
@@ -98,12 +98,12 @@ def ozwald_8day_multiyear(var="Ssoil", latitude=-34.3890427, longitude=148.46949
     return ds_concat
 
 
-def ozwald_8day(variables=["Ssoil", "GPP"], lat=-34.3890427, lon=148.469499, buffer=0.01, start_year="2020", end_year="2021", outdir=scratch_dir, stub="Test", thredds=True):
+def ozwald_8day(variables=["Ssoil", "GPP"], lat=-34.3890427, lon=148.469499, buffer=0.01, start_year="2020", end_year="2021", outdir=scratch_dir, stub="Test", tmp_dir=scratch_dir, thredds=True):
     """Download 8day variables from OzWald"""
     dss = []
     years = [str(year) for year in list(range(int(start_year), int(end_year) + 1))]
     for variable in variables:
-        ds_variable = ozwald_8day_multiyear(variable, lat, lon, buffer, years, thredds=thredds)
+        ds_variable = ozwald_8day_multiyear(variable, lat, lon, buffer, years, stub, tmp_dir, thredds=thredds)
         dss.append(ds_variable)
     ds_concat = xr.merge(dss)
     
@@ -116,6 +116,23 @@ def ozwald_8day(variables=["Ssoil", "GPP"], lat=-34.3890427, lon=148.469499, buf
 
 # %%time
 if __name__ == '__main__':
+    # Config for Chris
+    wd=/home/147/cb8590/Projects/PaddockTS
+    dir=/g/data/xe2/cb8590/Data/shelter/
+    tmpdir=/scratch/xe2/cb8590/tmp  
+    
+    # params to specify Region/Timeframe of interest
+    stub=BRODIE # e.g. <site name>_<buffer>_<years>
+    lat=-25.380116317675263
+    lon=147.15976757388694
+    buffer=0.05 #this distance in all directions from (lat,lon). 0.01 degrees is ~1km in each direction which woul mean 2kmx2km total
+    start_year='2016'
+    end_year='2026'
+
+    variables=["Ssoil"], 
+buffer=0.01, start_year="2020", end_year="2021", outdir=scratch_dir, stub="Test", tmp_dir=scratch_dir, thredds=True):
+
+    
     ds = ozwald_8day(thredds=True)
     print(ds)
 
