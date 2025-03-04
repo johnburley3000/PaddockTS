@@ -115,24 +115,7 @@ def ozwald_8day(variables=["Ssoil", "GPP"], lat=-34.3890427, lon=148.469499, buf
 
 
 # %%time
-if __name__ == '__main__':
-    # Config for Chris
-    wd=/home/147/cb8590/Projects/PaddockTS
-    dir=/g/data/xe2/cb8590/Data/shelter/
-    tmpdir=/scratch/xe2/cb8590/tmp  
-    
-    # params to specify Region/Timeframe of interest
-    stub=BRODIE # e.g. <site name>_<buffer>_<years>
-    lat=-25.380116317675263
-    lon=147.15976757388694
-    buffer=0.05 #this distance in all directions from (lat,lon). 0.01 degrees is ~1km in each direction which woul mean 2kmx2km total
-    start_year='2016'
-    end_year='2026'
-
-    variables=["Ssoil"], 
-buffer=0.01, start_year="2020", end_year="2021", outdir=scratch_dir, stub="Test", tmp_dir=scratch_dir, thredds=True):
-
-    
+if __name__ == '__main__':    
     ds = ozwald_8day(thredds=True)
     print(ds)
 
