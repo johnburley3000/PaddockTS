@@ -17,6 +17,7 @@ from rasterio import features
 import scipy.ndimage
 from scipy import stats
 from scipy.signal import fftconvolve
+from pyproj import Transformer
 
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
@@ -139,22 +140,49 @@ def add_numpy_band(ds, variable, array, affine, resampling_method):
 # endregion
 
 
-# Calculate the topographic layers
-filename = os.path.join(outdir, f"{stub}_terrain.tif")
-grid, dem, fdir, acc = pysheds_accumulation(filename)
-slope = calculate_slope(filename)
+# region
+# # Calculate the topographic layers
+# filename = os.path.join(outdir, f"{stub}_terrain.tif")
+# grid, dem, fdir, acc = pysheds_accumulation(filename)
+# slope = calculate_slope(filename)
+# endregion
 
-# Add the topographic layers
-ds = add_tiff_band(ds, "terrain", Resampling.average, outdir, stub)
-ds = add_numpy_band(ds, "slope", slope, grid.affine, Resampling.average)
-ds = add_numpy_band(ds, "topographic_index", acc, grid.affine, Resampling.max)
-ds = add_numpy_band(ds, "aspect", fdir, grid.affine, Resampling.nearest)
+# region
+# # Add the topographic layers
+# ds = add_tiff_band(ds, "terrain", Resampling.average, outdir, stub)
+# ds = add_numpy_band(ds, "slope", slope, grid.affine, Resampling.average)
+# ds = add_numpy_band(ds, "topographic_index", acc, grid.affine, Resampling.max)
+# ds = add_numpy_band(ds, "aspect", fdir, grid.affine, Resampling.nearest)
+# endregion
 
 # The resampling often messes up the boundary, so we trim the outside pixels after adding all the resampled bounds
 ds = ds.isel(
     y=slice(1, -1),
     x=slice(1, -1) 
 )
+
+# region
+# Crop the region to just Brodie's transects
+
+# Define the coordinate transformation from EPSG:4326 to EPSG:6933
+transformer = Transformer.from_crs("EPSG:4326", "EPSG:6933", always_xy=True)
+
+# Convert given lat/lon bounds to EPSG:6933
+lon_min, lat_min = 147 + 9/60 + 35.17/3600, -(25 + 22/60 + 51.54/3600)
+lon_max, lat_max = 147 + 9/60 + 41.09/3600, -(25 + 22/60 + 47.40/3600)
+
+x_min, y_min = transformer.transform(lon_min, lat_min)
+x_max, y_max = transformer.transform(lon_max, lat_max)
+
+# Crop the dataset
+ds_cropped = ds.rio.clip_box(minx=x_min, miny=y_min, maxx=x_max, maxy=y_max)
+
+# Check the new bounds
+print(ds_cropped.rio.bounds())
+
+ds_uncropped = ds
+ds = ds_cropped
+# endregion
 
 # region
 # Global canopy height tree_mask
@@ -288,18 +316,8 @@ productivity_variable = 'EVI'
 # Selecting an individual paddock
 # endregion
 
-# region
 # time = "2020-01-08"
 time = "2022-08-04"
-
-ds_timepoint = ds.sel(time=time, method='nearest')
-def normalize(arr):
-    return (arr - arr.min()) / (arr.max() - arr.min())
-red = ds_timepoint['nbart_red']
-green = ds_timepoint['nbart_green']
-blue = ds_timepoint['nbart_blue']
-rgb = np.stack([normalize(red), normalize(green), normalize(blue)], axis=-1)
-# endregion
 
 # region
 # Read in the polygons from SAMGeo (these will not neccesarily match user-provided paddocks)
@@ -381,6 +399,14 @@ plt.show()
 print("Saved:", filename)
 # endregion
 
+ds_timepoint = ds.sel(time=time, method='nearest')
+def normalize(arr):
+    return (arr - arr.min()) / (arr.max() - arr.min())
+red = ds_timepoint['nbart_red']
+green = ds_timepoint['nbart_green']
+blue = ds_timepoint['nbart_blue']
+rgb = np.stack([normalize(red), normalize(green), normalize(blue)], axis=-1)
+
 # region
 # Generate a map of the paddocks 
 bounds = ds[productivity_variable].rio.bounds()
@@ -394,10 +420,10 @@ ax.imshow(rgb, extent=(left, right, bottom, top))
 #     ax.text(x, y, label, fontsize=12, ha='center', va='center', color='yellow')
 
 scalebar = AnchoredSizeBar(
-    ax.transData, 1000, '1km', loc='lower center', pad=0.1, 
+    ax.transData, 100, '100m', loc='lower center', pad=0.1, 
     color='black', frameon=False, size_vertical=10,
     fontproperties=fm.FontProperties(size=label_size),
-    bbox_to_anchor=(0.05, -0.05),  # Position below the plot
+    bbox_to_anchor=(0.3, -0.15),  # Position below the plot
     bbox_transform=ax.transAxes,
 )
 ax.add_artist(scalebar)
@@ -1037,44 +1063,44 @@ def plot_maps(ds, tree_mask, stub):
     ax.set_title(f"Canopy Height", fontsize=title_size)
     add_cbar(im, "metres", label_size)
     
-    # Terrain
-    ax = axes[2,0]
-    im = ds_buffered['terrain'].plot(ax=ax, cmap='terrain', add_colorbar=True)
-    # paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
-    ax.set_title(f"Elevation", fontsize=title_size)
-    add_cbar(im, "Metres", label_size)
+    # # Terrain
+    # ax = axes[2,0]
+    # im = ds_buffered['terrain'].plot(ax=ax, cmap='terrain', add_colorbar=True)
+    # # paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
+    # ax.set_title(f"Elevation", fontsize=title_size)
+    # add_cbar(im, "Metres", label_size)
     
-    # WorldCover 
-    # ax = axes[2,1]
-    # ds_worldcover = ds.sel(time=time, method='nearest')['worldcover']
-    # im = ds_worldcover.plot(ax=ax, cmap=cmap_worldcover, norm=norm_worldcover, add_colorbar=False)
-    # paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
-    # ax.set_title(f"ESA WorldCover", fontsize=title_size)
+    # # WorldCover 
+    # # ax = axes[2,1]
+    # # ds_worldcover = ds.sel(time=time, method='nearest')['worldcover']
+    # # im = ds_worldcover.plot(ax=ax, cmap=cmap_worldcover, norm=norm_worldcover, add_colorbar=False)
+    # # paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
+    # # ax.set_title(f"ESA WorldCover", fontsize=title_size)
     
-    # # handles = [plt.Line2D([0], [0], color=color, lw=4) for color in world_cover_colors]
-    # # labels = list(world_cover_layers.keys())
-    # # ax.legend(handles, labels, fontsize=annotations_size, bbox_to_anchor=(1.6, 1)) # loc='lower right'
+    # # # handles = [plt.Line2D([0], [0], color=color, lw=4) for color in world_cover_colors]
+    # # # labels = list(world_cover_layers.keys())
+    # # # ax.legend(handles, labels, fontsize=annotations_size, bbox_to_anchor=(1.6, 1)) # loc='lower right'
     
-    # cbar = plt.colorbar(sm_white, ax=ax, orientation='vertical')
-    # cbar.set_ticks([])  
-    # cbar.set_label('')  
-    # cbar.outline.set_visible(False)
+    # # cbar = plt.colorbar(sm_white, ax=ax, orientation='vertical')
+    # # cbar.set_ticks([])  
+    # # cbar.set_label('')  
+    # # cbar.outline.set_visible(False)
     
-    # Aspect
-    ax = axes[3,0]
-    im = ds_buffered['aspect'].plot(ax=ax, cmap=cmap_aspect, norm=norm_aspect, add_colorbar=True)
-    # paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
-    ax.set_title(f"Aspect", fontsize=title_size)
-    cbar = add_cbar(im, "", label_size)
-    cbar.set_ticks(list(directions.keys()))
-    cbar.set_ticklabels(list(directions.values())) 
+    # # Aspect
+    # ax = axes[3,0]
+    # im = ds_buffered['aspect'].plot(ax=ax, cmap=cmap_aspect, norm=norm_aspect, add_colorbar=True)
+    # # paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
+    # ax.set_title(f"Aspect", fontsize=title_size)
+    # cbar = add_cbar(im, "", label_size)
+    # cbar.set_ticks(list(directions.keys()))
+    # cbar.set_ticklabels(list(directions.values())) 
     
-    # Topographic Index
-    ax = axes[3,1]
-    im = acc.plot(ax=ax, cmap='cubehelix', norm=colors.LogNorm(1, acc.max()), add_colorbar=True)
-    # paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
-    ax.set_title(f"Topographic Index", fontsize=title_size)
-    add_cbar(im, "Upstream Cells", label_size)
+    # # Topographic Index
+    # ax = axes[3,1]
+    # im = acc.plot(ax=ax, cmap='cubehelix', norm=colors.LogNorm(1, acc.max()), add_colorbar=True)
+    # # paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
+    # ax.set_title(f"Topographic Index", fontsize=title_size)
+    # add_cbar(im, "Upstream Cells", label_size)
     
     # Remove axes
     for row in axes:
