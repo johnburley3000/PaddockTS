@@ -17,6 +17,7 @@ from rasterio import features
 import scipy.ndimage
 from scipy import stats
 from scipy.signal import fftconvolve
+from scipy.ndimage import distance_transform_edt
 from pyproj import Transformer
 
 import matplotlib.pyplot as plt
@@ -171,6 +172,51 @@ for i in range(len(distances) - 1):
     print(f"Added layer: {layer_name}")
 # endregion
 
+ds['percent_trees_0m-300m'].plot()
+
+
+
+# region
+
+# Compute Euclidean distance from each non-tree pixel to the nearest tree
+distance_to_tree = distance_transform_edt(~tree_mask) * pixel_size
+
+# Mask out trees and adjacent pixels
+distance_to_tree[np.where(adjacent_mask)] = np.nan
+
+# Create an xarray DataArray for the distance layer
+distance_da = xr.DataArray(
+    distance_to_tree,
+    dims=("y", "x"),
+    coords={"y": ds.coords["y"], "x": ds.coords["x"]},
+    name="distance_to_tree"
+)
+
+# Add to dataset
+ds["distance_to_tree"] = distance_da
+ds["distance_to_tree"].plot()
+# endregion
+
+ds_timepoint = ds.sel(time=time, method='nearest')
+
+ds_timepoint['EVI'].plot()
+
+ds_timepoint['max_tree_height'].plot()
+
+# region
+filename = os.path.join(scratch_dir, f"{stub}_10m_canopy_height.tiff")
+ds_timepoint['max_tree_height'].rio.to_raster(filename)
+print(filename)
+
+filename = os.path.join(scratch_dir, f"{stub}_EVI_2022_08_03.tiff")
+ds_timepoint['EVI'].rio.to_raster(filename)
+print(filename)
+
+filename = os.path.join(scratch_dir, f"{stub}_distance_to_tree.tiff")
+ds_timepoint['distance_to_tree'].rio.to_raster(filename)
+print(filename)
+# endregion
+
 # Enhanced Vegetation Index
 B8 = ds['nbart_nir_1']
 B4 = ds['nbart_red']
@@ -190,6 +236,7 @@ rgb = np.stack([normalize(red), normalize(green), normalize(blue)], axis=-1)
 
 # region
 # RGB Image
+label_size = 14
 bounds = ds[productivity_variable].rio.bounds()
 left, bottom, right, top = bounds
 fig, ax = plt.subplots(figsize=(10, 10))
@@ -246,64 +293,64 @@ cmap_tree_height.set_bad(color='white')
 # endregion
 
 # region
-# Compare the different productivity scores across the whole region
+# # Compare the different productivity scores across the whole region
 
-# Extracting a single timepoint for RGB and productivity plots
-ds_timepoint = ds.sel(time=time, method='nearest')
-layer_name = f"percent_trees_0m-300m"
-s = ds[layer_name].values
-x = s.flatten()
+# # Extracting a single timepoint for RGB and productivity plots
+# ds_timepoint = ds.sel(time=time, method='nearest')
+# layer_name = f"percent_trees_0m-300m"
+# s = ds[layer_name].values
+# x = s.flatten()
 
-productivity_variable = 'EVI'
+# productivity_variable = 'EVI'
 
-# Calculate the productivity and shelter scores
-ds_productivity = ds.sel(time=time, method='nearest')[productivity_variable]
-ds_masked = ds_productivity.where(~adjacent_mask)
-y = ds_masked.values.flatten()
-y_values_outliers = y[~np.isnan(y)]  
-x_values_outliers = x[~np.isnan(y)]  
-lower_bound = np.percentile(y_values_outliers, 1)
-upper_bound = np.percentile(y_values_outliers, 99)
-y_values = y_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]    
-x_values_outliers = x[~np.isnan(y)]
-x_values = x_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]
-unsheltered = y_values[np.where(x_values < tree_cover_threshold)]
-median_value = np.median(unsheltered)
+# # Calculate the productivity and shelter scores
+# ds_productivity = ds.sel(time=time, method='nearest')[productivity_variable]
+# ds_masked = ds_productivity.where(~adjacent_mask)
+# y = ds_masked.values.flatten()
+# y_values_outliers = y[~np.isnan(y)]  
+# x_values_outliers = x[~np.isnan(y)]  
+# lower_bound = np.percentile(y_values_outliers, 1)
+# upper_bound = np.percentile(y_values_outliers, 99)
+# y_values = y_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]    
+# x_values_outliers = x[~np.isnan(y)]
+# x_values = x_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]
+# unsheltered = y_values[np.where(x_values < tree_cover_threshold)]
+# median_value = np.median(unsheltered)
 
-vmin_EVI = median_value - (upper_bound - lower_bound) / 2
-vmax_EVI = median_value + (upper_bound - lower_bound) / 2
-ds_trees = ds_productivity.where(~tree_mask)
+# vmin_EVI = median_value - (upper_bound - lower_bound) / 2
+# vmax_EVI = median_value + (upper_bound - lower_bound) / 2
+# ds_trees = ds_productivity.where(~tree_mask)
 
-productivity_stats[productivity_variable] = {
-    "vmin_EVI": vmin_EVI,
-    "vmax_EVI": vmax_EVI,
-    "ds_trees": ds_trees
-}
+# productivity_stats[productivity_variable] = {
+#     "vmin_EVI": vmin_EVI,
+#     "vmax_EVI": vmax_EVI,
+#     "ds_trees": ds_trees
+# }
 
-# Plotting the maps in subplots
-fig, axes = plt.subplots(1, 1, figsize=(10, 8))
-# fig.suptitle(f"Paddock {paddock_id} on {time}", fontsize=26)
+# # Plotting the maps in subplots
+# fig, axes = plt.subplots(1, 1, figsize=(10, 8))
+# # fig.suptitle(f"Paddock {paddock_id} on {time}", fontsize=26)
 
-# Fontsizes
-title_size = 20
-label_size = 16
-annotation_size = 12
+# # Fontsizes
+# title_size = 20
+# label_size = 16
+# annotation_size = 12
 
-# Axes
-productivity_variable = "EVI"
+# # Axes
+# productivity_variable = "EVI"
 
-vmin_EVI = productivity_stats[productivity_variable]['vmin_EVI']
-vmax_EVI = productivity_stats[productivity_variable]['vmax_EVI']
-ds_trees = productivity_stats[productivity_variable]['ds_trees']
-im = ds_trees.plot(cmap=cmap_EVI, vmin=vmin_EVI, vmax=vmax_EVI, add_colorbar=True)
-ax.set_title(f"Productivity Proxy", fontsize=title_size)
-add_cbar(im, productivity_variable, label_size)
+# vmin_EVI = productivity_stats[productivity_variable]['vmin_EVI']
+# vmax_EVI = productivity_stats[productivity_variable]['vmax_EVI']
+# ds_trees = productivity_stats[productivity_variable]['ds_trees']
+# im = ds_trees.plot(cmap=cmap_EVI, vmin=vmin_EVI, vmax=vmax_EVI, add_colorbar=True)
+# ax.set_title(f"Productivity Proxy", fontsize=title_size)
+# add_cbar(im, productivity_variable, label_size)
 
-plt.tight_layout()
-filename = os.path.join(scratch_dir, f"{stub}_Paddock_productivities_{time}.png")
-plt.savefig(filename)
-plt.show()
-print("Saved", filename)
+# plt.tight_layout()
+# filename = os.path.join(scratch_dir, f"{stub}_Paddock_productivities_{time}.png")
+# plt.savefig(filename)
+# plt.show()
+# print("Saved", filename)
 
 # endregion
 
