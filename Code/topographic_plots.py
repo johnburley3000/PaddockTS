@@ -175,9 +175,9 @@ def main():
     ax.add_artist(scalebar)
 
     # Add the polygons
-    pol.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=1)
-    for x, y, label in zip(pol.geometry.centroid.x, pol.geometry.centroid.y, pol['paddock']):
-        ax.text(x, y, label, fontsize=10, ha='center', va='center', color='black')
+    # pol.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=1)
+    # for x, y, label in zip(pol.geometry.centroid.x, pol.geometry.centroid.y, pol['paddock']):
+    #     ax.text(x, y, label, fontsize=10, ha='center', va='center', color='black')
 
     # Save the preview
     plt.tight_layout()
@@ -197,10 +197,10 @@ def main():
     plt.title("Topographic Index")
     plt.colorbar(im, ax=ax, label='upstream cells')
 
-    # Add the polygons
-    pol.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=1)
-    for x, y, label in zip(pol.geometry.centroid.x, pol.geometry.centroid.y, pol['paddock']):
-        ax.text(x, y, label, fontsize=10, ha='center', va='center', color='yellow')
+    # # Add the polygons
+    # pol.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=1)
+    # for x, y, label in zip(pol.geometry.centroid.x, pol.geometry.centroid.y, pol['paddock']):
+    #     ax.text(x, y, label, fontsize=10, ha='center', va='center', color='yellow')
 
     # Save the preview
     filepath = os.path.join(tmpdir, stub + "_topographic_index_preview.png")
@@ -221,9 +221,9 @@ def main():
     cbar.set_ticklabels(["E", "SE", "S", "SW", "W", 'NW', "N", "NE"])  
 
     # Add polygons
-    pol.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=1)
-    for x, y, label in zip(pol.geometry.centroid.x, pol.geometry.centroid.y, pol['paddock']):
-        ax.text(x, y, label, fontsize=12, ha='center', va='center', color='black')
+    # pol.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=1)
+    # for x, y, label in zip(pol.geometry.centroid.x, pol.geometry.centroid.y, pol['paddock']):
+    #     ax.text(x, y, label, fontsize=12, ha='center', va='center', color='black')
 
     filepath = os.path.join(tmpdir, stub + "_aspect_preview.png")
     plt.savefig(filepath)
@@ -240,9 +240,9 @@ def main():
     cbar.set_label("degrees")
 
     # Add Polygons
-    pol.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=1)
-    for x, y, label in zip(pol.geometry.centroid.x, pol.geometry.centroid.y, pol['paddock']):
-        ax.text(x, y, label, fontsize=12, ha='center', va='center', color='black')
+    # pol.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=1)
+    # for x, y, label in zip(pol.geometry.centroid.x, pol.geometry.centroid.y, pol['paddock']):
+    #     ax.text(x, y, label, fontsize=12, ha='center', va='center', color='black')
 
     # Save the preview
     filepath = os.path.join(tmpdir, stub + "_slope_preview.png")

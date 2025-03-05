@@ -10,17 +10,30 @@
 # aws_access_key_id = ACCESS_KEY
 # aws_secret_access_key = SECRET_KEY
 
-## Config:
-# specify working directory and storage directory:
-wd=/home/147/cb8590/Projects/PaddockTS  # We can't read or write to each other's home folders
-dir=/g/data/xe2/cb8590/Data/PadSeg      # We can read but can't write to each other's gdata or scratch folders
+# ## Config:
+# # specify working directory and storage directory:
+# wd=/home/147/cb8590/Projects/PaddockTS  # We can't read or write to each other's home folders
+# dir=/g/data/xe2/cb8590/Data/PadSeg      # We can read but can't write to each other's gdata or scratch folders
+# tmpdir=/scratch/xe2/cb8590/tmp  
+
+# # params
+# stub=MILG
+# lat=-35.289561061551844
+# lon=149.06381325367872
+# buffer=0.005    # In degrees in a single direction. For example, 0.01 degrees is about 1km so it would give a 2kmx2km area.
+# start='2017-01-01'
+# end_='2024-12-31'
+
+# Config for Chris
+wd=/home/147/cb8590/Projects/PaddockTS
+dir=/g/data/xe2/cb8590/Data/shelter/
 tmpdir=/scratch/xe2/cb8590/tmp  
 
-# params
-stub=MILG
-lat=-35.289561061551844
-lon=149.06381325367872
-buffer=0.005    # In degrees in a single direction. For example, 0.01 degrees is about 1km so it would give a 2kmx2km area.
+# params to specify Region/Timeframe of interest
+stub=BRODIE # e.g. <site name>_<buffer>_<years>
+lat=-25.380116317675263
+lon=147.15976757388694
+buffer=0.03 #this distance in all directions from (lat,lon). 0.01 degrees is ~1km in each direction which woul mean 2kmx2km total
 start='2017-01-01'
 end_='2024-12-31'
 
@@ -30,20 +43,20 @@ max_area_ha=1500
 max_perim_area_ratio=40
 
 
-## Run first job
-job_id1=$(qsub -v wd=$wd,stub=$stub,dir=$dir,lat=$lat,lon=$lon,buffer=$buffer,start_time=$start,end_time=$end_ Code/run_pre-seg.sh)
-echo "First job submitted with ID $job_id1"
+# ## Run first job
+# job_id1=$(qsub -v wd=$wd,stub=$stub,dir=$dir,lat=$lat,lon=$lon,buffer=$buffer,start_time=$start,end_time=$end_ Code/run_pre-seg.sh)
+# echo "First job submitted with ID $job_id1"
 
-## Run second job (if job ID was produced, and when job complete)
-if [[ -z "$job_id1" ]]
-then
-    echo "Failed to submit the first job."
-    exit 1
-else
-    echo "Submitting second job, dependent on the completion of the first."
-    qsub -W depend=afterok:$job_id1 -v wd=$wd,stub=$stub,dir=$dir,min_area_ha=$min_area_ha,max_area_ha=$max_area_ha,max_perim_area_ratio=$max_perim_area_ratio Code/run_SAMGeo_paddocks-ts.sh
-    #qsub -v stub=$stub,dir=$dir,min_area_ha=$min_area_ha,max_area_ha=$max_area_ha,max_perim_area_ratio=$max_perim_area_ratio Code/run_SAMGeo_paddocks-ts.sh
-fi
+# ## Run second job (if job ID was produced, and when job complete)
+# if [[ -z "$job_id1" ]]
+# then
+#     echo "Failed to submit the first job."
+#     exit 1
+# else
+#     echo "Submitting second job, dependent on the completion of the first."
+#     qsub -W depend=afterok:$job_id1 -v wd=$wd,stub=$stub,dir=$dir,min_area_ha=$min_area_ha,max_area_ha=$max_area_ha,max_perim_area_ratio=$max_perim_area_ratio Code/run_SAMGeo_paddocks-ts.sh
+#     #qsub -v stub=$stub,dir=$dir,min_area_ha=$min_area_ha,max_area_ha=$max_area_ha,max_perim_area_ratio=$max_perim_area_ratio Code/run_SAMGeo_paddocks-ts.sh
+# fi
 
 ## Run third job (independent of first two)
 job_id3=$(qsub -v wd=$wd,stub=$stub,dir=$dir,tmpdir=$tmpdir,lat=$lat,lon=$lon,buffer=$buffer,start_time=$start,end_time=$end_ Code/run_environmental.sh)

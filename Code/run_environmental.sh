@@ -1,9 +1,9 @@
 #!/bin/bash
 #PBS -N Environmental
-#PBS -q copyq
+#PBS -q normal
 #PBS -l mem=128GB
 #PBS -l jobfs=24GB
-#PBS -l ncpus=1
+#PBS -l ncpus=20
 #PBS -P xe2
 #PBS -l walltime=04:00:00
 #PBS -l storage=gdata/xe2+gdata/ub8
@@ -32,6 +32,21 @@ cd $wd
 echo "Working directory: $wd"
 
 # Run script:
-python Code/04_environmental.py --stub $stub --outdir $dir --tmpdir $tmpdir --lat $lat --lon $lon --buffer $buffer --start_time $start_time --end_time $end_time
+# python Code/04_environmental.py --stub $stub --outdir $dir --tmpdir $tmpdir --lat $lat --lon $lon --buffer $buffer --start_time $start_time --end_time $end_time
 
+# deactivate
+module load gdal/3.6.4
+source /g/data/xe2/John/geospatenv/bin/activate
+python3 Code/topographic_plots.py $stub $dir
+module purge
+deactivate
+Results:
+a tiff file & png of: (gaussian smoothed) elevation, topographic index, slope, and aspect
+
+# # ## Checkpoint plots.
+# module load ffmpeg/4.3.1 
+# source /g/data/xe2/John/geospatenv/bin/activate
+# python3 Code/checkpoint_plots.py $stub $dir
+# Results:
+# Set of plots with <stub>_<plot-description>.tif
 

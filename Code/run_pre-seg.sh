@@ -1,6 +1,6 @@
 #!/bin/bash
 #PBS -N PreSegment
-#PBS -l mem=186GB
+#PBS -l mem=190GB
 #PBS -l ncpus=24
 #PBS -l jobfs=24GB
 #PBS -P xe2

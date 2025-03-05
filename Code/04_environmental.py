@@ -63,7 +63,7 @@ def main(args):
     outdir = args.outdir
     tmpdir = args.tmpdir
 
-    terrain_tiles(lat, lon, buffer, outdir, stub, tmpdir)
+    # terrain_tiles(lat, lon, buffer, outdir, stub, tmpdir)
 
     # Worked for JB, but not required for PaddockTS currently
     # variables = ['Clay', 'Sand', 'Silt', 'pH_CaCl2']
@@ -76,8 +76,8 @@ def main(args):
     # Not working for JB... ValueError: must supply at least one object to concatenate
     # Working for CB... maybe missing access to the ub8 project?
 
-    variables = ['Ssoil']
-    ozwald_8day(variables, lat, lon, buffer, start_year, end_year, outdir, stub, thredds=True)
+    # variables = ['Ssoil']
+    # ozwald_8day(variables, lat, lon, buffer, start_year, end_year, outdir, stub, thredds=False)
 
     variables = ["daily_rain", "max_temp", "min_temp", "et_morton_actual", "et_morton_potential"]
     ds_silo_daily = silo_daily(variables, lat, lon, buffer, start_year, end_year, outdir, stub)

@@ -106,13 +106,13 @@ def plot_paddock_map_auto_fourier(raster_path, pol, out_dir, stub):
     ax.imshow(rgb, extent=(bounds.left, bounds.right, bounds.bottom, bounds.top))
 
     # Overlay the paddock polygons.
-    pol.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=1)
+    # pol.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=1)
 
-    # Add labels at the centroid of each paddock polygon.
-    for idx, row in pol.iterrows():
-        centroid = row.geometry.centroid
-        ax.text(centroid.x, centroid.y, row['paddock'],
-                fontsize=12, ha='center', va='center', color='yellow')
+    # # Add labels at the centroid of each paddock polygon.
+    # for idx, row in pol.iterrows():
+    #     centroid = row.geometry.centroid
+    #     ax.text(centroid.x, centroid.y, row['paddock'],
+    #             fontsize=12, ha='center', va='center', color='yellow')
 
     # Save the figure to file.
     output_filename = f"{out_dir}{stub}_paddock_map_auto_fourier.tif"
@@ -163,13 +163,13 @@ def plot_paddock_map_auto_rgb(ds, pol, out_dir, stub):
     ax.imshow(rgb, extent=(left, right, bottom, top))
 
     # Overlay the paddock polygons.
-    pol.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=1)
+    # pol.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=1)
 
-    # Add paddock labels at the centroid of each polygon.
-    for _, row in pol.iterrows():
-        centroid = row.geometry.centroid
-        ax.text(centroid.x, centroid.y, row['paddock'],
-                fontsize=12, ha='center', va='center', color='yellow')
+    # # Add paddock labels at the centroid of each polygon.
+    # for _, row in pol.iterrows():
+    #     centroid = row.geometry.centroid
+    #     ax.text(centroid.x, centroid.y, row['paddock'],
+    #             fontsize=12, ha='center', va='center', color='yellow')
 
     # Save the figure.
     output_filename = f"{out_dir}{stub}_paddock_map_auto_rgb.tif"

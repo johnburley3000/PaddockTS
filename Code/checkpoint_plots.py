@@ -42,7 +42,7 @@ def main():
     # TO DO: load the soil moisture dataset
 
     # Run the plotting functions:
-    pf.plot_indices_timeseries(ds, out_dir, stub)
+    # pf.plot_indices_timeseries(ds, out_dir, stub)  # Becomes too large if more than 1 year
     pf.plot_paddock_map_auto_rgb(ds, pol, out_dir, stub)
     pf.plot_paddock_map_auto_fourier(raster_path, pol, out_dir, stub)
     pf.plot_silo_daily(silo, ds, out_dir, stub) # TO DO: add soil moisture plot panel
