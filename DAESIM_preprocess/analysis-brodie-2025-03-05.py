@@ -45,7 +45,7 @@ print(f"Memory usage: {psutil.Process().memory_info().rss / 1024**2:.2f} MB")
 # region
 # Filepaths
 outdir = os.path.join(gdata_dir, "Data/shelter/")
-stub = "MILG"
+stub = "BRODIE"
 
 # outdir = os.path.join(gdata_dir, "Data/shelter/")
 # # stub = "34_5_148_2"
@@ -79,27 +79,31 @@ ds['max_tree_height'] = array.rio.reproject_match(ds, resampling=Resampling.max)
 binary_mask = (array >= 1).astype(float)
 ds['tree_percent'] = binary_mask.rio.reproject_match(ds, resampling=Resampling.average)
 
-# Add worldcover classes to the xarray
-world_cover_layers = {
-    "Tree cover": 10, # Green
-    # "Shrubland": 20, # Orange
-    "Grassland": 30, # Yellow
-    "Cropland": 40, # pink
-    "Built-up": 50, # red
-    "Permanent water bodies": 80, # blue
-}
 
-worldcover_path = os.path.join("/g/data/xe2/cb8590/WORLDCOVER/ESA_WORLDCOVER_10M_2021_V200/MAP/")
-MILG_id = "S36E147"
-filename = os.path.join(worldcover_path, f"ESA_WorldCover_10m_2021_v200_{MILG_id}_Map", f"ESA_WorldCover_10m_2021_v200_{MILG_id}_Map.tif")
-array = rxr.open_rasterio(filename)
-reprojected = array.rio.reproject_match(ds)
-ds["worldcover"] = reprojected.isel(band=0).drop_vars('band')
-cropland = ds["worldcover"].values == world_cover_layers["Cropland"]
-grassland = ds["worldcover"].values == world_cover_layers["Grassland"]
-tree_cover = ds["worldcover"].values == world_cover_layers["Tree cover"]
-crop_or_grass = cropland | grassland
+# region
+# # Add worldcover classes to the xarray
+# world_cover_layers = {
+#     "Tree cover": 10, # Green
+#     # "Shrubland": 20, # Orange
+#     "Grassland": 30, # Yellow
+#     "Cropland": 40, # pink
+#     "Built-up": 50, # red
+#     "Permanent water bodies": 80, # blue
+# }
+# endregion
 
+# region
+# worldcover_path = os.path.join("/g/data/xe2/cb8590/WORLDCOVER/ESA_WORLDCOVER_10M_2021_V200/MAP/")
+# MILG_id = "S36E147"
+# filename = os.path.join(worldcover_path, f"ESA_WorldCover_10m_2021_v200_{MILG_id}_Map", f"ESA_WorldCover_10m_2021_v200_{MILG_id}_Map.tif")
+# array = rxr.open_rasterio(filename)
+# reprojected = array.rio.reproject_match(ds)
+# ds["worldcover"] = reprojected.isel(band=0).drop_vars('band')
+# cropland = ds["worldcover"].values == world_cover_layers["Cropland"]
+# grassland = ds["worldcover"].values == world_cover_layers["Grassland"]
+# tree_cover = ds["worldcover"].values == world_cover_layers["Tree cover"]
+# crop_or_grass = cropland | grassland
+# endregion
 
 # region
 def add_tiff_band(ds, variable, resampling_method, outdir, stub):
@@ -284,7 +288,10 @@ productivity_variable = 'EVI'
 # Selecting an individual paddock
 # endregion
 
-time = "2020-01-08"
+# region
+# time = "2020-01-08"
+time = "2022-08-04"
+
 ds_timepoint = ds.sel(time=time, method='nearest')
 def normalize(arr):
     return (arr - arr.min()) / (arr.max() - arr.min())
@@ -292,6 +299,7 @@ red = ds_timepoint['nbart_red']
 green = ds_timepoint['nbart_green']
 blue = ds_timepoint['nbart_blue']
 rgb = np.stack([normalize(red), normalize(green), normalize(blue)], axis=-1)
+# endregion
 
 # region
 # Read in the polygons from SAMGeo (these will not neccesarily match user-provided paddocks)
@@ -303,24 +311,25 @@ pol['paddock'] = pol.paddock.astype('category')
 # endregion
 
 # region
-# Calculate aspect ratio of this region
-earth_radius_km = 6371
+# # Calculate aspect ratio of this region
+# earth_radius_km = 6371
 
-# Lat and lon parameters used to generate the imagery
+# # Lat and lon parameters used to generate the imagery
 filename = os.path.join(outdir, f"{stub}_ds2_query.pkl")
 with open(filename, 'rb') as file:
     query = pickle.load(file)
-latitude_deg = query['y'][0]
-lat_diff_deg = query['y'][1] - query['y'][0]
-lon_diff_deg = query['x'][1] - query['x'][0]
+    
+# latitude_deg = query['y'][0]
+# lat_diff_deg = query['y'][1] - query['y'][0]
+# lon_diff_deg = query['x'][1] - query['x'][0]
 
-# Conversion to km
-latitude_rad = math.radians(latitude_deg)
-lat_distance_km = lat_diff_deg * (math.pi * earth_radius_km / 180)
-lon_distance_km = lon_diff_deg * (math.cos(latitude_rad) * (math.pi * earth_radius_km / 180))
+# # Conversion to km
+# latitude_rad = math.radians(latitude_deg)
+# lat_distance_km = lat_diff_deg * (math.pi * earth_radius_km / 180)
+# lon_distance_km = lon_diff_deg * (math.cos(latitude_rad) * (math.pi * earth_radius_km / 180))
 
-lat_lon_ratio = lat_distance_km/lon_distance_km
-lat_lon_ratio
+# lat_lon_ratio = lat_distance_km/lon_distance_km
+# lat_lon_ratio
 
 # endregion
 
@@ -380,9 +389,9 @@ fig, ax = plt.subplots(figsize=(10, 10))
 
 ax.imshow(rgb, extent=(left, right, bottom, top))
 
-pol.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=1)
-for x, y, label in zip(pol.geometry.centroid.x, pol.geometry.centroid.y, pol['paddock']):
-    ax.text(x, y, label, fontsize=12, ha='center', va='center', color='yellow')
+# pol.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=1)
+# for x, y, label in zip(pol.geometry.centroid.x, pol.geometry.centroid.y, pol['paddock']):
+#     ax.text(x, y, label, fontsize=12, ha='center', va='center', color='yellow')
 
 scalebar = AnchoredSizeBar(
     ax.transData, 1000, '1km', loc='lower center', pad=0.1, 
@@ -403,68 +412,73 @@ print(filename)
 # endregion
 
 # region
-# WorldCover Plot
-fig, ax = plt.subplots(1, 1, figsize=(10, 10))
+# # WorldCover Plot
+# fig, ax = plt.subplots(1, 1, figsize=(10, 10))
 
-# Abbreviate the WorldCover names to take less space on the plot
-world_cover_layers = {
-    "Tree": 10, # Green
-    "Grass": 30, # Yellow
-    "Crop": 40, # pink
-    "Urban": 50, # red
-    "Water": 80, # blue
-}
-world_cover_colors = ['green', 'yellow', 'violet', 'red', 'blue']
-values_worldcover = list(world_cover_layers.values())
-cmap_worldcover = mcolors.ListedColormap(world_cover_colors)
-norm_worldcover = mcolors.BoundaryNorm(values_worldcover + [max(values_worldcover) + 10], cmap_worldcover.N)  # Add an extra upper bound
+# # Abbreviate the WorldCover names to take less space on the plot
+# world_cover_layers = {
+#     "Tree": 10, # Green
+#     "Grass": 30, # Yellow
+#     "Crop": 40, # pink
+#     "Urban": 50, # red
+#     "Water": 80, # blue
+# }
+# world_cover_colors = ['green', 'yellow', 'violet', 'red', 'blue']
+# values_worldcover = list(world_cover_layers.values())
+# cmap_worldcover = mcolors.ListedColormap(world_cover_colors)
+# norm_worldcover = mcolors.BoundaryNorm(values_worldcover + [max(values_worldcover) + 10], cmap_worldcover.N)  # Add an extra upper bound
 
-# Select the worldcover layer
-ds_worldcover = ds.sel(time=time, method='nearest')['worldcover']
-im = ds_worldcover.plot(
-    cmap=cmap_worldcover,
-    norm=norm_worldcover,
-    ax=ax,
-    add_colorbar=False
-)
-ax.set_title(f'WorldCover 2021', fontsize=title_size)
-ax.set_xlabel('')
-ax.set_ylabel('')
-ax.set_xticks([])
-ax.set_yticks([])
+# # Select the worldcover layer
+# ds_worldcover = ds.sel(time=time, method='nearest')['worldcover']
+# im = ds_worldcover.plot(
+#     cmap=cmap_worldcover,
+#     norm=norm_worldcover,
+#     ax=ax,a
+#     add_colorbar=False
+# )
+# ax.set_title(f'WorldCover 2021', fontsize=title_size)
+# ax.set_xlabel('')
+# ax.set_ylabel('')
+# ax.set_xticks([])
+# ax.set_yticks([])
 
-pol.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=1)
-for x, y, label in zip(pol.geometry.centroid.x, pol.geometry.centroid.y, pol['paddock']):
-    ax.text(x, y, label, fontsize=12, ha='center', va='center', color='purple')
+# pol.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=1)
+# for x, y, label in zip(pol.geometry.centroid.x, pol.geometry.centroid.y, pol['paddock']):
+#     ax.text(x, y, label, fontsize=12, ha='center', va='center', color='purple')
 
-scalebar = AnchoredSizeBar(
-    ax.transData, 1000, '1km', loc='lower center', pad=0.1, 
-    color='black', frameon=False, size_vertical=10,
-    fontproperties=fm.FontProperties(size=label_size),
-    bbox_to_anchor=(0.05, -0.05),  # Position below the plot
-    bbox_transform=ax.transAxes,
-)
-ax.add_artist(scalebar)
+# scalebar = AnchoredSizeBar(
+#     ax.transData, 1000, '1km', loc='lower center', pad=0.1, 
+#     color='black', frameon=False, size_vertical=10,
+#     fontproperties=fm.FontProperties(size=label_size),
+#     bbox_to_anchor=(0.05, -0.05),  # Position below the plot
+#     bbox_transform=ax.transAxes,
+# )
+# ax.add_artist(scalebar)
 
-ax.set_aspect(lat_lon_ratio)
-handles = [plt.Line2D([0], [0], color=color, lw=4) for color in world_cover_colors]
-labels = list(world_cover_layers.keys())
-ax.legend(handles, labels, loc='lower right', fontsize=annotations_size)
+# ax.set_aspect(lat_lon_ratio)
+# handles = [plt.Line2D([0], [0], color=color, lw=4) for color in world_cover_colors]
+# labels = list(world_cover_layers.keys())
+# ax.legend(handles, labels, loc='lower right', fontsize=annotations_size)
 
-filename = os.path.join(scratch_dir, stub+'_Paddocks_worldcover.png')
-plt.savefig(filename, dpi=300, bbox_inches='tight')
-plt.show()
-print(filename)
+# filename = os.path.join(scratch_dir, stub+'_Paddocks_worldcover.png')
+# plt.savefig(filename, dpi=300, bbox_inches='tight')
+# plt.show()
+# print(filename)
 # endregion
 
 # Remove unnecessary variables from ds
-useful_variables = ['nbart_red', 'nbart_green', 'nbart_blue', 'EVI', 'worldcover', 'tree_percent', 'max_tree_height', 'percent_trees_0m-300m'
+useful_variables = ['nbart_red', 'nbart_green', 'nbart_blue', 'EVI', 'tree_percent', 'max_tree_height', 'percent_trees_0m-300m'
                     , 'terrain', 'slope', 'topographic_index', 'aspect'
-                    , 'bg', 'pv', 'npv']
+                   , 'bg', 'pv', 'npv']
+# useful_variables = ['nbart_red', 'nbart_green', 'nbart_blue', 'EVI', 'worldcover', 'tree_percent', 'max_tree_height', 'percent_trees_0m-300m'
+#                     , 'terrain', 'slope', 'topographic_index', 'aspect'
+#                     , 'bg', 'pv', 'npv']
                     # , 'Clay', 'Silt', 'Sand', 'pH_CaCl2']
 ds_small = ds.isel(band=0)[useful_variables]
 
-paddock_id = 66
+# region
+# paddock_id = 66
+# endregion
 
 # region
 from matplotlib import colors  # Careful because I have a variable named 'colors' earlier in this script
@@ -553,7 +567,7 @@ for productivity_variable in productivity_variables:
 
 # Plotting the maps in subplots
 fig, axes = plt.subplots(2, 2, figsize=(12, 12))
-fig.suptitle(f"Paddock {paddock_id} on {time}", fontsize=26)
+# fig.suptitle(f"Paddock {paddock_id} on {time}", fontsize=26)
 
 # Fontsizes
 title_size = 20
@@ -614,49 +628,52 @@ print("Saved", filename)
 
 # endregion
 
-paddock_ids = [66]
+# paddock_ids = [66]
 productivity_variable = 'EVI'
 # paddock_ids = pol['paddock'].values
 # for paddock_id in paddock_ids:
 
 # region
-def calculate_adjacency_mask(pol, ds_small, paddock_id):
-    paddock_row = pol[pol['paddock'] == paddock_id]
-    paddock_geometry = paddock_row['geometry'].iloc[0]
+# def calculate_adjacency_mask(pol, ds_small, paddock_id):
+#     paddock_row = pol[pol['paddock'] == paddock_id]
+#     paddock_geometry = paddock_row['geometry'].iloc[0]
     
-    # Create a rectangular buffer
-    minx, miny, maxx, maxy = paddock_geometry.bounds
-    buffer_distance = max_distance * pixel_size
-    expanded_minx = minx - buffer_distance
-    expanded_miny = miny - buffer_distance
-    expanded_maxx = maxx + buffer_distance
-    expanded_maxy = maxy + buffer_distance
-    rectangular_buffer = box(expanded_minx, expanded_miny, expanded_maxx, expanded_maxy)
-    buffered_gdf = gpd.GeoDataFrame(geometry=[rectangular_buffer])
+#     # Create a rectangular buffer
+#     minx, miny, maxx, maxy = paddock_geometry.bounds
+#     buffer_distance = max_distance * pixel_size
+#     expanded_minx = minx - buffer_distance
+#     expanded_miny = miny - buffer_distance
+#     expanded_maxx = maxx + buffer_distance
+#     expanded_maxy = maxy + buffer_distance
+#     rectangular_buffer = box(expanded_minx, expanded_miny, expanded_maxx, expanded_maxy)
+#     buffered_gdf = gpd.GeoDataFrame(geometry=[rectangular_buffer])
     
-    # Clip the xarray to this paddock
-    ds_buffered = ds_small.rio.clip(buffered_gdf.geometry, drop=True, invert=False)
+#     # Clip the xarray to this paddock
+#     ds_buffered = ds_small.rio.clip(buffered_gdf.geometry, drop=True, invert=False)
     
-    # Recreate the adjacency mask for just this paddock
-    paddock_geometry = paddock_row['geometry'].iloc[0]
-    tree_percent = ds_buffered['tree_percent'].values
-    tree_mask = tree_percent > 0
-    structuring_element = np.ones((3, 3))
-    adjacent_mask = scipy.ndimage.binary_dilation(tree_mask, structure=structuring_element)
+#     # Recreate the adjacency mask for just this paddock
+#     paddock_geometry = paddock_row['geometry'].iloc[0]
+#     tree_percent = ds_buffered['tree_percent'].values
+#     tree_mask = tree_percent > 0
+#     structuring_element = np.ones((3, 3))
+#     adjacent_mask = scipy.ndimage.binary_dilation(tree_mask, structure=structuring_element)
     
-    # Exclude pixels outside the paddock for the rest of this analysis
-    paddock_mask = geometry_mask(
-        [paddock_geometry],
-        out_shape=(ds_buffered.sizes["y"], ds_buffered.sizes["x"]),
-        transform=ds_buffered.rio.transform())
-    adjacent_mask |= paddock_mask
+#     # Exclude pixels outside the paddock for the rest of this analysis
+#     paddock_mask = geometry_mask(
+#         [paddock_geometry],
+#         out_shape=(ds_buffered.sizes["y"], ds_buffered.sizes["x"]),
+#         transform=ds_buffered.rio.transform())
+#     adjacent_mask |= paddock_mask
 
-    return adjacent_mask, tree_mask, ds_buffered, 
+#     return adjacent_mask, tree_mask, ds_buffered, 
 
-paddock_id = paddock_ids[0]
-adjacent_mask, tree_mask, ds_buffered = calculate_adjacency_mask(pol, ds_small, paddock_id)
-plt.imshow(adjacent_mask)
+# paddock_id = paddock_ids[0]
+# adjacent_mask, tree_mask, ds_buffered = calculate_adjacency_mask(pol, ds_small, paddock_id)
+# plt.imshow(adjacent_mask)
 # endregion
+
+ds_buffered = ds
+
 
 # region
 def calculate_shelter_effects(ds, adjacent_mask, tree_cover_threshold=1):
@@ -716,7 +733,7 @@ def calculate_shelter_effects(ds, adjacent_mask, tree_cover_threshold=1):
     df_benefits = df_benefits.set_index('date')
     df_benefits.index = pd.to_datetime(df_benefits.index)
     
-    filename = os.path.join(scratch_dir, f"{stub}_Paddock{paddock_id}_benefits.csv")
+    filename = os.path.join(scratch_dir, f"{stub}_benefits.csv")
     df_benefits.to_csv(filename)
     print("Saved: ", filename)
 
@@ -839,13 +856,15 @@ def plot_histogram(ds, time, tree_cover_threshold=1):
     # Save the plots
     plt.tight_layout()
     plt.subplots_adjust(hspace=0.3) 
-    filename = os.path.join(scratch_dir, f"{stub}_Paddock{paddock_id}_{time}_regression.png")
+    filename = os.path.join(scratch_dir, f"{stub}_{time}_regression.png")
     plt.savefig(filename)
     plt.show()
     print("Saved", filename)
     
 time = df_benefits.index[0].date()
-time = "2020-01-08"   
+# time = "2020-01-08"  
+time = "2022-08-04"
+
 plot_histogram(ds_buffered, time)
 # endregion
 # region
@@ -918,7 +937,7 @@ def plot_timeseries(ds, df_benefits, stub):
     plt.subplots_adjust(hspace=0.2)
     
     # Save as a single image
-    filename_combined = os.path.join(scratch_dir, f"{stub}_Paddock{paddock_id}_time_series.png")
+    filename_combined = os.path.join(scratch_dir, f"{stub}_time_series.png")
     plt.savefig(filename_combined)
     print("Saved", filename_combined)
 
@@ -927,10 +946,10 @@ plot_timeseries(ds_buffered, df_benefits, stub)
 # endregion
 
 # region
-def plot_maps(ds, tree_mask, stub, paddock_id):
+def plot_maps(ds, tree_mask, stub):
     dem = ds['terrain']
     acc = ds['topographic_index']
-    paddock_row = pol[pol['paddock'] == paddock_id]
+    # paddock_row = pol[pol['paddock'] == paddock_id]
 
     # Extracting a single timepoint for RGB and productivity plots
     ds_timepoint = ds.sel(time=time, method='nearest')
@@ -971,7 +990,7 @@ def plot_maps(ds, tree_mask, stub, paddock_id):
     ###############################
     # Plotting the maps in subplots
     fig, axes = plt.subplots(4, 2, figsize=(12, 12))
-    fig.suptitle(f"Paddock {paddock_id} on {time}", fontsize=26)
+    fig.suptitle(f"{time}", fontsize=26)
     
     # Fontsizes
     title_size = 20
@@ -981,14 +1000,14 @@ def plot_maps(ds, tree_mask, stub, paddock_id):
     # EVI
     ax = axes[0,0]
     im = ds_trees.plot(ax=ax, cmap=cmap_EVI, vmin=vmin_EVI, vmax=vmax_EVI, add_colorbar=True)
-    paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
+    # paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
     ax.set_title(f"Productivity Proxy", fontsize=title_size)
     add_cbar(im, productivity_variable, label_size)
     
     # RGB
     ax = axes[0,1]
     ax.imshow(rgb, extent=(left, right, bottom, top))
-    paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
+    # paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
     ax.set_title(f"Sentinel-2 Imagery", fontsize=title_size)
     
     scalebar = AnchoredSizeBar(
@@ -1006,7 +1025,7 @@ def plot_maps(ds, tree_mask, stub, paddock_id):
     # Shelter score
     ax = axes[1,0] 
     im = ds_buffered['percent_trees_0m-300m'].plot(ax=ax, cmap=cmap_EVI, vmin=0, vmax=30) 
-    paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
+    # paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
     ax.set_title(f"Shelter Score", fontsize=title_size)
     add_cbar(im, "Tree cover within 300m (%)", annotation_size)
     
@@ -1014,37 +1033,37 @@ def plot_maps(ds, tree_mask, stub, paddock_id):
     ax = axes[1,1] 
     data = ds_buffered['max_tree_height'].where(ds_buffered['max_tree_height'] != 0, np.nan) 
     im = data.plot(ax=ax, cmap=cmap_tree_height, vmin=0, vmax=20) 
-    paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
+    # paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
     ax.set_title(f"Canopy Height", fontsize=title_size)
     add_cbar(im, "metres", label_size)
     
     # Terrain
     ax = axes[2,0]
     im = ds_buffered['terrain'].plot(ax=ax, cmap='terrain', add_colorbar=True)
-    paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
+    # paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
     ax.set_title(f"Elevation", fontsize=title_size)
     add_cbar(im, "Metres", label_size)
     
     # WorldCover 
-    ax = axes[2,1]
-    ds_worldcover = ds.sel(time=time, method='nearest')['worldcover']
-    im = ds_worldcover.plot(ax=ax, cmap=cmap_worldcover, norm=norm_worldcover, add_colorbar=False)
-    paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
-    ax.set_title(f"ESA WorldCover", fontsize=title_size)
+    # ax = axes[2,1]
+    # ds_worldcover = ds.sel(time=time, method='nearest')['worldcover']
+    # im = ds_worldcover.plot(ax=ax, cmap=cmap_worldcover, norm=norm_worldcover, add_colorbar=False)
+    # paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
+    # ax.set_title(f"ESA WorldCover", fontsize=title_size)
     
-    # handles = [plt.Line2D([0], [0], color=color, lw=4) for color in world_cover_colors]
-    # labels = list(world_cover_layers.keys())
-    # ax.legend(handles, labels, fontsize=annotations_size, bbox_to_anchor=(1.6, 1)) # loc='lower right'
+    # # handles = [plt.Line2D([0], [0], color=color, lw=4) for color in world_cover_colors]
+    # # labels = list(world_cover_layers.keys())
+    # # ax.legend(handles, labels, fontsize=annotations_size, bbox_to_anchor=(1.6, 1)) # loc='lower right'
     
-    cbar = plt.colorbar(sm_white, ax=ax, orientation='vertical')
-    cbar.set_ticks([])  
-    cbar.set_label('')  
-    cbar.outline.set_visible(False)
+    # cbar = plt.colorbar(sm_white, ax=ax, orientation='vertical')
+    # cbar.set_ticks([])  
+    # cbar.set_label('')  
+    # cbar.outline.set_visible(False)
     
     # Aspect
     ax = axes[3,0]
     im = ds_buffered['aspect'].plot(ax=ax, cmap=cmap_aspect, norm=norm_aspect, add_colorbar=True)
-    paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
+    # paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
     ax.set_title(f"Aspect", fontsize=title_size)
     cbar = add_cbar(im, "", label_size)
     cbar.set_ticks(list(directions.keys()))
@@ -1053,7 +1072,7 @@ def plot_maps(ds, tree_mask, stub, paddock_id):
     # Topographic Index
     ax = axes[3,1]
     im = acc.plot(ax=ax, cmap='cubehelix', norm=colors.LogNorm(1, acc.max()), add_colorbar=True)
-    paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
+    # paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
     ax.set_title(f"Topographic Index", fontsize=title_size)
     add_cbar(im, "Upstream Cells", label_size)
     
@@ -1063,20 +1082,20 @@ def plot_maps(ds, tree_mask, stub, paddock_id):
             remove_axis_labels(ax)
     
     plt.tight_layout()
-    filename = os.path.join(scratch_dir, f"{stub}_Paddock{paddock_id}_maps_{time}.png")
+    filename = os.path.join(scratch_dir, f"{stub}_maps_{time}.png")
     plt.savefig(filename)
     plt.show()
     print("Saved", filename)
 
     # True colour tiff
-    filename = os.path.join(scratch_dir, f"{stub}_Paddock{paddock_id}_RGB_{time}.tif")
+    filename = os.path.join(scratch_dir, f"{stub}_RGB_{time}.tif")
     ds_timepoint.attrs = {}
     rgb_stack = ds_timepoint[['nbart_red', 'nbart_green', 'nbart_blue']]
     rgb_stack.rio.to_raster(filename)
     print("Saved", filename)
     
     # Productivity tiff
-    filename = os.path.join(scratch_dir, f"{stub}_Paddock{paddock_id}_{productivity_variable}_{time}.tif")
+    filename = os.path.join(scratch_dir, f"{stub}_{productivity_variable}_{time}.tif")
     clipped = ds_masked.fillna(upper_bound + 0.1)
     clipped = clipped.clip(min=lower_bound, max=upper_bound)
     clipped.attrs = {}
@@ -1086,20 +1105,19 @@ def plot_maps(ds, tree_mask, stub, paddock_id):
     # Topography tiffs
     topographic_variables = ['terrain', 'topographic_index', 'aspect', 'slope']
     for topographic_variable in topographic_variables:
-        filename = os.path.join(scratch_dir, f"{stub}_Paddock{paddock_id}_{topographic_variable}.tif")
+        filename = os.path.join(scratch_dir, f"{stub}_{topographic_variable}.tif")
         ds_buffered[topographic_variable].rio.to_raster(filename)
         print("Saved", filename)
 
-# plot_maps(ds_buffered, tree_mask, stub, paddock_id)
+plot_maps(ds_buffered, tree_mask, stub)
 
 # endregion
 
-
 # region
-def plot_productivities(ds, tree_mask, stub, paddock_id):
+def plot_productivities(ds, tree_mask, stub):
 # ds = ds_buffered
 
-    paddock_row = pol[pol['paddock'] == paddock_id]
+    # paddock_row = pol[pol['paddock'] == paddock_id]
     
     # Extracting a single timepoint for RGB and productivity plots
     ds_timepoint = ds.sel(time=time, method='nearest')
@@ -1142,7 +1160,7 @@ def plot_productivities(ds, tree_mask, stub, paddock_id):
     
     # Plotting the maps in subplots
     fig, axes = plt.subplots(2, 2, figsize=(12, 12))
-    fig.suptitle(f"Paddock {paddock_id} on {time}", fontsize=26)
+    fig.suptitle(f"{time}", fontsize=26)
     
     # Fontsizes
     title_size = 20
@@ -1157,7 +1175,7 @@ def plot_productivities(ds, tree_mask, stub, paddock_id):
     vmax_EVI = productivity_stats[productivity_variable]['vmax_EVI']
     ds_trees = productivity_stats[productivity_variable]['ds_trees']
     im = ds_trees.plot(ax=ax, cmap=cmap_EVI, vmin=vmin_EVI, vmax=vmax_EVI, add_colorbar=True)
-    paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
+    # paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
     ax.set_title(f"Productivity Proxy", fontsize=title_size)
     add_cbar(im, productivity_variable, label_size)
     
@@ -1168,7 +1186,7 @@ def plot_productivities(ds, tree_mask, stub, paddock_id):
     vmax_EVI = productivity_stats[productivity_variable]['vmax_EVI']
     ds_trees = productivity_stats[productivity_variable]['ds_trees']
     im = ds_trees.plot(ax=ax, cmap=cmap_EVI, vmin=vmin_EVI, vmax=vmax_EVI, add_colorbar=True)
-    paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
+    # paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
     ax.set_title(f"Productivity Proxy", fontsize=title_size)
     add_cbar(im, productivity_variable, label_size)
     
@@ -1179,7 +1197,7 @@ def plot_productivities(ds, tree_mask, stub, paddock_id):
     vmax_EVI = productivity_stats[productivity_variable]['vmax_EVI']
     ds_trees = productivity_stats[productivity_variable]['ds_trees']
     im = ds_trees.plot(ax=ax, cmap=cmap_EVI, vmin=vmin_EVI, vmax=vmax_EVI, add_colorbar=True)
-    paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
+    # paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
     ax.set_title(f"Productivity Proxy", fontsize=title_size)
     add_cbar(im, productivity_variable, label_size)
     
@@ -1190,7 +1208,7 @@ def plot_productivities(ds, tree_mask, stub, paddock_id):
     vmax_EVI = productivity_stats[productivity_variable]['vmax_EVI']
     ds_trees = productivity_stats[productivity_variable]['ds_trees']
     im = ds_trees.plot(ax=ax, cmap=cmap_EVI, vmin=vmin_EVI, vmax=vmax_EVI, add_colorbar=True)
-    paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
+    # paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
     ax.set_title(f"Productivity Proxy", fontsize=title_size)
     add_cbar(im, productivity_variable, label_size)
     
@@ -1200,33 +1218,26 @@ def plot_productivities(ds, tree_mask, stub, paddock_id):
             remove_axis_labels(ax)
     
     plt.tight_layout()
-    filename = os.path.join(scratch_dir, f"{stub}_Paddock{paddock_id}_productivities_{time}.png")
+    filename = os.path.join(scratch_dir, f"{stub}_productivities_{time}.png")
     plt.savefig(filename)
     plt.show()
     print("Saved", filename)
 
-plot_productivities(ds_buffered, tree_mask, stub, paddock_id)
+plot_productivities(ds_buffered, tree_mask, stub)
 
 # endregion
 
 # region
 # %%time
-num_paddocks = len(pol)
-# paddock_ids = range(0,num_paddocks)
-paddock_ids = [66]
+# adjacent_mask, tree_mask, ds_buffered = calculate_adjacency_mask(pol, ds_small, paddock_id)
 
-for i, paddock_id in enumerate(paddock_ids):
-    print(f"{i+1}/{len(paddock_ids)}", "Paddock ID:", paddock_id)
-    adjacent_mask, tree_mask, ds_buffered = calculate_adjacency_mask(pol, ds_small, paddock_id)
-    df_benefits = calculate_shelter_effects(ds_buffered, adjacent_mask)
-    time = "2020-01-08"   
-    plot_histogram(ds_buffered, time)
-    if len(df_benefits) > 0:
-        plot_timeseries(ds_buffered, df_benefits, stub)
-    plot_maps(ds_buffered, tree_mask, stub, paddock_id)
+df_benefits = calculate_shelter_effects(ds_buffered, adjacent_mask)
+# time = "2020-01-08"   
+plot_histogram(ds_buffered, time)
+if len(df_benefits) > 0:
+    plot_timeseries(ds_buffered, df_benefits, stub)
+plot_maps(ds_buffered, tree_mask, stub)
 # endregion
-
-
 
 
 
