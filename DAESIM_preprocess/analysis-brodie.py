@@ -88,51 +88,35 @@ ds = ds.isel(
     x=slice(1, -1) 
 )
 
-
 # region
-def dms_to_decimal(degrees, minutes, seconds, direction):
-    """Convert DMS (degrees, minutes, seconds) to decimal degrees."""
-    decimal = degrees + (minutes / 60) + (seconds / 3600)
-    if direction in ['S', 'W']:  # South and West are negative
-        decimal *= -1
-    return decimal
+# # Crop the region to just Brodie's transects
 
-# Convert the given coordinates
-lat_min = dms_to_decimal(25, 22, 51.54, 'S')
-lon_min = dms_to_decimal(147, 9, 35.17, 'E')
+# # Define the coordinate transformation from EPSG:4326 to EPSG:6933
+# transformer = Transformer.from_crs("EPSG:4326", "EPSG:6933", always_xy=True)
 
-lat_max = dms_to_decimal(25, 22, 47.40, 'S')
-lon_max = dms_to_decimal(147, 9, 41.09, 'E')
+# # Convert given lat/lon bounds to EPSG:6933
+# lon_min, lat_min = 147 + 9/60 + 35.17/3600, -(25 + 22/60 + 51.54/3600)
+# lon_max, lat_max = 147 + 9/60 + 41.09/3600, -(25 + 22/60 + 47.40/3600)
 
-# Print results
-cropped_bounds = (lat_min, lon_min, lat_max, lon_max)
+# x_min, y_min = transformer.transform(lon_min, lat_min)
+# x_max, y_max = transformer.transform(lon_max, lat_max)
 
+# cropped_bounds = x_min, y_min, x_max, y_max
 # endregion
 
+cropped_bounds = (14198885, -3135710, 14199267, -3135470)
+# cropped_bounds =   (14198898, -3135643, 14199057, -3135510)
+x_min, y_min, x_max, y_max = cropped_bounds
+cropped_bounds
+
 # region
-# Crop the region to just Brodie's transects
-
-# Define the coordinate transformation from EPSG:4326 to EPSG:6933
-transformer = Transformer.from_crs("EPSG:4326", "EPSG:6933", always_xy=True)
-
-# Convert given lat/lon bounds to EPSG:6933
-lon_min, lat_min = 147 + 9/60 + 35.17/3600, -(25 + 22/60 + 51.54/3600)
-lon_max, lat_max = 147 + 9/60 + 41.09/3600, -(25 + 22/60 + 47.40/3600)
-
-x_min, y_min = transformer.transform(lon_min, lat_min)
-x_max, y_max = transformer.transform(lon_max, lat_max)
-
-cropped_bounds = x_min, y_min, x_max, y_max
+# ds = ds_uncropped
+# endregion
 
 # Crop the dataset
 ds_cropped = ds.rio.clip_box(minx=x_min, miny=y_min, maxx=x_max, maxy=y_max)
-
-# Check the new bounds
-print(ds_cropped.rio.bounds())
-
 ds_uncropped = ds
 ds = ds_cropped
-# endregion
 
 # region
 # Global canopy height tree_mask
@@ -141,37 +125,37 @@ tree_mask = tree_percent > 0
 
 # Shelterscore showing the number of trees within a donut at a given distance away from the crop/pasture pixel
 structuring_element = np.ones((3, 3))  # This defines adjacency (including diagonals)
-# adjacent_mask = scipy.ndimage.binary_dilation(tree_mask, structure=structuring_element)
-adjacent_mask = tree_mask
+adjacent_mask = scipy.ndimage.binary_dilation(tree_mask, structure=structuring_element)
+# adjacent_mask = tree_mask
 
-for i in range(len(distances) - 1):
+# for i in range(len(distances) - 1):
 
-    min_distance = distances[i]
-    max_distance = distances[i+1]
+#     min_distance = distances[i]
+#     max_distance = distances[i+1]
     
-    # Calculate the number of trees in a donut between the inner and outer circle
-    y, x = np.ogrid[-max_distance:max_distance+1, -max_distance:max_distance+1]
-    kernel = (x**2 + y**2 <= max_distance**2) & (x**2 + y**2 >= min_distance**2)
-    kernel = kernel.astype(float)
+#     # Calculate the number of trees in a donut between the inner and outer circle
+#     y, x = np.ogrid[-max_distance:max_distance+1, -max_distance:max_distance+1]
+#     kernel = (x**2 + y**2 <= max_distance**2) & (x**2 + y**2 >= min_distance**2)
+#     kernel = kernel.astype(float)
     
-    total_tree_cover = fftconvolve(tree_percent, kernel, mode='same')
-    shelter_score = (total_tree_cover / kernel.sum()) * 100
+#     total_tree_cover = fftconvolve(tree_percent, kernel, mode='same')
+#     shelter_score = (total_tree_cover / kernel.sum()) * 100
     
-    # Mask out trees and adjacent pixels
-    shelter_score[np.where(adjacent_mask)] = np.nan
-    shelter_score[shelter_score < 1] = 0
+#     # Mask out trees and adjacent pixels
+#     shelter_score[np.where(adjacent_mask)] = np.nan
+#     shelter_score[shelter_score < 1] = 0
     
-    # Add the shelter_score to the xarray
-    shelter_score_da = xr.DataArray(
-        shelter_score, 
-        dims=("y", "x"),  
-        coords={"y": ds.coords["y"], "x": ds.coords["x"]}, 
-        name="shelter_score" 
-    )
+#     # Add the shelter_score to the xarray
+#     shelter_score_da = xr.DataArray(
+#         shelter_score, 
+#         dims=("y", "x"),  
+#         coords={"y": ds.coords["y"], "x": ds.coords["x"]}, 
+#         name="shelter_score" 
+#     )
 
-    layer_name = f"percent_trees_{pixel_size * min_distance}m-{pixel_size * max_distance}m"
-    ds[layer_name] = shelter_score_da
-    print(f"Added layer: {layer_name}")
+#     layer_name = f"percent_trees_{pixel_size * min_distance}m-{pixel_size * max_distance}m"
+#     ds[layer_name] = shelter_score_da
+#     print(f"Added layer: {layer_name}")
 # endregion
 
 # Enhanced Vegetation Index
@@ -180,6 +164,12 @@ B4 = ds['nbart_red']
 B2 = ds['nbart_blue']
 ds['EVI'] = 2.5 * ((B8 - B4) / (B8 + 6 * B4 - 7.5 * B2 + 1))
 productivity_variable = 'EVI'
+
+ds_timepoint = ds.sel(time=time, method='nearest')
+
+plt.imshow(ds_timepoint['EVI'])
+
+
 
 # region
 # Compute Euclidean distance from each non-tree pixel to the nearest tree
@@ -201,8 +191,6 @@ ds["distance_to_tree"] = distance_da
 ds["distance_to_tree"].plot()
 # endregion
 
-ds_timepoint = ds.sel(time=time, method='nearest')
-
 ds_timepoint['EVI'].plot()
 
 ds_timepoint['max_tree_height'].plot()
@@ -210,7 +198,7 @@ ds_timepoint['max_tree_height'].plot()
 # region
 # Save the shelterscore, productivity score, and canopy height to tiff files for double checking in QGIS
 filename = os.path.join(scratch_dir, f"{stub}_10m_canopy_height.tiff")
-ds_timepoint['max_tree_height'].rio.to_raster(filename)
+ds['max_tree_height'].rio.to_raster(filename)
 print(filename)
 
 filename = os.path.join(scratch_dir, f"{stub}_EVI_2022_08_03.tiff")
@@ -218,7 +206,7 @@ ds_timepoint['EVI'].rio.to_raster(filename)
 print(filename)
 
 filename = os.path.join(scratch_dir, f"{stub}_distance_to_tree.tiff")
-ds_timepoint['distance_to_tree'].rio.to_raster(filename)
+ds['distance_to_tree'].rio.to_raster(filename)
 print(filename)
 # endregion
 
@@ -261,10 +249,18 @@ print(filename)
 useful_variables = ['nbart_red', 'nbart_green', 'nbart_blue', 'EVI', 'tree_percent', 'max_tree_height', 'percent_trees_0m-300m', 'distance_to_tree']
 ds_small = ds.isel(band=0)[useful_variables]
 
+ds_timepoint['npv']
+
+ds_timepoint['pv'].values.min(), ds_timepoint['pv'].values.max()
+
+ds_timepoint['bg'].values.min(), ds_timepoint['bg'].values.max()
+
+ds_timepoint['npv'].values.min(), ds_timepoint['npv'].values.max()
+
 # region
 # Prep arrays for histogram
 
-productivity_variable = 'EVI'
+productivity_variable = 'bg'
 ds_timepoint = ds.sel(time=time, method='nearest')
     
 # Calculate shelter score and productivity index for this timepoint
@@ -382,6 +378,8 @@ ax.set_title(f"Productivity Proxy", fontsize=title_size)
 add_cbar(im, productivity_variable, label_size)
 
 # endregion
+
+ds.time.values
 
 
 
