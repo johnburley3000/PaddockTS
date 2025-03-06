@@ -141,7 +141,8 @@ tree_mask = tree_percent > 0
 
 # Shelterscore showing the number of trees within a donut at a given distance away from the crop/pasture pixel
 structuring_element = np.ones((3, 3))  # This defines adjacency (including diagonals)
-adjacent_mask = scipy.ndimage.binary_dilation(tree_mask, structure=structuring_element)
+# adjacent_mask = scipy.ndimage.binary_dilation(tree_mask, structure=structuring_element)
+adjacent_mask = tree_mask
 
 for i in range(len(distances) - 1):
 
@@ -263,6 +264,7 @@ ds_small = ds.isel(band=0)[useful_variables]
 # region
 # Prep arrays for histogram
 
+productivity_variable = 'EVI'
 ds_timepoint = ds.sel(time=time, method='nearest')
     
 # Calculate shelter score and productivity index for this timepoint
@@ -721,7 +723,7 @@ def plot_timeseries(ds, df_benefits, stub):
     ax.plot(df.index, df['Minimum Soil Moisture']/EVI_scale_factor, color='blue', label="Soil moisture (mm)")
     ax.plot(df.index, df["q1"], color='grey')
     ax.plot(df.index, df["q3"], color='grey')
-    
+        
     # Plot the interquartile range
     q1 = df["q1"] 
     q3 = df["q3"]
@@ -862,131 +864,6 @@ plot_maps(ds_buffered, tree_mask, stub)
 
 # endregion
 
-# region
-def plot_productivities(ds, tree_mask, stub):
-# ds = ds_buffered
-
-    # paddock_row = pol[pol['paddock'] == paddock_id]
-    
-    # Extracting a single timepoint for RGB and productivity plots
-    ds_timepoint = ds.sel(time=time, method='nearest')
-    layer_name = f"percent_trees_0m-300m"
-    s = ds[layer_name].values
-    x = s.flatten()
-    
-    ###############################
-    
-    productivity_variables = ['EVI', 'bg', 'pv', 'npv']
-    productivity_stats = dict()
-    
-    for productivity_variable in productivity_variables:
-    
-        # Calculate the productivity and shelter scores
-        ds_productivity = ds.sel(time=time, method='nearest')[productivity_variable]
-        ds_masked = ds_productivity.where(~adjacent_mask)
-        y = ds_masked.values.flatten()
-        y_values_outliers = y[~np.isnan(y)]  
-        x_values_outliers = x[~np.isnan(y)]  
-        lower_bound = np.percentile(y_values_outliers, 1)
-        upper_bound = np.percentile(y_values_outliers, 99)
-        y_values = y_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]    
-        x_values_outliers = x[~np.isnan(y)]
-        x_values = x_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]
-        unsheltered = y_values[np.where(x_values < tree_cover_threshold)]
-        median_value = np.median(unsheltered)
-        
-        vmin_EVI = median_value - (upper_bound - lower_bound) / 2
-        vmax_EVI = median_value + (upper_bound - lower_bound) / 2
-        ds_trees = ds_productivity.where(~tree_mask)
-    
-        productivity_stats[productivity_variable] = {
-            "vmin_EVI": vmin_EVI,
-            "vmax_EVI": vmax_EVI,
-            "ds_trees": ds_trees
-        }
-    
-    
-    
-    # Plotting the maps in subplots
-    fig, axes = plt.subplots(2, 2, figsize=(12, 12))
-    fig.suptitle(f"{time}", fontsize=26)
-    
-    # Fontsizes
-    title_size = 20
-    label_size = 16
-    annotation_size = 12
-    
-    # Axes
-    ax = axes[0,0]
-    productivity_variable = "EVI"
-    
-    vmin_EVI = productivity_stats[productivity_variable]['vmin_EVI']
-    vmax_EVI = productivity_stats[productivity_variable]['vmax_EVI']
-    ds_trees = productivity_stats[productivity_variable]['ds_trees']
-    im = ds_trees.plot(ax=ax, cmap=cmap_EVI, vmin=vmin_EVI, vmax=vmax_EVI, add_colorbar=True)
-    # paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
-    ax.set_title(f"Productivity Proxy", fontsize=title_size)
-    add_cbar(im, productivity_variable, label_size)
-    
-    ax = axes[0,1]
-    productivity_variable = "bg"
-    
-    vmin_EVI = productivity_stats[productivity_variable]['vmin_EVI']
-    vmax_EVI = productivity_stats[productivity_variable]['vmax_EVI']
-    ds_trees = productivity_stats[productivity_variable]['ds_trees']
-    im = ds_trees.plot(ax=ax, cmap=cmap_EVI, vmin=vmin_EVI, vmax=vmax_EVI, add_colorbar=True)
-    # paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
-    ax.set_title(f"Productivity Proxy", fontsize=title_size)
-    add_cbar(im, productivity_variable, label_size)
-    
-    ax = axes[1,0]
-    productivity_variable = "pv"
-    
-    vmin_EVI = productivity_stats[productivity_variable]['vmin_EVI']
-    vmax_EVI = productivity_stats[productivity_variable]['vmax_EVI']
-    ds_trees = productivity_stats[productivity_variable]['ds_trees']
-    im = ds_trees.plot(ax=ax, cmap=cmap_EVI, vmin=vmin_EVI, vmax=vmax_EVI, add_colorbar=True)
-    # paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
-    ax.set_title(f"Productivity Proxy", fontsize=title_size)
-    add_cbar(im, productivity_variable, label_size)
-    
-    ax = axes[1,1]
-    productivity_variable = "npv"
-    
-    vmin_EVI = productivity_stats[productivity_variable]['vmin_EVI']
-    vmax_EVI = productivity_stats[productivity_variable]['vmax_EVI']
-    ds_trees = productivity_stats[productivity_variable]['ds_trees']
-    im = ds_trees.plot(ax=ax, cmap=cmap_EVI, vmin=vmin_EVI, vmax=vmax_EVI, add_colorbar=True)
-    # paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
-    ax.set_title(f"Productivity Proxy", fontsize=title_size)
-    add_cbar(im, productivity_variable, label_size)
-    
-    # Remove axes
-    for row in axes:
-        for ax in row:
-            remove_axis_labels(ax)
-    
-    plt.tight_layout()
-    filename = os.path.join(scratch_dir, f"{stub}_productivities_{time}.png")
-    plt.savefig(filename)
-    plt.show()
-    print("Saved", filename)
-
-plot_productivities(ds_buffered, tree_mask, stub)
-
-# endregion
-
-# region
-# %%time
-# adjacent_mask, tree_mask, ds_buffered = calculate_adjacency_mask(pol, ds_small, paddock_id)
-
-df_benefits = calculate_shelter_effects(ds_buffered, adjacent_mask)
-# time = "2020-01-08"   
-plot_histogram(ds_buffered, time)
-if len(df_benefits) > 0:
-    plot_timeseries(ds_buffered, df_benefits, stub)
-plot_maps(ds_buffered, tree_mask, stub)
-# endregion
 
 
 
