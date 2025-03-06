@@ -165,11 +165,10 @@ B2 = ds['nbart_blue']
 ds['EVI'] = 2.5 * ((B8 - B4) / (B8 + 6 * B4 - 7.5 * B2 + 1))
 productivity_variable = 'EVI'
 
+time = '2022-08-04'
 ds_timepoint = ds.sel(time=time, method='nearest')
 
 plt.imshow(ds_timepoint['EVI'])
-
-
 
 # region
 # Compute Euclidean distance from each non-tree pixel to the nearest tree
@@ -191,10 +190,6 @@ ds["distance_to_tree"] = distance_da
 ds["distance_to_tree"].plot()
 # endregion
 
-ds_timepoint['EVI'].plot()
-
-ds_timepoint['max_tree_height'].plot()
-
 # region
 # Save the shelterscore, productivity score, and canopy height to tiff files for double checking in QGIS
 filename = os.path.join(scratch_dir, f"{stub}_10m_canopy_height.tiff")
@@ -210,7 +205,13 @@ ds['distance_to_tree'].rio.to_raster(filename)
 print(filename)
 # endregion
 
-time = "2022-08-04"
+bg = ds_timepoint['bg'].values
+bg[np.where(adjacent_mask)] = np.nan
+ds_timepoint['bg'].plot()
+
+filename = os.path.join(scratch_dir, f"{stub}_bg_2022_08_03.tiff")
+ds_timepoint['bg'].rio.to_raster(filename)
+print(filename)
 
 ds_timepoint = ds.sel(time=time, method='nearest')
 def normalize(arr):
@@ -246,16 +247,8 @@ print(filename)
 # endregion
 
 # Remove unnecessary variables from ds
-useful_variables = ['nbart_red', 'nbart_green', 'nbart_blue', 'EVI', 'tree_percent', 'max_tree_height', 'percent_trees_0m-300m', 'distance_to_tree']
+useful_variables = ['nbart_red', 'nbart_green', 'nbart_blue', 'EVI', 'tree_percent', 'max_tree_height', 'distance_to_tree']
 ds_small = ds.isel(band=0)[useful_variables]
-
-ds_timepoint['npv']
-
-ds_timepoint['pv'].values.min(), ds_timepoint['pv'].values.max()
-
-ds_timepoint['bg'].values.min(), ds_timepoint['bg'].values.max()
-
-ds_timepoint['npv'].values.min(), ds_timepoint['npv'].values.max()
 
 # region
 # Prep arrays for histogram
@@ -290,578 +283,28 @@ x_values = x_values_outliers[(y_values_outliers > lower_bound) & (y_values_outli
 # endregion
 
 # region
-# Plot 1: 2D histogram 
-fig, axes = plt.subplots(1, 1, figsize=(8, 6)) 
-title_size = 30
-label_size = 26
-annotations_size = label_size
-# ax1 = axes[0]
-ax1 = axes
-hist = ax1.hist2d(
+
+# Create figure and axis
+fig, ax1 = plt.subplots(figsize=(8, 6))
+
+# Scatter plot
+sc = ax1.scatter(
     x_values, y_values, 
-    bins=100, 
-    norm=mcolors.LogNorm(),
-    cmap='viridis',
+    s=10,  
+    c='blue', 
+    alpha=0.5 
 )
-ax1.set_title(f"Vegetation Index vs Shelter Score on {time}", fontsize=title_size)
-ax1.set_xlabel(f"Distance from nearest tree (m)", fontsize=label_size)
-ax1.set_ylabel(f'{productivity_variable}', fontsize=label_size)
-ax1.tick_params(axis='both', labelsize=annotations_size)
+
+# Titles and labels
+ax1.set_title(f"Bare Ground vs Shelter Score, 3 Aug 2022", fontsize=18)
+ax1.set_xlabel("Distance from nearest tree (m)", fontsize=18)
+ax1.set_ylabel(f"bare ground (unitless)", fontsize=18)
+ax1.tick_params(axis='both', labelsize=14)
 ax1.yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
 
-cbar = plt.colorbar(hist[3], ax=ax1)  # hb[3] contains the QuadMesh, which is used for colorbar
-cbar.set_label(f"Number of pixels", fontsize=label_size)
-cbar.ax.tick_params(labelsize=annotations_size)
-
-# Linear regression line
-if len(np.unique(x_values)) > 1:
-    res = stats.linregress(x_values, y_values)
-    x_fit = np.linspace(min(x_values), max(x_values), 500)
-    y_fit = res.intercept + res.slope * x_fit
-    ax1.plot(x_fit, y_fit, 'r-', label=f"$R^2$ = {res.rvalue**2:.2f}")
-    ax1.legend(fontsize=label_size)
-
-# Add vertical black dotted line at the tree cover threshold
-ax1.axvline(
-    tree_cover_threshold, 
-    color='black', 
-    linestyle='dotted', 
-    linewidth=2, 
-    label=f"Tree cover = {tree_cover_threshold}%"
-)
+# ax1.set_ylim(0.15, 0.4)
+# ax1.set_xlim(0, 350)
 # endregion
-
-# region
-
-# Extracting a single timepoint for RGB and productivity plots
-ds_timepoint = ds.sel(time=time, method='nearest')
-
-# Calculate the productivity and shelter scores
-ds_productivity = ds.sel(time=time, method='nearest')[productivity_variable]
-ds_masked = ds_productivity.where(~adjacent_mask)
-layer_name = f"percent_trees_0m-300m"
-s = ds[layer_name].values
-y = ds_masked.values.flatten()
-y_values_outliers = y[~np.isnan(y)]  
-x = s.flatten()
-x_values_outliers = x[~np.isnan(y)]  
-
-# Remove outliers
-lower_bound = np.percentile(y_values_outliers, 1)
-upper_bound = np.percentile(y_values_outliers, 99)
-y_values = y_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]    
-x = s.flatten()
-x_values_outliers = x[~np.isnan(y)]
-x_values = x_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]
-unsheltered = y_values[np.where(x_values < tree_cover_threshold)]
-median_value = np.median(unsheltered)
-
-# Calculate colour bar boundaries
-vmin_EVI = median_value - (upper_bound - lower_bound) / 2
-vmax_EVI = median_value + (upper_bound - lower_bound) / 2
-ds_trees = ds_productivity.where(~tree_mask)
-
-###############################
-# Plotting the maps in subplots
-fig, axes = plt.subplots(1, 1, figsize=(8, 8))
-fig.suptitle(f"{time}", fontsize=26)
-
-# Fontsizes
-title_size = 20
-label_size = 16
-annotation_size = 12
-
-# EVI
-ax = axes
-im = ds_trees.plot(ax=ax, cmap=cmap_EVI, vmin=vmin_EVI, vmax=vmax_EVI, add_colorbar=True)
-ax.set_title(f"Productivity Proxy", fontsize=title_size)
-add_cbar(im, productivity_variable, label_size)
-
-# endregion
-
-ds.time.values
-
-
-
-
-
-
-
-# region
-# Plot 2: Box plot
-ax2 = axes[1]
-
-# Calculate sheltered and unsheltered pixels
-sheltered = y_values[np.where(x_values >= tree_cover_threshold)]
-unsheltered = y_values[np.where(x_values < tree_cover_threshold)]
-
-# Don't draw the boxplot if all the pixels are in the same category
-all_same_category = (len(sheltered) == 0) or (len(unsheltered) == 0)
-if all_same_category:
-    ax2.set_title(f"Pixels all same category of unsheltered or sheltered", fontsize=title_size)
-
-elif not(all_same_category):    
-    box_data = [unsheltered, sheltered]
-    im = ax2.boxplot(box_data, labels=['Unsheltered', 'Sheltered'], showfliers=False)
-    ax2.set_title(f'Shelter threshold of {tree_cover_threshold}% tree cover within {max_distance * pixel_size}m', fontsize=title_size)
-    ax2.set_ylabel(productivity_variable, fontsize=label_size)
-    ax2.tick_params(axis='both', labelsize=annotations_size)
-    
-    # Add medians and sample size next to each box plot
-    medians = [np.median(data) for data in box_data]
-    number_of_pixels = [len(unsheltered), len(sheltered)]
-    
-    placement_unsheltered = np.percentile(unsheltered, 75) + (1.5 * (np.percentile(unsheltered, 75) - np.percentile(unsheltered, 25)))
-    placement_sheltered = np.percentile(sheltered, 75) + (1.5 * (np.percentile(sheltered, 75) - np.percentile(sheltered, 25)))
-    n_placements = [placement_unsheltered, placement_sheltered]
-    
-    for i, median in enumerate(medians):
-        ax2.text(i + 1 + 0.09, median, f'{median:.2f}', ha='left', va='center', fontsize=label_size)
-        ax2.text(i + 1 - 0.09, n_placements[i] + 0.015, f'n={number_of_pixels[i]}', ha='left', va='center', fontsize=label_size)
-    
-    # Add some space above the sample size text
-    y_max = max(placement_unsheltered, placement_sheltered) + 0.1 * max(placement_unsheltered, placement_sheltered)
-    ax2.set_ylim(None, y_max)
-    
-    # Create a dummy white colorbar to align the plots nicely
-    white_cmap = LinearSegmentedColormap.from_list("white_cmap", ["white", "white"])
-    norm = Normalize(vmin=0, vmax=1)
-    sm = ScalarMappable(norm=norm, cmap=white_cmap)
-    cbar = plt.colorbar(sm, ax=ax2, orientation='vertical')
-    cbar.set_ticks([])  
-    cbar.set_label('')  
-    cbar.outline.set_visible(False)
-    
-# Save the plots
-plt.tight_layout()
-plt.subplots_adjust(hspace=0.3) 
-filename = os.path.join(scratch_dir, f"{stub}_{time}_regression.png")
-plt.savefig(filename)
-plt.show()
-print("Saved", filename)
-
-# endregion
-
-# region
-# Prep formatting functions
-def remove_axis_labels(ax):
-    ax.set_xlabel('')
-    ax.set_ylabel('')
-    ax.set_xticks([])
-    ax.set_yticks([])
-
-# Create a dummy white colorbar to align the plots nicely
-white_cmap = LinearSegmentedColormap.from_list("white_cmap", ["white", "white"])
-white_norm = Normalize(vmin=0, vmax=1)
-sm_white = ScalarMappable(norm=white_norm, cmap=white_cmap)
-
-# Add a colour bar with a specified title and label
-def add_cbar(im, title="", label_size=16):
-    cbar = im.colorbar
-    cbar.set_label(title, fontsize=label_size)
-    cbar.ax.tick_params(labelsize=label_size)
-    return cbar
-
-# Prep cmaps
-cmap_EVI = plt.cm.coolwarm
-cmap_EVI.set_bad(color='green')  # Set NaN pixels to green
-cmap_tree_height = plt.cm.viridis
-cmap_tree_height.set_bad(color='white')
-# endregion
-
-ds_buffered = ds
-
-
-# region
-def calculate_shelter_effects(ds, adjacent_mask, tree_cover_threshold=1):
-    benefits = []
-    layer_name = f"percent_trees_{pixel_size * min_distance}m-{pixel_size * max_distance}m"
-    shelter_score = ds[layer_name]
-    x = shelter_score.values.flatten()
-    for i, time in enumerate(ds.time.values):
-        ndvi = ds.sel(time=time, method='nearest')[productivity_variable]
-        productivity_score = ndvi.where(~adjacent_mask)
-    
-        # Remove all pixels that are trees, adjacent to trees, or masked by cloud cover
-        y = productivity_score.values.flatten()
-        y_values_outliers = y[~np.isnan(y)]   
-    
-        if len(y_values_outliers) == 0:
-            continue
-    
-        # Remove outliers
-        lower_bound = 0
-        upper_bound = max(np.percentile(y_values_outliers, 99.9), 1)
-        y_values = y_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]
-        x_values_outliers = x[~np.isnan(y)]
-        x_values = x_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]
-        
-        sheltered = y_values[np.where(x_values >= tree_cover_threshold)]
-        unsheltered = y_values[np.where(x_values < tree_cover_threshold)]
-        
-        if len(sheltered) == 0 or len(unsheltered) == 0:
-            continue
-            
-        percentage_benefit = (np.median(sheltered) - np.median(unsheltered))/np.median(unsheltered)
-        sample_size = min(len(sheltered), len(unsheltered))
-        
-        res = stats.linregress(x_values, y_values)
-    
-        benefit = {
-            "distance":max_distance,
-            "time": time,
-            "r2": res.rvalue**2,
-            "slope": res.slope,
-            "percentage_benefit": percentage_benefit,
-            "sample_size": sample_size,
-            "median": np.median(y_values),
-            "q1": np.percentile(y_values, 25),
-            "q3": np.percentile(y_values, 75)
-        }
-        benefits.append(benefit)
-
-    # Create a dataframe of the shelter benefits
-    df_benefits = pd.DataFrame(benefits)
-    if len(df_benefits) == 0:
-        df_benefits.index = pd.to_datetime(df_benefits.index)
-        return df_benefits
-    
-    df_benefits['date'] = df_benefits['time'].dt.date
-    df_benefits = df_benefits.set_index('date')
-    df_benefits.index = pd.to_datetime(df_benefits.index)
-    
-    filename = os.path.join(scratch_dir, f"{stub}_benefits.csv")
-    df_benefits.to_csv(filename)
-    print("Saved: ", filename)
-
-    return df_benefits
-
-df_benefits = calculate_shelter_effects(ds_buffered, adjacent_mask)
-# endregion
-
-# region
-def plot_histogram(ds, time, tree_cover_threshold=1):
-    
-    ds_timepoint = ds.sel(time=time, method='nearest')
-        
-    # Calculate shelter score and productivity index for this timepoint
-    ndvi = ds.sel(time=time, method='nearest')[productivity_variable]
-    p = ndvi.where(~adjacent_mask) #  & (grassland | cropland))
-    # layer_name = f"percent_trees_0m-300m"
-    layer_name = f"distance_to_tree"
-    s = ds[layer_name]
-    x = s.values.flatten()
-    
-    # Make sure that any nan values in the shelter score are also nan in the productivity_score
-    p = p.where(~s.isnull())
-    
-    # Remove all pixels that are trees or adjacent to trees
-    y = p.values.flatten()
-    y_values_outliers = y[~np.isnan(y)]  
-    
-    # Outlier boundary
-    lower_bound = 0
-    upper_bound = max(np.percentile(y_values_outliers, 99.9), 1)
-    
-    # Find the shelter scores not obstructed by cloud cover or outliers
-    y_values = y_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]
-    x_values_outliers = x[~np.isnan(y)]
-    x_values = x_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]
-    
-    # Plot 1: 2D histogram 
-    fig, axes = plt.subplots(2, 1, figsize=(14, 16)) 
-    title_size = 30
-    label_size = 26
-    annotations_size = label_size
-    ax1 = axes[0]
-    hist = ax1.hist2d(
-        x_values, y_values, 
-        bins=100, 
-        norm=mcolors.LogNorm(),
-        cmap='viridis',
-    )
-    ax1.set_title(f"Vegetation Index vs Shelter Score on {time}", fontsize=title_size)
-    ax1.set_xlabel(f"Tree cover within {max_distance * pixel_size}m (%)", fontsize=label_size)
-    ax1.set_ylabel(f'{productivity_variable}', fontsize=label_size)
-    ax1.tick_params(axis='both', labelsize=annotations_size)
-    ax1.yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
-    
-    cbar = plt.colorbar(hist[3], ax=ax1)  # hb[3] contains the QuadMesh, which is used for colorbar
-    cbar.set_label(f"Number of pixels", fontsize=label_size)
-    cbar.ax.tick_params(labelsize=annotations_size)
-    
-    # Linear regression line
-    if len(np.unique(x_values)) > 1:
-        res = stats.linregress(x_values, y_values)
-        x_fit = np.linspace(min(x_values), max(x_values), 500)
-        y_fit = res.intercept + res.slope * x_fit
-        ax1.plot(x_fit, y_fit, 'r-', label=f"$R^2$ = {res.rvalue**2:.2f}")
-        ax1.legend(fontsize=label_size)
-    
-    # Add vertical black dotted line at the tree cover threshold
-    ax1.axvline(
-        tree_cover_threshold, 
-        color='black', 
-        linestyle='dotted', 
-        linewidth=2, 
-        label=f"Tree cover = {tree_cover_threshold}%"
-    )
-    
-    # Plot 2: Box plot
-    ax2 = axes[1]
-
-    # Calculate sheltered and unsheltered pixels
-    sheltered = y_values[np.where(x_values >= tree_cover_threshold)]
-    unsheltered = y_values[np.where(x_values < tree_cover_threshold)]
-
-    # Don't draw the boxplot if all the pixels are in the same category
-    all_same_category = (len(sheltered) == 0) or (len(unsheltered) == 0)
-    if all_same_category:
-        ax2.set_title(f"Pixels all same category of unsheltered or sheltered", fontsize=title_size)
-
-    elif not(all_same_category):    
-        box_data = [unsheltered, sheltered]
-        im = ax2.boxplot(box_data, labels=['Unsheltered', 'Sheltered'], showfliers=False)
-        ax2.set_title(f'Shelter threshold of {tree_cover_threshold}% tree cover within {max_distance * pixel_size}m', fontsize=title_size)
-        ax2.set_ylabel(productivity_variable, fontsize=label_size)
-        ax2.tick_params(axis='both', labelsize=annotations_size)
-        
-        # Add medians and sample size next to each box plot
-        medians = [np.median(data) for data in box_data]
-        number_of_pixels = [len(unsheltered), len(sheltered)]
-        
-        placement_unsheltered = np.percentile(unsheltered, 75) + (1.5 * (np.percentile(unsheltered, 75) - np.percentile(unsheltered, 25)))
-        placement_sheltered = np.percentile(sheltered, 75) + (1.5 * (np.percentile(sheltered, 75) - np.percentile(sheltered, 25)))
-        n_placements = [placement_unsheltered, placement_sheltered]
-        
-        for i, median in enumerate(medians):
-            ax2.text(i + 1 + 0.09, median, f'{median:.2f}', ha='left', va='center', fontsize=label_size)
-            ax2.text(i + 1 - 0.09, n_placements[i] + 0.015, f'n={number_of_pixels[i]}', ha='left', va='center', fontsize=label_size)
-        
-        # Add some space above the sample size text
-        y_max = max(placement_unsheltered, placement_sheltered) + 0.1 * max(placement_unsheltered, placement_sheltered)
-        ax2.set_ylim(None, y_max)
-        
-        # Create a dummy white colorbar to align the plots nicely
-        white_cmap = LinearSegmentedColormap.from_list("white_cmap", ["white", "white"])
-        norm = Normalize(vmin=0, vmax=1)
-        sm = ScalarMappable(norm=norm, cmap=white_cmap)
-        cbar = plt.colorbar(sm, ax=ax2, orientation='vertical')
-        cbar.set_ticks([])  
-        cbar.set_label('')  
-        cbar.outline.set_visible(False)
-        
-    # Save the plots
-    plt.tight_layout()
-    plt.subplots_adjust(hspace=0.3) 
-    filename = os.path.join(scratch_dir, f"{stub}_{time}_regression.png")
-    plt.savefig(filename)
-    plt.show()
-    print("Saved", filename)
-    
-time = df_benefits.index[0].date()
-# time = "2020-01-08"  
-time = "2022-08-04"
-
-plot_histogram(ds_buffered, time)
-# endregion
-# region
-def plot_timeseries(ds, df_benefits, stub):
-    filename_ozwald = os.path.join(outdir, f"{stub}_ozwald_8day.nc")
-    filename_silo = os.path.join(outdir, f"{stub}_silo_daily.nc")
-    ds_ozwald = xr.open_dataset(filename_ozwald)
-    ds_silo = xr.open_dataset(filename_silo)
-    df_daily = merge_ozwald_silo(ds_ozwald, ds_silo)
-    df_weekly = resample_weekly(df_daily)
-    
-    # Merge shelter benefits
-    df_merged = pd.merge_asof(df_weekly, df_benefits, left_index=True, right_index=True, direction='nearest')
-    df = df_merged
-    
-    # Plot 1: shelter benefits
-    fig, axes = plt.subplots(2, 1, figsize=(50, 30))  # Create two vertically stacked subplots
-    title_fontsize = 70
-    tick_size = 42
-    
-    ax = axes[0]
-    ax.plot(df.index, df["r2"] * 100, color='black', label='Shelter score vs productivity index ($r^2 \\times 100$)')
-    ax.plot(df.index, df["percentage_benefit"] * 100, color='grey')
-    opacity = 0.3
-    ax.fill_between(
-        df.index, 
-        0, 
-        df["percentage_benefit"] * 100, 
-        where=(df["percentage_benefit"] > 0), 
-        color='limegreen', 
-        alpha=opacity, 
-        interpolate=True,
-        label='Sheltered > unsheltered (%)'
-    )
-    ax.fill_between(
-        df.index, 
-        0, 
-        df["percentage_benefit"] * 100, 
-        where=(df["percentage_benefit"] < 0), 
-        color='red', 
-        alpha=opacity, 
-        interpolate=True,
-        label='Sheltered < unsheltered (%)'
-    )
-    ax.set_title(f"Time Series of Shelter Benefits", fontsize=title_fontsize)
-    ax.legend(fontsize=tick_size, loc='upper left')
-    ax.tick_params(axis='both', labelsize=tick_size)
-    
-    # Plot 2: Weather data
-    ax = axes[1]
-    ax.set_title(f"Environmental Variables", fontsize=title_fontsize)
-    EVI_scale_factor = 100
-    
-    rainfall_plot = ax.bar(df.index, df['Rainfall']/EVI_scale_factor, color='skyblue', width=5, label=r'Weekly Rainfall (mm $\times 10^2$)')
-    ax.bar(df.index, df['Potential Evapotranspiration']/EVI_scale_factor, color='orange', label=r"Potential Evapotranspiration (mm $\times 10^2$)")
-    ax.plot(df.index, df['Minimum Soil Moisture']/EVI_scale_factor, color='blue', label="Soil moisture (mm)")
-    ax.plot(df.index, df["q1"], color='grey')
-    ax.plot(df.index, df["q3"], color='grey')
-        
-    # Plot the interquartile range
-    q1 = df["q1"] 
-    q3 = df["q3"]
-    ax.fill_between(df.index, q1, q3, color='green', alpha=opacity, label="Enhanced Vegetation Index (IQR)")
-    
-    ax.legend(fontsize=tick_size, loc='upper left')
-    ax.tick_params(axis='both', labelsize=tick_size)
-    
-    # Adjust layout to prevent overlap
-    plt.tight_layout()
-    plt.subplots_adjust(hspace=0.2)
-    
-    # Save as a single image
-    filename_combined = os.path.join(scratch_dir, f"{stub}_time_series.png")
-    plt.savefig(filename_combined)
-    print("Saved", filename_combined)
-
-ds_buffered = ds
-plot_timeseries(ds_buffered, df_benefits, stub)
-# endregion
-
-# region
-def plot_maps(ds, tree_mask, stub):
-
-    # Extracting a single timepoint for RGB and productivity plots
-    ds_timepoint = ds.sel(time=time, method='nearest')
-
-    # Setting up the RGB layers
-    red = ds_timepoint['nbart_red']
-    green = ds_timepoint['nbart_green']
-    blue = ds_timepoint['nbart_blue']
-    rgb = np.stack([normalize(red), normalize(green), normalize(blue)], axis=-1)
-    bounds = ds_buffered[productivity_variable].rio.bounds()
-    left, bottom, right, top = bounds
-
-    # Calculate the productivity and shelter scores
-    ds_productivity = ds.sel(time=time, method='nearest')[productivity_variable]
-    ds_masked = ds_productivity.where(~adjacent_mask)
-    layer_name = f"percent_trees_0m-300m"
-    s = ds[layer_name].values
-    y = ds_masked.values.flatten()
-    y_values_outliers = y[~np.isnan(y)]  
-    x = s.flatten()
-    x_values_outliers = x[~np.isnan(y)]  
-    
-    # Remove outliers
-    lower_bound = np.percentile(y_values_outliers, 1)
-    upper_bound = np.percentile(y_values_outliers, 99)
-    y_values = y_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]    
-    x = s.flatten()
-    x_values_outliers = x[~np.isnan(y)]
-    x_values = x_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]
-    unsheltered = y_values[np.where(x_values < tree_cover_threshold)]
-    median_value = np.median(unsheltered)
-
-    # Calculate colour bar boundaries
-    vmin_EVI = median_value - (upper_bound - lower_bound) / 2
-    vmax_EVI = median_value + (upper_bound - lower_bound) / 2
-    ds_trees = ds_productivity.where(~tree_mask)
-
-    ###############################
-    # Plotting the maps in subplots
-    fig, axes = plt.subplots(2, 2, figsize=(12, 12))
-    fig.suptitle(f"{time}", fontsize=26)
-    
-    # Fontsizes
-    title_size = 20
-    label_size = 16
-    annotation_size = 12
-    
-    # EVI
-    ax = axes[0,0]
-    im = ds_trees.plot(ax=ax, cmap=cmap_EVI, vmin=vmin_EVI, vmax=vmax_EVI, add_colorbar=True)
-    # paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
-    ax.set_title(f"Productivity Proxy", fontsize=title_size)
-    add_cbar(im, productivity_variable, label_size)
-    
-    # RGB
-    ax = axes[0,1]
-    ax.imshow(rgb, extent=(left, right, bottom, top))
-    # paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
-    ax.set_title(f"Sentinel-2 Imagery", fontsize=title_size)
-    
-    scalebar = AnchoredSizeBar(
-        ax.transData, 1000, '1km', loc='lower center', pad=0.1, 
-        color='white', frameon=False, size_vertical=10, 
-        fontproperties=fm.FontProperties(size=label_size)
-    )
-    ax.add_artist(scalebar)
-    
-    cbar = plt.colorbar(sm_white, ax=ax, orientation='vertical')
-    cbar.set_ticks([])  
-    cbar.set_label('')  
-    cbar.outline.set_visible(False)
-    
-    # Shelter score
-    ax = axes[1,0] 
-    im = ds_buffered['percent_trees_0m-300m'].plot(ax=ax, cmap=cmap_EVI, vmin=0, vmax=30) 
-    # paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
-    ax.set_title(f"Shelter Score", fontsize=title_size)
-    add_cbar(im, "Tree cover within 300m (%)", annotation_size)
-    
-    # Canopy Height
-    ax = axes[1,1] 
-    data = ds_buffered['max_tree_height'].where(ds_buffered['max_tree_height'] != 0, np.nan) 
-    im = data.plot(ax=ax, cmap=cmap_tree_height, vmin=0, vmax=20) 
-    # paddock_row.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=5)
-    ax.set_title(f"Canopy Height", fontsize=title_size)
-    add_cbar(im, "metres", label_size)
-    
-    # Remove axes
-    for row in axes:
-        for ax in row:
-            remove_axis_labels(ax)
-    
-    plt.tight_layout()
-    filename = os.path.join(scratch_dir, f"{stub}_maps_{time}.png")
-    plt.savefig(filename)
-    plt.show()
-    print("Saved", filename)
-
-    # True colour tiff
-    filename = os.path.join(scratch_dir, f"{stub}_RGB_{time}.tif")
-    ds_timepoint.attrs = {}
-    rgb_stack = ds_timepoint[['nbart_red', 'nbart_green', 'nbart_blue']]
-    rgb_stack.rio.to_raster(filename)
-    print("Saved", filename)
-    
-    # Productivity tiff
-    filename = os.path.join(scratch_dir, f"{stub}_{productivity_variable}_{time}.tif")
-    clipped = ds_masked.fillna(upper_bound + 0.1)
-    clipped = clipped.clip(min=lower_bound, max=upper_bound)
-    clipped.attrs = {}
-    clipped.rio.to_raster(filename)
-    print("Saved", filename)
-    
-plot_maps(ds_buffered, tree_mask, stub)
-
-# endregion
-
 
 
 
