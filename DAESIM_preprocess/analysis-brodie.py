@@ -22,6 +22,7 @@ from pyproj import Transformer
 
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
+from matplotlib import colors
 import matplotlib.patches as mpatches
 from matplotlib.ticker import MaxNLocator, FormatStrFormatter
 from matplotlib.font_manager import FontProperties
@@ -172,12 +173,14 @@ for i in range(len(distances) - 1):
     print(f"Added layer: {layer_name}")
 # endregion
 
-ds['percent_trees_0m-300m'].plot()
-
-
+# Enhanced Vegetation Index
+B8 = ds['nbart_nir_1']
+B4 = ds['nbart_red']
+B2 = ds['nbart_blue']
+ds['EVI'] = 2.5 * ((B8 - B4) / (B8 + 6 * B4 - 7.5 * B2 + 1))
+productivity_variable = 'EVI'
 
 # region
-
 # Compute Euclidean distance from each non-tree pixel to the nearest tree
 distance_to_tree = distance_transform_edt(~tree_mask) * pixel_size
 
@@ -204,6 +207,7 @@ ds_timepoint['EVI'].plot()
 ds_timepoint['max_tree_height'].plot()
 
 # region
+# Save the shelterscore, productivity score, and canopy height to tiff files for double checking in QGIS
 filename = os.path.join(scratch_dir, f"{stub}_10m_canopy_height.tiff")
 ds_timepoint['max_tree_height'].rio.to_raster(filename)
 print(filename)
@@ -216,13 +220,6 @@ filename = os.path.join(scratch_dir, f"{stub}_distance_to_tree.tiff")
 ds_timepoint['distance_to_tree'].rio.to_raster(filename)
 print(filename)
 # endregion
-
-# Enhanced Vegetation Index
-B8 = ds['nbart_nir_1']
-B4 = ds['nbart_red']
-B2 = ds['nbart_blue']
-ds['EVI'] = 2.5 * ((B8 - B4) / (B8 + 6 * B4 - 7.5 * B2 + 1))
-productivity_variable = 'EVI'
 
 time = "2022-08-04"
 
@@ -260,12 +257,192 @@ print(filename)
 # endregion
 
 # Remove unnecessary variables from ds
-useful_variables = ['nbart_red', 'nbart_green', 'nbart_blue', 'EVI', 'tree_percent', 'max_tree_height', 'percent_trees_0m-300m']
+useful_variables = ['nbart_red', 'nbart_green', 'nbart_blue', 'EVI', 'tree_percent', 'max_tree_height', 'percent_trees_0m-300m', 'distance_to_tree']
 ds_small = ds.isel(band=0)[useful_variables]
 
 # region
-from matplotlib import colors
+# Prep arrays for histogram
 
+ds_timepoint = ds.sel(time=time, method='nearest')
+    
+# Calculate shelter score and productivity index for this timepoint
+ndvi = ds.sel(time=time, method='nearest')[productivity_variable]
+p = ndvi.where(~adjacent_mask) #  & (grassland | cropland))
+# layer_name = f"percent_trees_0m-300m"
+layer_name = f"distance_to_tree"
+s = ds[layer_name]
+x = s.values.flatten()
+
+# Make sure that any nan values in the shelter score are also nan in the productivity_score
+p = p.where(~s.isnull())
+
+# Remove all pixels that are trees or adjacent to trees
+y = p.values.flatten()
+y_values_outliers = y[~np.isnan(y)]  
+
+# Outlier boundary
+lower_bound = 0
+upper_bound = max(np.percentile(y_values_outliers, 99.9), 1)
+
+# Find the shelter scores not obstructed by cloud cover or outliers
+y_values = y_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]
+x_values_outliers = x[~np.isnan(y)]
+x_values = x_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]
+
+# endregion
+
+# region
+# Plot 1: 2D histogram 
+fig, axes = plt.subplots(1, 1, figsize=(8, 6)) 
+title_size = 30
+label_size = 26
+annotations_size = label_size
+# ax1 = axes[0]
+ax1 = axes
+hist = ax1.hist2d(
+    x_values, y_values, 
+    bins=100, 
+    norm=mcolors.LogNorm(),
+    cmap='viridis',
+)
+ax1.set_title(f"Vegetation Index vs Shelter Score on {time}", fontsize=title_size)
+ax1.set_xlabel(f"Distance from nearest tree (m)", fontsize=label_size)
+ax1.set_ylabel(f'{productivity_variable}', fontsize=label_size)
+ax1.tick_params(axis='both', labelsize=annotations_size)
+ax1.yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
+
+cbar = plt.colorbar(hist[3], ax=ax1)  # hb[3] contains the QuadMesh, which is used for colorbar
+cbar.set_label(f"Number of pixels", fontsize=label_size)
+cbar.ax.tick_params(labelsize=annotations_size)
+
+# Linear regression line
+if len(np.unique(x_values)) > 1:
+    res = stats.linregress(x_values, y_values)
+    x_fit = np.linspace(min(x_values), max(x_values), 500)
+    y_fit = res.intercept + res.slope * x_fit
+    ax1.plot(x_fit, y_fit, 'r-', label=f"$R^2$ = {res.rvalue**2:.2f}")
+    ax1.legend(fontsize=label_size)
+
+# Add vertical black dotted line at the tree cover threshold
+ax1.axvline(
+    tree_cover_threshold, 
+    color='black', 
+    linestyle='dotted', 
+    linewidth=2, 
+    label=f"Tree cover = {tree_cover_threshold}%"
+)
+# endregion
+
+# region
+
+# Extracting a single timepoint for RGB and productivity plots
+ds_timepoint = ds.sel(time=time, method='nearest')
+
+# Calculate the productivity and shelter scores
+ds_productivity = ds.sel(time=time, method='nearest')[productivity_variable]
+ds_masked = ds_productivity.where(~adjacent_mask)
+layer_name = f"percent_trees_0m-300m"
+s = ds[layer_name].values
+y = ds_masked.values.flatten()
+y_values_outliers = y[~np.isnan(y)]  
+x = s.flatten()
+x_values_outliers = x[~np.isnan(y)]  
+
+# Remove outliers
+lower_bound = np.percentile(y_values_outliers, 1)
+upper_bound = np.percentile(y_values_outliers, 99)
+y_values = y_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]    
+x = s.flatten()
+x_values_outliers = x[~np.isnan(y)]
+x_values = x_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]
+unsheltered = y_values[np.where(x_values < tree_cover_threshold)]
+median_value = np.median(unsheltered)
+
+# Calculate colour bar boundaries
+vmin_EVI = median_value - (upper_bound - lower_bound) / 2
+vmax_EVI = median_value + (upper_bound - lower_bound) / 2
+ds_trees = ds_productivity.where(~tree_mask)
+
+###############################
+# Plotting the maps in subplots
+fig, axes = plt.subplots(1, 1, figsize=(8, 8))
+fig.suptitle(f"{time}", fontsize=26)
+
+# Fontsizes
+title_size = 20
+label_size = 16
+annotation_size = 12
+
+# EVI
+ax = axes
+im = ds_trees.plot(ax=ax, cmap=cmap_EVI, vmin=vmin_EVI, vmax=vmax_EVI, add_colorbar=True)
+ax.set_title(f"Productivity Proxy", fontsize=title_size)
+add_cbar(im, productivity_variable, label_size)
+
+# endregion
+
+
+
+
+
+
+
+# region
+# Plot 2: Box plot
+ax2 = axes[1]
+
+# Calculate sheltered and unsheltered pixels
+sheltered = y_values[np.where(x_values >= tree_cover_threshold)]
+unsheltered = y_values[np.where(x_values < tree_cover_threshold)]
+
+# Don't draw the boxplot if all the pixels are in the same category
+all_same_category = (len(sheltered) == 0) or (len(unsheltered) == 0)
+if all_same_category:
+    ax2.set_title(f"Pixels all same category of unsheltered or sheltered", fontsize=title_size)
+
+elif not(all_same_category):    
+    box_data = [unsheltered, sheltered]
+    im = ax2.boxplot(box_data, labels=['Unsheltered', 'Sheltered'], showfliers=False)
+    ax2.set_title(f'Shelter threshold of {tree_cover_threshold}% tree cover within {max_distance * pixel_size}m', fontsize=title_size)
+    ax2.set_ylabel(productivity_variable, fontsize=label_size)
+    ax2.tick_params(axis='both', labelsize=annotations_size)
+    
+    # Add medians and sample size next to each box plot
+    medians = [np.median(data) for data in box_data]
+    number_of_pixels = [len(unsheltered), len(sheltered)]
+    
+    placement_unsheltered = np.percentile(unsheltered, 75) + (1.5 * (np.percentile(unsheltered, 75) - np.percentile(unsheltered, 25)))
+    placement_sheltered = np.percentile(sheltered, 75) + (1.5 * (np.percentile(sheltered, 75) - np.percentile(sheltered, 25)))
+    n_placements = [placement_unsheltered, placement_sheltered]
+    
+    for i, median in enumerate(medians):
+        ax2.text(i + 1 + 0.09, median, f'{median:.2f}', ha='left', va='center', fontsize=label_size)
+        ax2.text(i + 1 - 0.09, n_placements[i] + 0.015, f'n={number_of_pixels[i]}', ha='left', va='center', fontsize=label_size)
+    
+    # Add some space above the sample size text
+    y_max = max(placement_unsheltered, placement_sheltered) + 0.1 * max(placement_unsheltered, placement_sheltered)
+    ax2.set_ylim(None, y_max)
+    
+    # Create a dummy white colorbar to align the plots nicely
+    white_cmap = LinearSegmentedColormap.from_list("white_cmap", ["white", "white"])
+    norm = Normalize(vmin=0, vmax=1)
+    sm = ScalarMappable(norm=norm, cmap=white_cmap)
+    cbar = plt.colorbar(sm, ax=ax2, orientation='vertical')
+    cbar.set_ticks([])  
+    cbar.set_label('')  
+    cbar.outline.set_visible(False)
+    
+# Save the plots
+plt.tight_layout()
+plt.subplots_adjust(hspace=0.3) 
+filename = os.path.join(scratch_dir, f"{stub}_{time}_regression.png")
+plt.savefig(filename)
+plt.show()
+print("Saved", filename)
+
+# endregion
+
+# region
 # Prep formatting functions
 def remove_axis_labels(ax):
     ax.set_xlabel('')
@@ -290,68 +467,6 @@ cmap_EVI = plt.cm.coolwarm
 cmap_EVI.set_bad(color='green')  # Set NaN pixels to green
 cmap_tree_height = plt.cm.viridis
 cmap_tree_height.set_bad(color='white')
-# endregion
-
-# region
-# # Compare the different productivity scores across the whole region
-
-# # Extracting a single timepoint for RGB and productivity plots
-# ds_timepoint = ds.sel(time=time, method='nearest')
-# layer_name = f"percent_trees_0m-300m"
-# s = ds[layer_name].values
-# x = s.flatten()
-
-# productivity_variable = 'EVI'
-
-# # Calculate the productivity and shelter scores
-# ds_productivity = ds.sel(time=time, method='nearest')[productivity_variable]
-# ds_masked = ds_productivity.where(~adjacent_mask)
-# y = ds_masked.values.flatten()
-# y_values_outliers = y[~np.isnan(y)]  
-# x_values_outliers = x[~np.isnan(y)]  
-# lower_bound = np.percentile(y_values_outliers, 1)
-# upper_bound = np.percentile(y_values_outliers, 99)
-# y_values = y_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]    
-# x_values_outliers = x[~np.isnan(y)]
-# x_values = x_values_outliers[(y_values_outliers > lower_bound) & (y_values_outliers < upper_bound)]
-# unsheltered = y_values[np.where(x_values < tree_cover_threshold)]
-# median_value = np.median(unsheltered)
-
-# vmin_EVI = median_value - (upper_bound - lower_bound) / 2
-# vmax_EVI = median_value + (upper_bound - lower_bound) / 2
-# ds_trees = ds_productivity.where(~tree_mask)
-
-# productivity_stats[productivity_variable] = {
-#     "vmin_EVI": vmin_EVI,
-#     "vmax_EVI": vmax_EVI,
-#     "ds_trees": ds_trees
-# }
-
-# # Plotting the maps in subplots
-# fig, axes = plt.subplots(1, 1, figsize=(10, 8))
-# # fig.suptitle(f"Paddock {paddock_id} on {time}", fontsize=26)
-
-# # Fontsizes
-# title_size = 20
-# label_size = 16
-# annotation_size = 12
-
-# # Axes
-# productivity_variable = "EVI"
-
-# vmin_EVI = productivity_stats[productivity_variable]['vmin_EVI']
-# vmax_EVI = productivity_stats[productivity_variable]['vmax_EVI']
-# ds_trees = productivity_stats[productivity_variable]['ds_trees']
-# im = ds_trees.plot(cmap=cmap_EVI, vmin=vmin_EVI, vmax=vmax_EVI, add_colorbar=True)
-# ax.set_title(f"Productivity Proxy", fontsize=title_size)
-# add_cbar(im, productivity_variable, label_size)
-
-# plt.tight_layout()
-# filename = os.path.join(scratch_dir, f"{stub}_Paddock_productivities_{time}.png")
-# plt.savefig(filename)
-# plt.show()
-# print("Saved", filename)
-
 # endregion
 
 ds_buffered = ds
@@ -432,7 +547,8 @@ def plot_histogram(ds, time, tree_cover_threshold=1):
     # Calculate shelter score and productivity index for this timepoint
     ndvi = ds.sel(time=time, method='nearest')[productivity_variable]
     p = ndvi.where(~adjacent_mask) #  & (grassland | cropland))
-    layer_name = f"percent_trees_0m-300m"
+    # layer_name = f"percent_trees_0m-300m"
+    layer_name = f"distance_to_tree"
     s = ds[layer_name]
     x = s.values.flatten()
     
