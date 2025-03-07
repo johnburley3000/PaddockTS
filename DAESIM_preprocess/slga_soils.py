@@ -167,7 +167,7 @@ if __name__ == '__main__':
     buffer=0.0003
     latitude = -34.52194
     longitude=148.30472
-    slga_soils(variables=variables, latitude=latitude, longitude=longitude, buffer=buffer, stub=stub, depths=depths)
+    slga_soils(variables=variables, lat=latitude, lon=longitude, buffer=buffer, stub=stub, depths=depths)
     
     # Load the tiff files we just downloaded (each should just have a single pixel)
     values = []
@@ -197,3 +197,5 @@ if __name__ == '__main__':
     
     # Save
     sorted_df.to_csv("Harden_Soils_sorted.csv", index=False)
+
+

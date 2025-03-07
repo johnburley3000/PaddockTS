@@ -258,5 +258,3 @@ if __name__ == '__main__':
 
     # slope = calculate_slope(filepath)
     # show_slope(slope)
-
-
