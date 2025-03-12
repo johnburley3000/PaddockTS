@@ -64,7 +64,7 @@ def ozwald_8day_singleyear_thredds(var="Ssoil", latitude=-34.3890427, longitude=
 
 
 # This function accesses files directly, so is much faster but needs to be run on NCI with access to the ub8 project
-def ozwald_8day_singleyear_nci(var="Ssoil", latitude=-34.3890427, longitude=148.469499, buffer=0.1, year="2021"):
+def ozwald_8day_singleyear_gdata(var="Ssoil", latitude=-34.3890427, longitude=148.469499, buffer=0.1, year="2021"):
     """Select the region of interest from the Australia wide NetCDF file"""
     filename = os.path.join("/g/data/ub8/au/OzWALD/8day", var, f"OzWALD.{var}.{year}.nc")
 
@@ -91,7 +91,7 @@ def ozwald_8day_multiyear(var="Ssoil", latitude=-34.3890427, longitude=148.46949
         if thredds:
             ds_year = ozwald_8day_singleyear_thredds(var, latitude, longitude, buffer, year, stub, tmp_dir)
         else:
-            ds_year = ozwald_8day_singleyear_nci(var, latitude, longitude, buffer, year)
+            ds_year = ozwald_8day_singleyear_gdata(var, latitude, longitude, buffer, year)
         if ds_year:
             dss.append(ds_year)
     ds_concat = xr.concat(dss, dim='time')
@@ -115,12 +115,9 @@ def ozwald_8day(variables=["Ssoil", "GPP"], lat=-34.3890427, lon=148.469499, buf
 
 
 # %%time
-if __name__ == '__main__':    
-    ds = ozwald_8day(thredds=True)
-    print(ds)
-
+if __name__ == '__main__':  
     ds = ozwald_8day(thredds=False)
     print(ds)
 
-
-
+    ds = ozwald_8day(thredds=True)
+    print(ds)

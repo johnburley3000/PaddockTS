@@ -205,5 +205,5 @@ def visualise_temp(df, outpath=scratch_dir, stub="Test"):
 
 # %%time
 if __name__ == '__main__':
-    ds = silo_daily(["radiation", "et_morton_actual", "et_morton_potential", "et_short_crop", "et_tall_crop"])
+    ds = silo_daily()
     print(ds)

@@ -108,6 +108,7 @@ if __name__ == '__main__':
 
     ds = ozwald_daily(["Uavg"], thredds=False)  # Took 2 seconds (0.5 seconds per variable per year)
     print(ds)
-    # ds = ozwald_daily(["Uavg"], thredds=True)  # Took 2 seconds (0.5 seconds per variable per year)
-    # print(ds)
+    
+    ds = ozwald_daily(["Uavg"], thredds=True)  # Took 2 seconds (0.5 seconds per variable per year)
+    print(ds)
 

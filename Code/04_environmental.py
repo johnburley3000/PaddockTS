@@ -63,27 +63,26 @@ def main(args):
     outdir = args.outdir
     tmpdir = args.tmpdir
 
+    thredds=False
+
     terrain_tiles(lat, lon, buffer, outdir, stub, tmpdir)
 
-    # Worked for JB, but not required for PaddockTS currently
-    # variables = ['Clay', 'Sand', 'Silt', 'pH_CaCl2']
-    # slga_soils(variables, lat, lon, buffer, outdir, stub)
+    variables = ['Clay', 'Sand', 'Silt', 'pH_CaCl2']
+    slga_soils(variables, lat, lon, buffer, outdir, stub)
 
-    # NCI Thredds not working via PBS for some reason. Have to rewrite these two functions to access the directories directly like with ozwald_8day below.
-    # ozwald_yearly_average(["Tmax", "Tmin", "Pg"], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir)
-    # ozwald_daily(["VPeff", "Uavg"], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir)
+    # Downloading these variables separately because they use separate grids
+    ozwald_daily(["Uavg", "VPeff"], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds)
+    ozwald_daily(["Tmax", "Tmin"], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds)
+    ozwald_daily(["Pg"], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds)
 
-    # Not working for JB... ValueError: must supply at least one object to concatenate
-    # Working for CB... maybe missing access to the ub8 project?
+    variables = ["Ssoil", "Qtot", "LAI", "GPP"]
+    ozwald_8day(variables, lat, lon, buffer, start_year, end_year, outdir, stub, thredds)
 
-    variables = ['Ssoil']
-    ozwald_8day(variables, lat, lon, buffer, start_year, end_year, outdir, stub, thredds=True)
-
-    variables = ["daily_rain", "max_temp", "min_temp", "et_morton_actual", "et_morton_potential"]
+    # By default we use rainfall, temperature, and vapour pressure from OzWald instead of SILO for consistency with the soil moisture
+    # But I'm including all these variables for comparison purposes
+    variables = ["radiation", "vp", "max_temp", "min_temp", "daily_rain", "et_morton_actual", "et_morton_potential"]
     ds_silo_daily = silo_daily(variables, lat, lon, buffer, start_year, end_year, outdir, stub)
 
-    # Not using - not going to setup AWS credentials now. 
-    # canopy_height(lat, lon, buffer, outdir, stub, tmpdir)
 
 if __name__ == "__main__":
     args = parse_arguments()
