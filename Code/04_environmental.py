@@ -76,7 +76,7 @@ def main(args):
     ozwald_daily(["Pg"], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds)
 
     variables = ["Ssoil", "Qtot", "LAI", "GPP"]
-    ozwald_8day(variables, lat, lon, buffer, start_year, end_year, outdir, stub, thredds)
+    ozwald_8day(variables, lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds)
 
     # By default we use rainfall, temperature, and vapour pressure from OzWald instead of SILO for consistency with the soil moisture
     # But I'm including all these variables for comparison purposes

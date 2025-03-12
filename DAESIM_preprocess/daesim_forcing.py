@@ -1,9 +1,10 @@
 # +
 # This script merges SILO and OzWald data into a csv for DAESim
-# -
 
+# +
 # I'm using python 3.9
-# !pip install jupyter jupytext xarray pandas scipy cftime
+# # !pip install jupyter jupytext xarray pandas scipy cftime
+# -
 
 # Standard Libraries
 import os
@@ -29,45 +30,40 @@ from DAESIM_preprocess.silo_daily import silo_daily, silo_abbreviations
 # Terraclim has everything except leaf area, growth
 # -
 
-# Specify the location and years
-latitude = -34.52194
-longitude=148.30472
-buffer = 0.0000000001 # Single point
-start_year = 2000
-end_year = 2019
+# Input parameters
+lat=-37.1856746323413
+lon=143.8202752762509
+buffer = 0.000001
+stub = "DSIM"
+start_year = "2021"
+end_year = "2022"
+outdir = '/scratch/xe2/cb8590'
+tmpdir = '/scratch/xe2/cb8590'
+thredds=False
+
+# %%time
+# Download all the variables we need (notebook version of environmental.py)
+ozwald_daily(["Uavg", "VPeff"], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds)
+ozwald_daily(["Tmax", "Tmin"], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds)
+ozwald_daily(["Pg"], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds)
 
 
+# %%time
+variables = ["Ssoil", "Qtot", "LAI", "GPP"]
+ozwald_8day(variables, lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds)
+
+
+# %%time
+variables = ["radiation", "vp", "max_temp", "min_temp", "daily_rain", "et_morton_actual", "et_morton_potential"]
+ds_silo_daily = silo_daily(variables, lat, lon, buffer, start_year, end_year, outdir, stub)
 
 # +
-# %%time  
-
-# Some of the OzWald variables use different grids, so we load separate xarrays and merge
-ds_ozwald_daily1 = ozwald_daily(["VPeff", "Uavg"], latitude, longitude, buffer, start_year, end_year)
-ds_ozwald_daily2 = ozwald_daily(["Tmax", "Tmin"], latitude, longitude, buffer, start_year, end_year)
-ds_ozwald_daily3 = ozwald_daily(["Pg"], latitude, longitude, buffer, start_year, end_year)
-
-# Took 1 minute (15 seconds per variable per year)
+# Make sure this works for a large area or a small one
 # -
 
-ds_ozwald_daily3['Pg'].plot()
 
-# +
-# %%time  
 
-# Fetch 8day variables from ozwald
-ds_ozwald_8day = ozwald_8day(["Ssoil", "Qtot", "LAI", "GPP"], latitude, longitude, buffer, start_year, end_year)
-ds_ozwald_8day
 
-# Took 11 seconds (1 second per variable per year)
-
-# +
-# # %%time
-# ds_silo_daily = silo_daily(["radiation", "et_morton_actual", "et_morton_potential", "et_short_crop", "et_tall_crop"], latitude, longitude, buffer, start_year, end_year)
-ds_silo_daily = silo_daily(["radiation"], latitude, longitude, buffer, start_year, end_year)
-ds_silo_daily
-
-# Took about 10 secs (because its pre-downloaded to gdata)
-# -
 
 # Remove the coordinates before merging, since we are looking at a single point location
 ds1 = ds_ozwald_daily1.max(dim=['latitude','longitude'])
