@@ -24,10 +24,10 @@ from DAESIM_preprocess.silo_daily import silo_daily, silo_abbreviations
 # VPeff (vapour pressure), Uavg (wind), min temperature, max temperature, precipitation, solar radiation
 # Soil moisture, runoff, leaf area, growth
 
-# Ozwald has everything except radiation
-# SILO has everything except wind, soil moisture, runoff, leaf area, growth
-# ANUClim has everything except wind, soil moisture, runoff, leaf area, growth
-# Terraclim has everything except leaf area, growth
+# Ozwald doesn't have radiation
+# SILO doesn't have wind, soil moisture, runoff, leaf area, GPP
+# ANUClim doesn't have wind, soil moisture, runoff, leaf area, GPP
+# Terraclim doesn't have leaf area, GPP
 
 # +
 
@@ -77,21 +77,38 @@ ds_ozwald_daily_Pg = xr.open_dataset(os.path.join(outdir, stub+'_ozwald_daily_Pg
 ds_ozwald_daily_Tmax = xr.open_dataset(os.path.join(outdir, stub+'_ozwald_daily_Tmax.nc'))
 ds_ozwald_daily_Uavg = xr.open_dataset(os.path.join(outdir, stub+'_ozwald_daily_Uavg.nc'))
 
-ds_silo_daily
-
-# Should probably do this drop earlier during the SILO download
+# Should probably do this earlier during the SILO download
 if 'crs' in ds_silo_daily.data_vars:
     ds_silo_daily = ds_silo_daily.drop_vars(['crs'])
-
-ds_silo_daily_median = ds_silo_daily.median(dim=["lat", "lon"])
-ds_ozwald_8day_median = ds_ozwald_8day.median(dim=["latitude", "longitude"])
-ds_ozwald_daily_Pg_median = ds_ozwald_daily_Pg.median(dim=["latitude", "longitude"])
-ds_ozwald_daily_Tmax_median = ds_ozwald_daily_Tmax.median(dim=["latitude", "longitude"])
-ds_ozwald_daily_Uavg_median = ds_ozwald_daily_Uavg.median(dim=["latitude", "longitude"])
+ds_silo_daily = ds_silo_daily.rename({"lat": "latitude", "lon": "longitude"})
 
 
-# Even though they have overlapping variables it's fine to merge ozwald and SILO, because the variables all have different names (e.g. 'Pg' and 'daily_rain')
-ds_merged = xr.merge([ds_silo_daily_median, ds_ozwald_8day_median, ds_ozwald_daily_Pg_median, ds_ozwald_daily_Tmax_median, ds_ozwald_daily_Uavg_median])
+def aggregate_pixels(ds):
+    """Find the median of all pixels for each timepoint, or drop that dimension if it only has one coordinate"""
+    dims = ds.dims
+    coords = ds.coords
+    if "latitude" in dims and "longitude" in dims:
+        ds = ds.median(dim=["latitude", "longitude"])
+    elif "latitude" in dims:  
+        ds = ds.median(dim=["latitude"])
+    elif "longitude" in dims: 
+        ds = ds.median(dim=["longitude"])
+        
+    if "latitude" in coords:
+        ds = ds.drop_vars(["latitude"])
+    if "longitude" in coords:
+        ds = ds.drop_vars(["longitude"])
+    return ds
+
+
+ds_silo_daily = aggregate_pixels(ds_silo_daily)
+ds_ozwald_8day = aggregate_pixels(ds_ozwald_8day)
+ds_ozwald_daily_Pg = aggregate_pixels(ds_ozwald_daily_Pg)
+ds_ozwald_daily_Tmax = aggregate_pixels(ds_ozwald_daily_Tmax)
+ds_ozwald_daily_Uavg = aggregate_pixels(ds_ozwald_daily_Uavg)
+
+# Even though they have overlapping variables it's fine to merge ozwald and SILO, because the overlapping variables all have different names (e.g. 'Pg' and 'daily_rain')
+ds_merged = xr.merge([ds_silo_daily, ds_ozwald_8day, ds_ozwald_daily_Pg, ds_ozwald_daily_Tmax, ds_ozwald_daily_Uavg])
 
 # +
 # Rename the columns to match DAESim_forcing.csv
