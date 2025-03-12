@@ -16,14 +16,14 @@ os.chdir(os.path.join(os.path.expanduser('~'), "Projects/PaddockTS"))
 from DAESIM_preprocess.util import create_bbox, scratch_dir
 
 ozwald_daily_abbreviations = {
-    "Pg" : "Gross precipitation",
-    "Tmax" : "Maximum temperature",
-    "Tmin" : "Minimum temperature",
-    "Uavg" : "Average 24h windspeed",
-    "Ueff" : "Effective daytime windspeed",
-    "VPeff" : "Volume of effective rainfall",
-    "kTavg" : "Coefficient to calculate mean screen level temperature",
-    "kTeff" : "Coefficient to calculate effective screen level temperature"
+    "Pg" : "Gross precipitation",  # 4km grid
+    "Tmax" : "Maximum temperature",  # 250m grid
+    "Tmin" : "Minimum temperature",  # 250m grid
+    "Uavg" : "Average 24h windspeed",  # 5km grid
+    "Ueff" : "Effective daytime windspeed",  # 5km grid
+    "VPeff" : "Volume of effective rainfall",  # 5km grid
+    "kTavg" : "Coefficient to calculate mean screen level temperature",  # 5km grid
+    "kTeff" : "Coefficient to calculate effective screen level temperature"  # 5km grid
 }
 
 
@@ -94,8 +94,9 @@ def ozwald_daily(variables=["VPeff", "Uavg"], lat=-34.3890427, lon=148.469499, b
         ds_variable = ozwald_daily_multiyear(variable, lat, lon, buffer, years, stub, tmp_dir, thredds)
         dss.append(ds_variable)
     ds_concat = xr.merge(dss)
-    
-    filename = os.path.join(outdir, f'{stub}_ozwald_daily.nc')
+
+    # Appending the first variable to the filename, so you can download temperature, rainfall, and wind/humidity separately since they use different grids.
+    filename = os.path.join(outdir, f'{stub}_ozwald_daily_{variables[0]}.nc')
     ds_concat.to_netcdf(filename)
     print("Saved:", filename)
             
@@ -104,10 +105,9 @@ def ozwald_daily(variables=["VPeff", "Uavg"], lat=-34.3890427, lon=148.469499, b
 
 # %%time
 if __name__ == '__main__':
+
     ds = ozwald_daily(["Uavg"], thredds=False)  # Took 2 seconds (0.5 seconds per variable per year)
     print(ds)
-    ds = ozwald_daily(["Uavg"], thredds=True)  # Took 2 seconds (0.5 seconds per variable per year)
-    print(ds)
-
-
+    # ds = ozwald_daily(["Uavg"], thredds=True)  # Took 2 seconds (0.5 seconds per variable per year)
+    # print(ds)
 
