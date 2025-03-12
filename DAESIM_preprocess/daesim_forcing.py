@@ -13,7 +13,8 @@ import os
 import pandas as pd
 import xarray as xr
 
-os.chdir(os.path.dirname(os.getcwd()))
+paddockTS_path = os.path.dirname(os.getcwd())
+os.chdir(paddockTS_path)
 from DAESIM_preprocess.ozwald_8day import ozwald_8day, ozwald_8day_abbreviations
 from DAESIM_preprocess.ozwald_daily import ozwald_daily, ozwald_daily_abbreviations
 from DAESIM_preprocess.silo_daily import silo_daily, silo_abbreviations
@@ -27,39 +28,54 @@ from DAESIM_preprocess.silo_daily import silo_daily, silo_abbreviations
 # SILO has everything except wind, soil moisture, runoff, leaf area, growth
 # ANUClim has everything except wind, soil moisture, runoff, leaf area, growth
 # Terraclim has everything except leaf area, growth
-# -
+
+# +
 
 # Input parameters
-lat=-37.1856746323413
-lon=143.8202752762509
-buffer = 0.000001
+# lat=-37.1856746323413
+# lon=143.8202752762509
+# buffer = 0.000001
+# start_year = "2021"
+# end_year = "2022"
 stub = "DSIM"
-start_year = "2021"
-end_year = "2022"
-outdir = '/scratch/xe2/cb8590'
-tmpdir = '/scratch/xe2/cb8590'
-thredds=False
+outdir = os.path.join(paddockTS_path,'data')
+tmpdir = os.path.join(paddockTS_path,'tmp')
+# thredds=False
 
-# %%time
-# Download all the variables we need (notebook version of environmental.py)
-ozwald_daily(["Uavg", "VPeff"], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds)
-ozwald_daily(["Tmax", "Tmin"], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds)
-ozwald_daily(["Pg"], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds)
+# # Come back to this to check the downloads all work locally as well as on NCI. Probably need to auto-create directories "data" and "tmp"
+
+# -
+
+outdir
+
+# +
+# # %%time
+# # Download all the variables we need (notebook version of environmental.py)
+# ozwald_daily(["Uavg", "VPeff"], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds)
+# ozwald_daily(["Tmax", "Tmin"], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds)
+# ozwald_daily(["Pg"], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds)
 
 
-# %%time
-variables = ["Ssoil", "Qtot", "LAI", "GPP"]
-ozwald_8day(variables, lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds)
+# +
+# # %%time
+# variables = ["Ssoil", "Qtot", "LAI", "GPP"]
+# ozwald_8day(variables, lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds)
 
 
-# %%time
-variables = ["radiation", "vp", "max_temp", "min_temp", "daily_rain", "et_morton_actual", "et_morton_potential"]
-ds_silo_daily = silo_daily(variables, lat, lon, buffer, start_year, end_year, outdir, stub)
+# +
+# # %%time
+# variables = ["radiation", "vp", "max_temp", "min_temp", "daily_rain", "et_morton_actual", "et_morton_potential"]
+# ds_silo_daily = silo_daily(variables, lat, lon, buffer, start_year, end_year, outdir, stub)
 
 # +
 # Make sure this works for a large area or a small one
 # -
-
+# %%time
+ds_silo_daily = xr.open_dataset(os.path.join(outdir, stub+'_silo_daily.nc'))
+ds_ozwald_8day = xr.open_dataset(os.path.join(outdir, stub+'_ozwald_8day.nc'))
+ds_ozwald_daily_Pg = xr.open_dataset(os.path.join(outdir, stub+'_ozwald_daily_Pg.nc'))
+ds_ozwald_daily_Tmax = xr.open_dataset(os.path.join(outdir, stub+'_ozwald_daily_Tmax.nc'))
+ds_ozwald_daily_Uavg = xr.open_dataset(os.path.join(outdir, stub+'_ozwald_daily_Uavg.nc'))
 
 
 
