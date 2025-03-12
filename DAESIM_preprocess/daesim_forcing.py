@@ -77,36 +77,61 @@ ds_ozwald_daily_Pg = xr.open_dataset(os.path.join(outdir, stub+'_ozwald_daily_Pg
 ds_ozwald_daily_Tmax = xr.open_dataset(os.path.join(outdir, stub+'_ozwald_daily_Tmax.nc'))
 ds_ozwald_daily_Uavg = xr.open_dataset(os.path.join(outdir, stub+'_ozwald_daily_Uavg.nc'))
 
+ds_silo_daily
+
+# Should probably do this drop earlier during the SILO download
+if 'crs' in ds_silo_daily.data_vars:
+    ds_silo_daily = ds_silo_daily.drop_vars(['crs'])
+
+ds_silo_daily_median = ds_silo_daily.median(dim=["lat", "lon"])
+ds_ozwald_8day_median = ds_ozwald_8day.median(dim=["latitude", "longitude"])
+ds_ozwald_daily_Pg_median = ds_ozwald_daily_Pg.median(dim=["latitude", "longitude"])
+ds_ozwald_daily_Tmax_median = ds_ozwald_daily_Tmax.median(dim=["latitude", "longitude"])
+ds_ozwald_daily_Uavg_median = ds_ozwald_daily_Uavg.median(dim=["latitude", "longitude"])
 
 
+# Even though they have overlapping variables it's fine to merge ozwald and SILO, because the variables all have different names (e.g. 'Pg' and 'daily_rain')
+ds_merged = xr.merge([ds_silo_daily_median, ds_ozwald_8day_median, ds_ozwald_daily_Pg_median, ds_ozwald_daily_Tmax_median, ds_ozwald_daily_Uavg_median])
 
-# Remove the coordinates before merging, since we are looking at a single point location
-ds1 = ds_ozwald_daily1.max(dim=['latitude','longitude'])
-ds2 = ds_ozwald_daily2.max(dim=['latitude','longitude'])
-ds3 = ds_ozwald_daily3.max(dim=['latitude','longitude'])
-ds4 = ds_ozwald_8day.drop_vars(['latitude', 'longitude'])
-ds5 = ds_silo_daily.drop_vars(['lat', 'lon'])
+# +
+# Rename the columns to match DAESim_forcing.csv
 
-# Combine the datasets along the 'time' dimension
-ds_merged = xr.merge([ds1, ds2, ds3, ds4, ds5])
+# Use this dict to primarily use SILO
+# abbreviations = {
+#     "radiation":"SRAD",  # SILO
+#     "daily_rain" : "Precipitation",  # SILO
+#     "max_temp" : "Maximum temperature",  # SILO
+#     "min_temp" : "Minimum temperature",  # SILO
+#     "vp":"VPeff"  # SILO
+#     "Uavg":"Uavg"  # OzWald
+#     "Ssoil":"Soil moisture",  # OzWald
+#     "Qtot":"Runoff",  # OzWald
+#     "LAI":"Vegetation leaf area",  # OzWald
+#     "GPP":"Vegetation growth",  # OzWald
+#     }
+
+# Use this dict to primarily use OzWald
+abbreviations = {
+    "radiation":"SRAD",  # SILO
+    "Pg" : "Precipitation",  # OzWald
+    "Tmax" : "Maximum temperature",  # OzWald
+    "Tmin" : "Minimum temperature",  # OzWald
+    "VPeff":"VPeff",  # OzWald
+    "Uavg":"Uavg",  # OzWald
+    "Ssoil":"Soil moisture",  # OzWald
+    "Qtot":"Runoff",  # OzWald
+    "LAI":"Vegetation leaf area",  # OzWald
+    "GPP":"Vegetation growth"  # OzWald
+    }
 
 df = ds_merged.to_dataframe().reset_index()
-df = df.drop(columns=["crs"])
 df = df.set_index('time')
-
-# Rename the columns to match DAESim_forcing.csv
-abbreviations = {
-    "Pg" : "Precipitation",
-    "Tmax" : "Maximum temperature",
-    "Tmin" : "Minimum temperature",
-    "Ssoil":"Soil moisture",
-    "Qtot":"Runoff",
-    "LAI":"Vegetation leaf area",
-    "GPP":"Vegetation growth",
-    "radiation":"SRAD",
-    }
 df.rename(columns=abbreviations, inplace=True)
 df.rename_axis("date", inplace=True)
-df_ordered = df[["Precipitation", "Runoff", "Minimum temperature", "Maximum temperature", "Soil moisture", "Vegetation growth", "Vegetation leaf area", "VPeff",	"Uavg", "SRAD"]] 
-df.to_csv("DAESim_forcing_Harden_2000-2019.csv")
-df.head()
+
+daesim_ordering = ["Precipitation", "Runoff", "Minimum temperature", "Maximum temperature", "Soil moisture", "Vegetation growth", "Vegetation leaf area", "VPeff",	"Uavg", "SRAD"]
+df_ordered = df[daesim_ordering] 
+
+filepath = os.path.join(outdir, stub + "_DAESim_forcing.csv")
+df.to_csv(filepath)
+print(filepath)
