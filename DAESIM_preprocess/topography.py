@@ -12,7 +12,7 @@ from matplotlib import colors
 import rasterio
 
 # Local imports
-os.chdir(os.path.join(os.path.expanduser('~'), "Projects/PaddockTS"))
+os.chdir(os.path.dirname(os.getcwd()))
 from DAESIM_preprocess.util import gdata_dir, scratch_dir, plot_categorical
 
 dirmap = (64, 128, 1, 2, 4, 8, 16, 32)

@@ -12,7 +12,7 @@ import xarray as xr
 import pandas as pd
 # -
 
-os.chdir(os.path.join(os.path.expanduser('~'), "Projects/PaddockTS"))
+os.chdir(os.path.dirname(os.getcwd()))
 from DAESIM_preprocess.util import create_bbox, scratch_dir
 
 ozwald_daily_abbreviations = {

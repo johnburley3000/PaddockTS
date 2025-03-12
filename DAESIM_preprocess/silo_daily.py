@@ -13,7 +13,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-os.chdir(os.path.join(os.path.expanduser('~'), "Projects/PaddockTS"))
+os.chdir(os.path.dirname(os.getcwd()))
 from DAESIM_preprocess.util import gdata_dir, scratch_dir, create_bbox
 # -
 

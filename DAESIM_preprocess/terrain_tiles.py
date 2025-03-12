@@ -15,8 +15,7 @@ from scipy.ndimage import zoom
 import rioxarray as rxr
 
 # Local imports
-paddockTS_dir = os.path.join(os.path.expanduser('~'), "Projects/PaddockTS")
-os.chdir(paddockTS_dir)
+os.chdir(os.path.dirname(os.getcwd()))
 from DAESIM_preprocess.util import gdata_dir, scratch_dir, create_bbox, transform_bbox
 
 def run_gdalwarp(bbox=[148.464499, -34.394042, 148.474499, -34.3840426], filename="output.tif"):

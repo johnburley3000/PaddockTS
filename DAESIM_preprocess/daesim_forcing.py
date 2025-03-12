@@ -13,8 +13,7 @@ import os
 import pandas as pd
 import xarray as xr
 
-# Local imports
-os.chdir(os.path.join(os.path.expanduser('~'), "Projects/PaddockTS"))
+os.chdir(os.path.dirname(os.getcwd()))
 from DAESIM_preprocess.ozwald_8day import ozwald_8day, ozwald_8day_abbreviations
 from DAESIM_preprocess.ozwald_daily import ozwald_daily, ozwald_daily_abbreviations
 from DAESIM_preprocess.silo_daily import silo_daily, silo_abbreviations
