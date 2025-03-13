@@ -12,8 +12,12 @@ import xarray as xr
 import pandas as pd
 # -
 
-os.chdir(os.path.dirname(os.getcwd()))
-from DAESIM_preprocess.util import create_bbox, scratch_dir
+# Find the paddockTS repo on gadi or locally
+if os.path.expanduser("~").startswith("/home/"):
+    paddockTS_dir = os.path.join(os.path.expanduser("~"), "Projects/PaddockTS")
+else:
+    paddockTS_dir = os.path.dirname(os.getcwd())
+os.chdir(paddockTS_dir)from DAESIM_preprocess.util import create_bbox, scratch_dir
 
 ozwald_daily_abbreviations = {
     "Pg" : "Gross precipitation",  # 4km grid

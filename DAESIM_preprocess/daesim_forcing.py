@@ -13,8 +13,12 @@ import os
 import pandas as pd
 import xarray as xr
 
-paddockTS_path = os.path.dirname(os.getcwd())
-os.chdir(paddockTS_path)
+# Find the paddockTS repo on gadi or locally
+if os.path.expanduser("~").startswith("/home/"):
+    paddockTS_dir = os.path.join(os.path.expanduser("~"), "Projects/PaddockTS")
+else:
+    paddockTS_dir = os.path.dirname(os.getcwd())
+os.chdir(paddockTS_dir)
 from DAESIM_preprocess.ozwald_8day import ozwald_8day, ozwald_8day_abbreviations
 from DAESIM_preprocess.ozwald_daily import ozwald_daily, ozwald_daily_abbreviations
 from DAESIM_preprocess.silo_daily import silo_daily, silo_abbreviations

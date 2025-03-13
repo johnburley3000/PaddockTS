@@ -11,8 +11,12 @@ import matplotlib.pyplot as plt
 from matplotlib import colors
 import rasterio
 
-# Local imports
-os.chdir(os.path.dirname(os.getcwd()))
+# Find the paddockTS repo on gadi or locally
+if os.path.expanduser("~").startswith("/home/"):
+    paddockTS_dir = os.path.join(os.path.expanduser("~"), "Projects/PaddockTS")
+else:
+    paddockTS_dir = os.path.dirname(os.getcwd())
+os.chdir(paddockTS_dir)
 from DAESIM_preprocess.util import gdata_dir, scratch_dir, plot_categorical
 
 dirmap = (64, 128, 1, 2, 4, 8, 16, 32)

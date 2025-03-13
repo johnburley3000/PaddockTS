@@ -16,8 +16,12 @@ from owslib.wcs import WebCoverageService
 from pyproj import Proj, Transformer
 import matplotlib.pyplot as plt
 
-# Local imports
-os.chdir(os.path.dirname(os.getcwd()))
+# Find the paddockTS repo on gadi or locally
+if os.path.expanduser("~").startswith("/home/"):
+    paddockTS_dir = os.path.join(os.path.expanduser("~"), "Projects/PaddockTS")
+else:
+    paddockTS_dir = os.path.dirname(os.getcwd())
+os.chdir(paddockTS_dir)
 from DAESIM_preprocess.util import create_bbox, scratch_dir, plot_categorical
 
 # Taken from GeoDataHarvester: https://github.com/Sydney-Informatics-Hub/geodata-harvester/blob/main/src/geodata_harvester/getdata_slga.py

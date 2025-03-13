@@ -14,8 +14,12 @@ from scipy.interpolate import griddata
 from scipy.ndimage import zoom
 import rioxarray as rxr
 
-# Local imports
-os.chdir(os.path.dirname(os.getcwd()))
+# Find the paddockTS repo on gadi or locally
+if os.path.expanduser("~").startswith("/home/"):
+    paddockTS_dir = os.path.join(os.path.expanduser("~"), "Projects/PaddockTS")
+else:
+    paddockTS_dir = os.path.dirname(os.getcwd())
+os.chdir(paddockTS_dir)
 from DAESIM_preprocess.util import gdata_dir, scratch_dir, create_bbox, transform_bbox
 
 def run_gdalwarp(bbox=[148.464499, -34.394042, 148.474499, -34.3840426], filename="output.tif"):
