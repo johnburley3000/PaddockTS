@@ -12,6 +12,7 @@ import os
 # Dependencies
 import pandas as pd
 import xarray as xr
+import rioxarray as rxr
 
 # Find the paddockTS repo on gadi or locally
 if os.path.expanduser("~").startswith("/home/"):
@@ -22,10 +23,13 @@ os.chdir(paddockTS_dir)
 from DAESIM_preprocess.ozwald_8day import ozwald_8day, ozwald_8day_abbreviations
 from DAESIM_preprocess.ozwald_daily import ozwald_daily, ozwald_daily_abbreviations
 from DAESIM_preprocess.silo_daily import silo_daily, silo_abbreviations
+from DAESIM_preprocess.util import scratch_dir
 
 stub = "DSIM"
-outdir = os.path.join(paddockTS_path,'data')
-tmpdir = os.path.join(paddockTS_path,'tmp')
+# outdir = os.path.join(paddockTS_dir,'data')
+# tmpdir = os.path.join(paddockTS_dir,'tmp')
+outdir = scratch_dir
+tmpdir = scratch_dir
 
 ds_silo_daily = xr.open_dataset(os.path.join(outdir, stub+'_silo_daily.nc'))
 ds_ozwald_8day = xr.open_dataset(os.path.join(outdir, stub+'_ozwald_8day.nc'))
@@ -99,16 +103,15 @@ df.to_csv(filepath)
 print(filepath)
 
 # +
-
-# Load the tiff files we just downloaded (each should just have a single pixel)
-values = []
-stub = "Harden"
+# Create a csv of the soil variables
+variables = ['Clay', 'Silt', 'Sand', 'pH_CaCl2', 'Bulk_Density', 'Available_Water_Capacity', 'Effective_Cation_Exchange_Capacity', 'Total_Nitrogen', 'Total_Phosphorus']
 depths=['5-15cm', '15-30cm', '30-60cm', '60-100cm']
+values = []
 for variable in variables:
     for depth in depths:
         filename = os.path.join(scratch_dir, f"{stub}_{variable}_{depth}.tif")
         ds = rxr.open_rasterio(filename)
-        value = float(ds.isel(band=0, x=0, y=0).values)
+        value = float(ds.isel(band=0, x=0, y=0).values)  # Assumes a single point was downloaded
         values.append({
             "variable":variable,
             "depth":depth,
@@ -127,4 +130,8 @@ df['depth'] = pd.Categorical(df['depth'], categories=depth_order, ordered=True)
 sorted_df = df.sort_values(by='depth')
 
 # Save
-sorted_df.to_csv("Harden_Soils_sorted.csv", index=False)
+filepath = os.path.join(outdir, stub + "_Soils.csv")
+sorted_df.to_csv(filepath, index=False)
+# -
+
+sorted_df
