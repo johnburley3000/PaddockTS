@@ -6,6 +6,7 @@
 import os
 import pickle
 import time
+import random
 
 # Dependencies
 import numpy as np
@@ -25,7 +26,7 @@ os.chdir(paddockTS_dir)
 from DAESIM_preprocess.util import create_bbox, scratch_dir, plot_categorical
 
 # Taken from GeoDataHarvester: https://github.com/Sydney-Informatics-Hub/geodata-harvester/blob/main/src/geodata_harvester/getdata_slga.py
-asris_urls = {
+slga_soils_abbrevations = {
     "Clay": "https://www.asris.csiro.au/arcgis/services/TERN/CLY_ACLEP_AU_NAT_C/MapServer/WCSServer",
     "Silt": "https://www.asris.csiro.au/arcgis/services/TERN/SLT_ACLEP_AU_NAT_C/MapServer/WCSServer",
     "Sand": "https://www.asris.csiro.au/arcgis/services/TERN/SND_ACLEP_AU_NAT_C/MapServer/WCSServer",
@@ -74,21 +75,26 @@ def slga_soils(variables=["Clay", "Sand", "Silt", "pH_CaCl2"], lat=-34.3890427, 
         identifier = identifiers[depth]
         for variable in variables:
             filename = os.path.join(outdir, f"{stub}_{variable}_{depth}.tif")
-            url = asris_urls[variable]
-            
+            url = slga_soils_abbrevations[variable]
+
             # The SLGA server is a bit temperamental, so sometimes you have to try again
             attempt = 0
-            delay = 10
+            base_delay = 5  
             max_retries = 3
+            
             while attempt < max_retries:
-                time.sleep(delay)
                 try:
                     download_tif(bbox, url, identifier, filename)
                     print(f"Downloaded {filename}")
-                    attempt = max_retries
-                except:
-                    print(f"Failed to download {variable}")
-                    attempt+=1
+                    break
+                except Exception as e:
+                    print(f"Failed to download {variable} {depth}, attempt {attempt + 1} of {max_retries}")
+                    attempt += 1
+                    if attempt < max_retries:
+                        delay = base_delay * (2 ** attempt) # Exponential backoff
+                        print(f"Retrying in {delay:.2f} seconds...")
+                        time.sleep(delay)
+
 
 
 def visualise_soil_texture(outdir, visuals_dir=scratch_dir, stub="Test"):
@@ -163,43 +169,4 @@ def visualise_soil_pH(outdir, visuals_dir=scratch_dir, stub="Test"):
     plt.show()
 
 if __name__ == '__main__':
-
-    # Download all the soil layers for a single location
-    stub = "Harden"
-    variables = ['Clay', 'Silt', 'Sand', 'pH_CaCl2', 'Bulk_Density', 'Available_Water_Capacity', 'Effective_Cation_Exchange_Capacity', 'Total_Nitrogen', 'Total_Phosphorus']
-    depths=['5-15cm', '15-30cm', '30-60cm', '60-100cm']
-    buffer=0.0003
-    latitude = -34.52194
-    longitude=148.30472
-    slga_soils(variables=variables, lat=latitude, lon=longitude, buffer=buffer, stub=stub, depths=depths)
-    
-    # Load the tiff files we just downloaded (each should just have a single pixel)
-    values = []
-    stub = "Harden"
-    depths=['5-15cm', '15-30cm', '30-60cm', '60-100cm']
-    for variable in variables:
-        for depth in depths:
-            filename = os.path.join(scratch_dir, f"{stub}_{variable}_{depth}.tif")
-            ds = rxr.open_rasterio(filename)
-            value = float(ds.isel(band=0, x=0, y=0).values)
-            values.append({
-                "variable":variable,
-                "depth":depth,
-                "value":value
-            })
-    
-    # Pivot
-    df = pd.DataFrame(values)
-    pivot_df = df.pivot(index='depth', columns='variable', values='value')
-    pivot_df = pivot_df.reset_index() 
-    
-    # Sort by depth
-    df = pivot_df
-    depth_order = ['5-15cm', '15-30cm', '30-60cm', '60-100cm']
-    df['depth'] = pd.Categorical(df['depth'], categories=depth_order, ordered=True)
-    sorted_df = df.sort_values(by='depth')
-    
-    # Save
-    sorted_df.to_csv("Harden_Soils_sorted.csv", index=False)
-
-
+    slga_soils(buffer=0.0001)

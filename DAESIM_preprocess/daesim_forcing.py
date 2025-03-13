@@ -23,58 +23,10 @@ from DAESIM_preprocess.ozwald_8day import ozwald_8day, ozwald_8day_abbreviations
 from DAESIM_preprocess.ozwald_daily import ozwald_daily, ozwald_daily_abbreviations
 from DAESIM_preprocess.silo_daily import silo_daily, silo_abbreviations
 
-# +
-# DAESim requirements:
-# VPeff (vapour pressure), Uavg (wind), min temperature, max temperature, precipitation, solar radiation
-# Soil moisture, runoff, leaf area, growth
-
-# Ozwald doesn't have radiation
-# SILO doesn't have wind, soil moisture, runoff, leaf area, GPP
-# ANUClim doesn't have wind, soil moisture, runoff, leaf area, GPP
-# Terraclim doesn't have leaf area, GPP
-
-# +
-
-# Input parameters
-# lat=-37.1856746323413
-# lon=143.8202752762509
-# buffer = 0.000001
-# start_year = "2021"
-# end_year = "2022"
 stub = "DSIM"
 outdir = os.path.join(paddockTS_path,'data')
 tmpdir = os.path.join(paddockTS_path,'tmp')
-# thredds=False
 
-# # Come back to this to check the downloads all work locally as well as on NCI. Probably need to auto-create directories "data" and "tmp"
-
-# -
-
-outdir
-
-# +
-# # %%time
-# # Download all the variables we need (notebook version of environmental.py)
-# ozwald_daily(["Uavg", "VPeff"], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds)
-# ozwald_daily(["Tmax", "Tmin"], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds)
-# ozwald_daily(["Pg"], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds)
-
-
-# +
-# # %%time
-# variables = ["Ssoil", "Qtot", "LAI", "GPP"]
-# ozwald_8day(variables, lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds)
-
-
-# +
-# # %%time
-# variables = ["radiation", "vp", "max_temp", "min_temp", "daily_rain", "et_morton_actual", "et_morton_potential"]
-# ds_silo_daily = silo_daily(variables, lat, lon, buffer, start_year, end_year, outdir, stub)
-
-# +
-# Make sure this works for a large area or a small one
-# -
-# %%time
 ds_silo_daily = xr.open_dataset(os.path.join(outdir, stub+'_silo_daily.nc'))
 ds_ozwald_8day = xr.open_dataset(os.path.join(outdir, stub+'_ozwald_8day.nc'))
 ds_ozwald_daily_Pg = xr.open_dataset(os.path.join(outdir, stub+'_ozwald_daily_Pg.nc'))
@@ -116,27 +68,16 @@ ds_merged = xr.merge([ds_silo_daily, ds_ozwald_8day, ds_ozwald_daily_Pg, ds_ozwa
 
 # +
 # Rename the columns to match DAESim_forcing.csv
-
-# Use this dict to primarily use SILO
-# abbreviations = {
-#     "radiation":"SRAD",  # SILO
-#     "daily_rain" : "Precipitation",  # SILO
-#     "max_temp" : "Maximum temperature",  # SILO
-#     "min_temp" : "Minimum temperature",  # SILO
-#     "vp":"VPeff"  # SILO
-#     "Uavg":"Uavg"  # OzWald
-#     "Ssoil":"Soil moisture",  # OzWald
-#     "Qtot":"Runoff",  # OzWald
-#     "LAI":"Vegetation leaf area",  # OzWald
-#     "GPP":"Vegetation growth",  # OzWald
-#     }
-
-# Use this dict to primarily use OzWald
 abbreviations = {
+    # Deliberated commenting out these variables to use the OzWald variables by default
+    # "daily_rain" : "Precipitation",  # SILO
+    # "max_temp" : "Maximum temperature",  # SILO
+    # "min_temp" : "Minimum temperature",  # SILO
+    # "vp":"VPeff",  # SILO
     "radiation":"SRAD",  # SILO
-    "Pg" : "Precipitation",  # OzWald
-    "Tmax" : "Maximum temperature",  # OzWald
-    "Tmin" : "Minimum temperature",  # OzWald
+    "Pg":"Precipitation",  # OzWald
+    "Tmax":"Maximum temperature",  # OzWald
+    "Tmin":"Minimum temperature",  # OzWald
     "VPeff":"VPeff",  # OzWald
     "Uavg":"Uavg",  # OzWald
     "Ssoil":"Soil moisture",  # OzWald
@@ -156,3 +97,34 @@ df_ordered = df[daesim_ordering]
 filepath = os.path.join(outdir, stub + "_DAESim_forcing.csv")
 df.to_csv(filepath)
 print(filepath)
+
+# +
+
+# Load the tiff files we just downloaded (each should just have a single pixel)
+values = []
+stub = "Harden"
+depths=['5-15cm', '15-30cm', '30-60cm', '60-100cm']
+for variable in variables:
+    for depth in depths:
+        filename = os.path.join(scratch_dir, f"{stub}_{variable}_{depth}.tif")
+        ds = rxr.open_rasterio(filename)
+        value = float(ds.isel(band=0, x=0, y=0).values)
+        values.append({
+            "variable":variable,
+            "depth":depth,
+            "value":value
+        })
+
+# Pivot
+df = pd.DataFrame(values)
+pivot_df = df.pivot(index='depth', columns='variable', values='value')
+pivot_df = pivot_df.reset_index() 
+
+# Sort by depth
+df = pivot_df
+depth_order = ['5-15cm', '15-30cm', '30-60cm', '60-100cm']
+df['depth'] = pd.Categorical(df['depth'], categories=depth_order, ordered=True)
+sorted_df = df.sort_values(by='depth')
+
+# Save
+sorted_df.to_csv("Harden_Soils_sorted.csv", index=False)
