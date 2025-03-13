@@ -6,11 +6,6 @@ Requirements:
 - Modules: gdal/3.6.4  (for terrain_tiles gdalwarp)
 - Environment base: /g/data/xe2/John/geospatenv
 
-Additionally, for the canopy_height.download_new_tiles() to work you need to create an AWS account, then create a file named .aws/credentials in your home directory (e.g. /home/147/cb8590) with these contents:
-[default]
-aws_access_key_id = ACCESS_KEY
-aws_secret_access_key = SECRET_KEY
-
 """
 import argparse
 import logging
@@ -23,12 +18,10 @@ os.chdir(paddockTS_dir)
 sys.path.append(paddockTS_dir)
 
 from DAESIM_preprocess.terrain_tiles import terrain_tiles
-from DAESIM_preprocess.slga_soils import slga_soils, asris_urls
-from DAESIM_preprocess.ozwald_yearly import ozwald_yearly_average
+from DAESIM_preprocess.slga_soils import slga_soils, slga_soils_abbrevations
 from DAESIM_preprocess.ozwald_8day import ozwald_8day, ozwald_8day_abbreviations
 from DAESIM_preprocess.ozwald_daily import ozwald_daily, ozwald_daily_abbreviations
 from DAESIM_preprocess.silo_daily import silo_daily
-from DAESIM_preprocess.canopy_height import canopy_height
 
 
 # Adjust logging configuration for the script
@@ -68,7 +61,9 @@ def main(args):
     terrain_tiles(lat, lon, buffer, outdir, stub, tmpdir)
 
     variables = ['Clay', 'Sand', 'Silt', 'pH_CaCl2']
-    slga_soils(variables, lat, lon, buffer, outdir, stub)
+    variables = ['Clay', 'Silt', 'Sand', 'pH_CaCl2', 'Bulk_Density', 'Available_Water_Capacity', 'Effective_Cation_Exchange_Capacity', 'Total_Nitrogen', 'Total_Phosphorus']
+depths=['5-15cm', '15-30cm', '30-60cm', '60-100cm']
+    slga_soils(variables, lat, lon, buffer, outdir, stub, depths)
 
     # Downloading these variables separately because they use separate grids
     ozwald_daily(["Uavg", "VPeff"], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds)
@@ -79,8 +74,8 @@ def main(args):
     ozwald_8day(variables, lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds)
 
     # By default we use rainfall, temperature, and vapour pressure from OzWald instead of SILO for consistency with the soil moisture
-    # But I'm including all these variables for comparison purposes
-    variables = ["radiation", "vp", "max_temp", "min_temp", "daily_rain", "et_morton_actual", "et_morton_potential"]
+    variables = ["radiation"]
+    # variables = ["radiation", "vp", "max_temp", "min_temp", "daily_rain", "et_morton_actual", "et_morton_potential"]  # Use this if you want to use the SILO rainfall, temperature, and vapour pressure instead of OzWald
     ds_silo_daily = silo_daily(variables, lat, lon, buffer, start_year, end_year, outdir, stub)
 
 

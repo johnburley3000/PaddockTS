@@ -132,6 +132,4 @@ sorted_df = df.sort_values(by='depth')
 # Save
 filepath = os.path.join(outdir, stub + "_Soils.csv")
 sorted_df.to_csv(filepath, index=False)
-# -
-
-sorted_df
+print(filepath)
