@@ -5,6 +5,7 @@
 # Standard Libraries
 import os
 import glob
+import shutil
 
 # Dependencies
 import requests
@@ -20,6 +21,7 @@ if os.path.expanduser("~").startswith("/home/"):
 else:
     paddockTS_dir = os.path.dirname(os.getcwd())
 os.chdir(paddockTS_dir)
+from DAESIM_preprocess.util import create_bbox, scratch_dir
 
 # Taken from https://github.com/Sydney-Informatics-Hub/geodata-harvester/blob/main/src/geodata_harvester/getdata_silo.py
 silo_abbreviations = {
@@ -48,27 +50,28 @@ silo_abbreviations = {
 SILO_FOLDER="/g/data/xe2/datasets/Climate_SILO"
 
 
-# I used this script to download data from SILO into gdata
-# Need to double check this folder is writeable for everyone
-def download_from_SILO(silo_folder=SILO_FOLDER):
-    from geodata_harvester.getdata_silo import download_file
-    
+def download_from_SILO(silo_folder=SILO_FOLDER, var="radiation", year="2021"):
+    """Download a NetCDF for the whole of Australia, for a given year and variable"""
+    # Note: I haven't found a way to download only the region of interest from SILO, hence downloading all of Australia
     silo_baseurl = "https://s3-ap-southeast-2.amazonaws.com/silo-open-data/Official/annual/"
-    layernames = ["radiation", "et_morton_actual", "et_morton_potential", "et_short_crop", "et_tall_crop"]
-    years = ["2017","2018","2019","2020", "2021", "2022", "2023", "2024"]
-    outpath = silo_folder
-    for layername in layernames:
-        for year in years:
-            url = silo_baseurl + layername + "/" + str(year) + "." + layername + ".nc"
-            download_file(url, layername, year, outpath)
-            print("Downloaded:", os.path.join(outpath, f"{year}.{layername}.nc"))
-            # Takes about 400MB and 5 mins per file
+    url = silo_baseurl + var + "/" + str(year) + "." + var + ".nc"
+    filename = os.path.join(silo_folder, f"{year}.{var}.nc")
 
+    with requests.get(url, stream=True) as stream:
+        with open(filename, "wb") as file:
+            shutil.copyfileobj(stream.raw, file)
+    print(f"Downloaded {filename}")
+    # Takes about 400MB and 5 mins per file
 
 
 def silo_daily_singleyear(var="radiation", latitude=-34.3890427, longitude=148.469499, buffer=0.1, year="2021", silo_folder=SILO_FOLDER):
     """Select the region of interest from the Australia wide NetCDF file"""
     filename = os.path.join(silo_folder, f"{year}.{var}.nc")
+    
+    if not os.path.exists(filename):
+        print(f"Downloading from SILO: {var} {year} ~400MB, estimated time: 5 mins")
+        download_from_SILO(silo_folder, var, year)
+    
     ds = xr.open_dataset(filename)
     bbox = create_bbox(latitude, longitude, buffer)
     ds_region = ds.sel(lat=slice(bbox[1], bbox[3]), lon=slice(bbox[0], bbox[2]))
@@ -90,10 +93,6 @@ def silo_daily_multiyear(var="radiation", latitude=-34.3890427, longitude=148.46
 
 
 def silo_daily(variables=["radiation", "et_morton_actual"], lat=-34.3890427, lon=148.469499, buffer=0.1, start_year="2020", end_year="2021", outdir="data", stub="Test", tmp_dir=scratch_dir, silo_folder=SILO_FOLDER):
-    
-    # If the file hasn't been downloaded yet, then download it. 
-    
-    
     dss = []
     years = [str(year) for year in list(range(int(start_year), int(end_year) + 1))]
     for variable in variables:
@@ -105,11 +104,6 @@ def silo_daily(variables=["radiation", "et_morton_actual"], lat=-34.3890427, lon
     ds_concat.to_netcdf(filename)
     print("Saved:", filename)
     return ds_concat
-
-SILO_FOLDER
-
-
-
 
 
 # %%time
