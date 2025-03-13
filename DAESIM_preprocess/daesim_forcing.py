@@ -43,13 +43,13 @@ abbreviations = {
 def aggregate_pixels(ds):
     """Find the median of all pixels for each timepoint, or drop that dimension if it only has one coordinate"""
     dims = ds.dims
-    coords = ds.coords
     if "latitude" in dims and "longitude" in dims:
         ds = ds.median(dim=["latitude", "longitude"])
     elif "latitude" in dims:  
         ds = ds.median(dim=["latitude"])
     elif "longitude" in dims: 
         ds = ds.median(dim=["longitude"])
+    coords = ds.coords
     if "latitude" in coords:
         ds = ds.drop_vars(["latitude"])
     if "longitude" in coords:
@@ -95,8 +95,9 @@ def daesim_forcing(outdir=scratch_dir, stub="DSIM"):
     # Save
     filepath = os.path.join(outdir, stub + "_DAESim_forcing.csv")
     df.to_csv(filepath)
-    print(filepath)
+    print("Saved", filepath)
 
+    return df
 
 # Should check with Yasar & Alex that these are all still required in the latest version of DAESim
 def daesim_soils(outdir=scratch_dir, stub="DSIM"):
@@ -106,7 +107,7 @@ def daesim_soils(outdir=scratch_dir, stub="DSIM"):
     values = []
     for variable in variables:
         for depth in depths:
-            filename = os.path.join(scratch_dir, f"{stub}_{variable}_{depth}.tif")
+            filename = os.path.join(outdir, f"{stub}_{variable}_{depth}.tif")
             ds = rxr.open_rasterio(filename)
             value = float(ds.isel(band=0, x=0, y=0).values)  # Assumes a single point was downloaded
             values.append({
@@ -129,11 +130,12 @@ def daesim_soils(outdir=scratch_dir, stub="DSIM"):
     # Save
     filepath = os.path.join(outdir, stub + "_Soils.csv")
     sorted_df.to_csv(filepath, index=False)
-    print(filepath)
+    print("Saved", filepath)
 
+    return sorted_df
 
 if __name__ == '__main__':
-    outdir = scratch_dir
-    stub = "DSIM"
+    outdir = "/g/data/xe2/cb8590/Data/PadSeg/"
+    stub = "TEST8"
     daesim_forcing(outdir, stub)
     daesim_soils(outdir, stub)

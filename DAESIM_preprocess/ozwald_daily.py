@@ -33,8 +33,8 @@ ozwald_daily_abbreviations = {
 
 
 def ozwald_daily_singleyear_thredds(var="VPeff", latitude=-34.3890427, longitude=148.469499, buffer=0.1, year="2021", stub="Test", tmp_dir="scratch_dir"):
-    
-    # buffer = 0.0000000001    # Using a buffer less than the grid size of 5km (0.05 degrees) gets a single point
+
+    buffer = max(0.1, buffer)  # Minimum buffer for OzWald rainfall is 0.1 (~1km)
     
     north = latitude + buffer 
     south = latitude - buffer 
@@ -62,6 +62,8 @@ def ozwald_daily_singleyear_thredds(var="VPeff", latitude=-34.3890427, longitude
 
 def ozwald_daily_singleyear_gdata(var="VPeff", latitude=-34.3890427, longitude=148.469499, buffer=0.1, year="2021", stub="Test", tmp_dir=scratch_dir):
     
+    buffer = max(0.1, buffer)  # Minimum buffer for OzWald rainfall is 0.1 (~1km)
+
     prefix = ".daily" if var == "Pg" else ""
     filename = os.path.join(f"/g/data/ub8/au/OzWALD/daily/meteo/{var}/OzWALD{prefix}.{var}.{year}.nc")
 
@@ -110,10 +112,7 @@ def ozwald_daily(variables=["VPeff", "Uavg"], lat=-34.3890427, lon=148.469499, b
 
 # %%time
 if __name__ == '__main__':
+    ozwald_daily()
 
-    ds = ozwald_daily(["Uavg"], thredds=False)  # Took 2 seconds (0.5 seconds per variable per year)
-    print(ds)
-    
-    ds = ozwald_daily(["Uavg"], thredds=True)  # Took 2 seconds (0.5 seconds per variable per year)
-    print(ds)
+
 

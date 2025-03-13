@@ -84,8 +84,6 @@ def ozwald_8day_singleyear_gdata(var="Ssoil", latitude=-34.3890427, longitude=14
     # If the region is too small, then just find a single point
     if ds_region[var].shape[1] == 0:
         ds_region = ds.sel(latitude=latitude, longitude=longitude, method="nearest")
-
-    print("Loaded from gdata", filename)
         
     return ds_region
 

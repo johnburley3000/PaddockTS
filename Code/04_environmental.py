@@ -21,7 +21,9 @@ from DAESIM_preprocess.terrain_tiles import terrain_tiles
 from DAESIM_preprocess.slga_soils import slga_soils, slga_soils_abbrevations
 from DAESIM_preprocess.ozwald_8day import ozwald_8day, ozwald_8day_abbreviations
 from DAESIM_preprocess.ozwald_daily import ozwald_daily, ozwald_daily_abbreviations
-from DAESIM_preprocess.silo_daily import silo_daily
+from DAESIM_preprocess.silo_daily import silo_daily, silo_abbreviations
+from DAESIM_preprocess.daesim_forcing import daesim_forcing, daesim_soils
+
 
 
 # Adjust logging configuration for the script
@@ -58,14 +60,6 @@ def main(args):
 
     thredds=False
 
-    terrain_tiles(lat, lon, buffer, outdir, stub, tmpdir)
-
-    variables = ['Clay', 'Sand', 'Silt', 'pH_CaCl2']
-    variables = ['Clay', 'Silt', 'Sand', 'pH_CaCl2', 'Bulk_Density', 'Available_Water_Capacity', 'Effective_Cation_Exchange_Capacity', 'Total_Nitrogen', 'Total_Phosphorus']
-depths=['5-15cm', '15-30cm', '30-60cm', '60-100cm']
-    slga_soils(variables, lat, lon, buffer, outdir, stub, depths)
-
-    # Downloading these variables separately because they use separate grids
     ozwald_daily(["Uavg", "VPeff"], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds)
     ozwald_daily(["Tmax", "Tmin"], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds)
     ozwald_daily(["Pg"], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds)
@@ -73,11 +67,19 @@ depths=['5-15cm', '15-30cm', '30-60cm', '60-100cm']
     variables = ["Ssoil", "Qtot", "LAI", "GPP"]
     ozwald_8day(variables, lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds)
 
-    # By default we use rainfall, temperature, and vapour pressure from OzWald instead of SILO for consistency with the soil moisture
-    variables = ["radiation"]
-    # variables = ["radiation", "vp", "max_temp", "min_temp", "daily_rain", "et_morton_actual", "et_morton_potential"]  # Use this if you want to use the SILO rainfall, temperature, and vapour pressure instead of OzWald
+    variables = ["radiation", "vp", "max_temp", "min_temp", "daily_rain", "et_morton_actual", "et_morton_potential"]
     ds_silo_daily = silo_daily(variables, lat, lon, buffer, start_year, end_year, outdir, stub)
 
+    df_climate = daesim_forcing(outdir, stub)
+
+    variables = ['Clay', 'Sand', 'Silt', 'pH_CaCl2']
+    variables = ['Clay', 'Silt', 'Sand', 'pH_CaCl2', 'Bulk_Density', 'Available_Water_Capacity', 'Effective_Cation_Exchange_Capacity', 'Total_Nitrogen', 'Total_Phosphorus']
+    depths=['5-15cm', '15-30cm', '30-60cm', '60-100cm']
+    slga_soils(variables, lat, lon, buffer, outdir, stub, depths)
+
+    df_soils = daesim_soils(outdir, stub)
+
+    terrain_tiles(lat, lon, buffer, outdir, stub, tmpdir)
 
 if __name__ == "__main__":
     args = parse_arguments()
