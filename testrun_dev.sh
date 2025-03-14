@@ -3,6 +3,9 @@
 # Set the core parameters and then run the python scripts in serial. 
 t_start=$(date +%s)
 
+# when testing, start up an interactive session with small resources:
+# qsub -I -P xe2 -q normal -l ncpus=4,mem=24GB,jobfs=2GB,walltime=5:00:00,wd,storage=scratch/xe2+gdata/xe2+gdata/v10+gdata/ka08
+
 ####
 ## CONFIGURATION AND SETUP
 ####
@@ -165,7 +168,7 @@ echo "Step 3 complete."
 echo
 t3=$(date +%s)
 # Results:
-# (<stub>_ds2.pkl) updated with vegetation indices and vegetation fractional cover.
+# (<stub>_ds2i.pkl) updated with vegetation indices and vegetation fractional cover.
 
 echo "Step 4: segment paddocks"
 source /g/data/xe2/John/geospatenv/bin/activate
