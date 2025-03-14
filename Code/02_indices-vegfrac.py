@@ -77,7 +77,7 @@ def main():
     ds = calculate_indices(ds, indices)
 
     #  save ds
-    out_name = os.path.join(outdir, stub + '_ds2.pkl')
+    out_name = os.path.join(outdir, stub + '_ds2i.pkl')
     with open(out_name, 'wb') as f:
         pickle.dump(ds, f, protocol=pickle.HIGHEST_PROTOCOL)
     logging.info(f"Data saved successfully to {out_name}")
