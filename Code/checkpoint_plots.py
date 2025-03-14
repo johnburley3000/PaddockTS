@@ -24,7 +24,7 @@ def main():
     out_dir = args.base_directory
 
     ## Open the satellite data stack
-    with open(out_dir+stub+'_ds2.pkl', 'rb') as handle:
+    with open(out_dir+stub+'_ds2i.pkl', 'rb') as handle:
         ds = pickle.load(handle)
 
     # read in the polygons and plot:
