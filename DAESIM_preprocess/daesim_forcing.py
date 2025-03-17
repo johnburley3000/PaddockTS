@@ -128,7 +128,7 @@ def daesim_soils(outdir=".", stub="DSIM"):
     return sorted_df
 
 if __name__ == '__main__':
-    outdir = "/g/data/xe2/cb8590/Data/PadSeg/"
-    stub = "TEST8"
+    outdir = "."
+    stub = "Test"
     daesim_forcing(outdir, stub)
     daesim_soils(outdir, stub)

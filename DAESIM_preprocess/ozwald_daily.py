@@ -100,7 +100,8 @@ def ozwald_daily(variables=["VPeff", "Uavg"], lat=-34.3890427, lon=148.469499, b
     return ds_concat
 
 
-# +
+# -
+
 # %%time
 if __name__ == '__main__':
     ozwald_daily()
