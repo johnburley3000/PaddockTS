@@ -1,5 +1,5 @@
 # +
-# Catalog is here: https://dapds00.nci.org.au/thredds/catalog/ub8/au/OzWALD/8day/catalog.html
+# Catalog is here: https://thredds.nci.org.au/thredds/catalog/ub8/au/OzWALD/8day/catalog.html
 
 # Standard Libraries
 import os
@@ -40,19 +40,18 @@ def ozwald_8day_singleyear_thredds(var="Ssoil", latitude=-34.3890427, longitude=
     time_start = f"{year}-01-01"
     time_end = f"{year}-12-31"
     
-    # base_url = "https://thredds.nci.org.au"  # This is the new url (dapds00 is supposedly deprecated), but LAI only works with the old url
-    base_url = "https://dapds00.nci.org.au"
-    url = f'{base_url}/thredds/ncss/grid/ub8/au/OzWALD/8day/{var}/OzWALD.{var}.{year}.nc?var={var}&north={north}&west={west}&east={east}&south={south}&time_start={time_start}&time_end={time_end}' 
-    
-    response = requests.get(url)
-    filename = os.path.join(tmp_dir, f"{stub}_{var}_{year}.nc")
-    with open(filename, 'wb') as f:
-        f.write(response.content)
-        
-    print("Downloaded from Thredds", filename)
+    base_url = "https://thredds.nci.org.au"
+    url = f"https://thredds.nci.org.au/thredds/dodsC/ub8/au/OzWALD/8day/{var}/OzWALD.{var}.{year}.nc"
+    ds = xr.open_dataset(url)
 
-    ds = xr.open_dataset(filename, engine='netcdf4')
-    return ds
+    bbox = [longitude - buffer, latitude - buffer, longitude + buffer, latitude + buffer]
+    ds_region = ds.sel(latitude=slice(bbox[3], bbox[1]), longitude=slice(bbox[0], bbox[2]))
+
+    # If the region is too small, then just find a single point
+    if ds_region[var].shape[1] == 0:
+        ds_region = ds.sel(latitude=latitude, longitude=longitude, method="nearest")
+        
+    return ds_region
 
 
 # This function accesses files directly, so is much faster but needs to be run on NCI with access to the ub8 project
@@ -108,4 +107,4 @@ def ozwald_8day(variables=["Ssoil", "GPP"], lat=-34.3890427, lon=148.469499, buf
 
 # %%time
 if __name__ == '__main__':  
-    ozwald_8day()
+    ozwald_8day(variables=["Ssoil", "Qtot", "LAI", "GPP"])
