@@ -13,7 +13,11 @@ import os
 import sys
 
 # Change directory and insert it into the python path
-paddockTS_dir = os.path.join(os.path.expanduser('~'), "Projects/PaddockTS")
+if os.path.expanduser("~").startswith("/home/"):
+    paddockTS_dir = os.path.join(os.path.expanduser("~"), "Projects/PaddockTS")
+else:
+    paddockTS_dir = os.path.dirname(os.getcwd())
+print("Changing directory to:",paddockTS_dir)
 os.chdir(paddockTS_dir)
 sys.path.append(paddockTS_dir)
 
@@ -23,8 +27,6 @@ from DAESIM_preprocess.ozwald_8day import ozwald_8day, ozwald_8day_abbreviations
 from DAESIM_preprocess.ozwald_daily import ozwald_daily, ozwald_daily_abbreviations
 from DAESIM_preprocess.silo_daily import silo_daily, silo_abbreviations
 from DAESIM_preprocess.daesim_forcing import daesim_forcing, daesim_soils
-
-
 
 # Adjust logging configuration for the script
 logging.basicConfig(level=logging.INFO)
@@ -47,7 +49,7 @@ python3 Code/04_environmental.py --stub test --outdir /g/data/xe2/cb8590 --tmpdi
     parser.add_argument("--end_time", type=str, required=True, help="End time for the data query (YYYY-MM-DD)")
     return parser.parse_args()
 
-        
+
 def main(args):
     lat = args.lat
     lon = args.lon
@@ -58,7 +60,7 @@ def main(args):
     outdir = args.outdir
     tmpdir = args.tmpdir
 
-    thredds=False
+    thredds=True
 
     ozwald_daily(["Uavg", "VPeff"], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds)
     ozwald_daily(["Tmax", "Tmin"], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds)
@@ -67,7 +69,8 @@ def main(args):
     variables = ["Ssoil", "Qtot", "LAI", "GPP"]
     ozwald_8day(variables, lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds)
 
-    variables = ["radiation", "vp", "max_temp", "min_temp", "daily_rain", "et_morton_actual", "et_morton_potential"]
+    # variables = ["radiation", "vp", "max_temp", "min_temp", "daily_rain", "et_morton_actual", "et_morton_potential"]
+    variables = ["radiation"]
     ds_silo_daily = silo_daily(variables, lat, lon, buffer, start_year, end_year, outdir, stub)
 
     df_climate = daesim_forcing(outdir, stub)
@@ -83,4 +86,16 @@ def main(args):
 
 if __name__ == "__main__":
     args = parse_arguments()
+    # args = argparse.Namespace(
+    #     lat=-34.3890427,
+    #     lon=148.469499,
+    #     buffer=0.1,
+    #     stub="Test",
+    #     start_time="2020-01-01",
+    #     end_time="2021-12-31",
+    #     outdir=".",
+    #     tmpdir="."
+    # )
     main(args)
+
+
