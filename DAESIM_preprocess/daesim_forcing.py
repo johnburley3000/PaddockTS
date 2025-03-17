@@ -14,13 +14,6 @@ import pandas as pd
 import xarray as xr
 import rioxarray as rxr
 
-# Find the paddockTS repo on gadi or locally
-if os.path.expanduser("~").startswith("/home/"):
-    paddockTS_dir = os.path.join(os.path.expanduser("~"), "Projects/PaddockTS")
-else:
-    paddockTS_dir = os.path.dirname(os.getcwd())
-os.chdir(paddockTS_dir)
-from DAESIM_preprocess.util import scratch_dir
 
 abbreviations = {
     "daily_rain" : "Precipitation (SILO)",  # SILO
@@ -57,7 +50,7 @@ def aggregate_pixels(ds):
     return ds
 
 
-def daesim_forcing(outdir=scratch_dir, stub="DSIM"):
+def daesim_forcing(outdir=".", stub="DSIM"):
     """Merge the ozwald and silo netcdf's into a dataframe for input into DAESim"""
 
     # Open the pre-downloaded netcdf files
@@ -100,7 +93,7 @@ def daesim_forcing(outdir=scratch_dir, stub="DSIM"):
     return df
 
 # Should check with Yasar & Alex that these are all still required in the latest version of DAESim
-def daesim_soils(outdir=scratch_dir, stub="DSIM"):
+def daesim_soils(outdir=".", stub="DSIM"):
     """Create a csv with soil inputs required for DAESim"""
     variables = ['Clay', 'Silt', 'Sand', 'pH_CaCl2', 'Bulk_Density', 'Available_Water_Capacity', 'Effective_Cation_Exchange_Capacity', 'Total_Nitrogen', 'Total_Phosphorus']
     depths=['5-15cm', '15-30cm', '30-60cm', '60-100cm']

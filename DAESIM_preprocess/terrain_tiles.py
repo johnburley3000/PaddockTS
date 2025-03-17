@@ -1,3 +1,4 @@
+# +
 # # NCI ARE Setup
 # Modules: gdal/3.6.4  
 # Environment base: /g/data/xe2/John/geospatenv
@@ -10,17 +11,17 @@ import os
 import numpy as np
 import rasterio
 import matplotlib.pyplot as plt
+import rioxarray as rxr
 from scipy.interpolate import griddata
 from scipy.ndimage import zoom
-import rioxarray as rxr
+from pyproj import Transformer
 
-# Find the paddockTS repo on gadi or locally
-if os.path.expanduser("~").startswith("/home/"):
-    paddockTS_dir = os.path.join(os.path.expanduser("~"), "Projects/PaddockTS")
-else:
-    paddockTS_dir = os.path.dirname(os.getcwd())
-os.chdir(paddockTS_dir)
-from DAESIM_preprocess.util import gdata_dir, scratch_dir, create_bbox, transform_bbox
+# +
+def transform_bbox(bbox=[148.464499, -34.394042, 148.474499, -34.384042], inputEPSG="EPSG:4326", outputEPSG="EPSG:3857"):
+    transformer = Transformer.from_crs(inputEPSG, outputEPSG)
+    x1,y1 = transformer.transform(bbox[1], bbox[0])
+    x2,y2 = transformer.transform(bbox[3], bbox[2])
+    return (x1, y1, x2, y2)
 
 def run_gdalwarp(bbox=[148.464499, -34.394042, 148.474499, -34.3840426], filename="output.tif"):
     """Use gdalwarp to download a tif from terrain tiles"""
@@ -79,7 +80,7 @@ def interpolate_nan(filename="output.tif"):
                 np.linspace(0, Z.shape[0] - 1, Z.shape[0]))
     nearest = griddata(xy_coords, z_flat, (X, Y), method='nearest')
 
-    return dem, meta
+    return nearest, meta
 
 def downsample(dem):
     """Downsample from 10m dem to 30m dem"""
@@ -107,11 +108,11 @@ def visualise_tif(filename="terrain_tiles.tif", title="Terrain Tiles"):
     plt.ylabel('Latitude')
     plt.show()
 
-def terrain_tiles(lat=-34.3890427, lon=148.469499, buffer=0.005, outdir="", stub="test", tmp_dir=""):
+def terrain_tiles(lat=-34.3890427, lon=148.469499, buffer=0.005, outdir=".", stub="test", tmp_dir="."):
     """Download 10m resolution elevation from terrain_tiles"""
     
     # Load the raw data
-    bbox = create_bbox(lat, lon, buffer)
+    bbox = [lon - buffer, lat - buffer, lon + buffer, lat + buffer]
     filename = os.path.join(tmp_dir, f"{stub}_terrain_original.tif")
     run_gdalwarp(bbox, filename)
 
@@ -120,19 +121,6 @@ def terrain_tiles(lat=-34.3890427, lon=148.469499, buffer=0.005, outdir="", stub
     filename = os.path.join(outdir, f"{stub}_terrain.tif")
     download_dem(dem, meta, filename)
 
+# +
 if __name__ == '__main__':
-    # Choosing location
-    lat, lon = -34.3890427, 148.469499
-    buffer = 0.005  # 0.01 degrees is about 1km in each direction, so 2km total
-    stub = "MILG_1km"
-
-    # Specify output destinations
-    outdir = os.path.join(gdata_dir, "Data/PadSeg/")
-    tmp_dir = os.path.join(scratch_dir, "tmp")
-
-    # Download elevation from terrain tiles
-    terrain_tiles(lat, lon, buffer, outdir, stub, tmp_dir)
-
-    # Visualise the downloaded data
-    filename = os.path.join(outdir, f"{stub}_terrain.tif")
-    visualise_tif(filename, "Terrain Tiles")
+    terrain_tiles()

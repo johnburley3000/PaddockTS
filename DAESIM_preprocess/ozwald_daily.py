@@ -4,22 +4,12 @@
 # +
 # Standard Libraries
 import os
-import glob
 
 # Dependencies
 import requests
 import xarray as xr
-import pandas as pd
-# -
 
-# Find the paddockTS repo on gadi or locally
-if os.path.expanduser("~").startswith("/home/"):
-    paddockTS_dir = os.path.join(os.path.expanduser("~"), "Projects/PaddockTS")
-else:
-    paddockTS_dir = os.path.dirname(os.getcwd())
-os.chdir(paddockTS_dir)
-from DAESIM_preprocess.util import create_bbox, scratch_dir
-
+# +
 ozwald_daily_abbreviations = {
     "Pg" : "Gross precipitation",  # 4km grid
     "Tmax" : "Maximum temperature",  # 250m grid
@@ -60,7 +50,7 @@ def ozwald_daily_singleyear_thredds(var="VPeff", latitude=-34.3890427, longitude
     return ds
 
 
-def ozwald_daily_singleyear_gdata(var="VPeff", latitude=-34.3890427, longitude=148.469499, buffer=0.1, year="2021", stub="Test", tmp_dir=scratch_dir):
+def ozwald_daily_singleyear_gdata(var="VPeff", latitude=-34.3890427, longitude=148.469499, buffer=0.1, year="2021"):
     
     buffer = max(0.1, buffer)  # Minimum buffer for OzWald rainfall is 0.1 (~1km)
 
@@ -72,7 +62,7 @@ def ozwald_daily_singleyear_gdata(var="VPeff", latitude=-34.3890427, longitude=1
         return None
         
     ds = xr.open_dataset(filename)
-    bbox = create_bbox(latitude, longitude, buffer)
+    bbox = [longitude - buffer, latitude - buffer, longitude + buffer, latitude + buffer]
     ds_region = ds.sel(latitude=slice(bbox[3], bbox[1]), longitude=slice(bbox[0], bbox[2]))
     
     # If the region is too small, then just find a single point
@@ -82,19 +72,19 @@ def ozwald_daily_singleyear_gdata(var="VPeff", latitude=-34.3890427, longitude=1
     return ds_region
 
 
-def ozwald_daily_multiyear(var="VPeff", latitude=-34.3890427, longitude=148.469499, buffer=0.1, years=["2020", "2021"], stub="Test", tmp_dir=scratch_dir, thredds=True):
+def ozwald_daily_multiyear(var="VPeff", latitude=-34.3890427, longitude=148.469499, buffer=0.1, years=["2020", "2021"], stub="Test", tmp_dir=".", thredds=True):
     dss = []
     for year in years:
         if thredds:
             ds_year = ozwald_daily_singleyear_thredds(var, latitude, longitude, buffer, year, stub, tmp_dir)
         else:
-            ds_year = ozwald_daily_singleyear_gdata(var, latitude, longitude, buffer, year, stub, tmp_dir)
+            ds_year = ozwald_daily_singleyear_gdata(var, latitude, longitude, buffer, year)
         dss.append(ds_year)
     ds_concat = xr.concat(dss, dim='time')
     return ds_concat
 
 
-def ozwald_daily(variables=["VPeff", "Uavg"], lat=-34.3890427, lon=148.469499, buffer=0.1, start_year="2020", end_year="2021", outdir=scratch_dir, stub="Test", tmp_dir=scratch_dir, thredds=True):
+def ozwald_daily(variables=["VPeff", "Uavg"], lat=-34.3890427, lon=148.469499, buffer=0.1, start_year="2020", end_year="2021", outdir=".", stub="Test", tmp_dir=".", thredds=True):
     dss = []
     years = [str(year) for year in list(range(int(start_year), int(end_year) + 1))]
     for variable in variables:
@@ -110,9 +100,7 @@ def ozwald_daily(variables=["VPeff", "Uavg"], lat=-34.3890427, lon=148.469499, b
     return ds_concat
 
 
+# +
 # %%time
 if __name__ == '__main__':
     ozwald_daily()
-
-
-

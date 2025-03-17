@@ -1,30 +1,16 @@
 # +
 # Catalog is here: https://www.asris.csiro.au/arcgis/rest/services/TERN
-# -
 
 # Standard Libraries
 import os
-import pickle
 import time
-import random
 
 # Dependencies
 import numpy as np
-import xarray as xr
 import rioxarray as rxr
-import pandas as pd
 from owslib.wcs import WebCoverageService
-from pyproj import Proj, Transformer
-import matplotlib.pyplot as plt
 
-# Find the paddockTS repo on gadi or locally
-if os.path.expanduser("~").startswith("/home/"):
-    paddockTS_dir = os.path.join(os.path.expanduser("~"), "Projects/PaddockTS")
-else:
-    paddockTS_dir = os.path.dirname(os.getcwd())
-os.chdir(paddockTS_dir)
-from DAESIM_preprocess.util import create_bbox, scratch_dir, plot_categorical
-
+# +
 # Taken from GeoDataHarvester: https://github.com/Sydney-Informatics-Hub/geodata-harvester/blob/main/src/geodata_harvester/getdata_slga.py
 slga_soils_abbrevations = {
     "Clay": "https://www.asris.csiro.au/arcgis/services/TERN/CLY_ACLEP_AU_NAT_C/MapServer/WCSServer",
@@ -49,7 +35,6 @@ def download_tif(bbox=[148.46449900000002, -34.3940427, 148.474499, -34.38404269
                   identifier='4', 
                   filename="output.tif"):
 
-    # Request the data using WebCoverageService
     wcs = WebCoverageService(url, version='1.0.0')    
     crs = 'EPSG:4326'
     resolution = 1
@@ -66,11 +51,9 @@ def download_tif(bbox=[148.46449900000002, -34.3940427, 148.474499, -34.38404269
     with open(filename, 'wb') as file:
         file.write(response.read())
 
-    # Make sure to time.sleep(1) if running this multiple times to avoid throttling
-
-def slga_soils(variables=["Clay", "Sand", "Silt", "pH_CaCl2"], lat=-34.3890427, lon=148.469499, buffer=0.005, outdir=scratch_dir, stub="Test",  depths=["5-15cm"]):
+def slga_soils(variables=["Clay", "Sand", "Silt", "pH_CaCl2"], lat=-34.3890427, lon=148.469499, buffer=0.005, outdir=".", stub="Test",  depths=["5-15cm"]):
     """Download soil variables from CSIRO"""
-    bbox = create_bbox(lat, lon, buffer)
+    bbox = [lat - buffer, lon - buffer, lon + buffer, lat + buffer]     # From my experimentation, the asris.csiro API allows a maximum bbox of about 40km (0.2 degrees in each direction)
     for depth in depths:
         identifier = identifiers[depth]
         for variable in variables:
@@ -95,9 +78,7 @@ def slga_soils(variables=["Clay", "Sand", "Silt", "pH_CaCl2"], lat=-34.3890427, 
                         print(f"Retrying in {delay:.2f} seconds...")
                         time.sleep(delay)
 
-
-
-def visualise_soil_texture(outdir, visuals_dir=scratch_dir, stub="Test"):
+def soil_texture(outdir=".", stub="Test"):
     """Convert from sand silt and clay percent to the 12 categories in the soil texture triangle"""
 
     # Load the sand, silt and clay layers
@@ -113,7 +94,7 @@ def visualise_soil_texture(outdir, visuals_dir=scratch_dir, stub="Test"):
     silt_array = ds_silt.isel(band=0).values
     clay_array = ds_clay.isel(band=0).values
     
-    # Rescale values to add up to 100 (range was 74%-108% in Mullon example)
+    # The sand, silt and clay percent don't necessarily add up to 100% originally, because they get predicted by separate models
     total_percent = sand_array + silt_array + clay_array
     sand_percent = (sand_array / total_percent) * 100
     silt_percent = (silt_array / total_percent) * 100
@@ -122,51 +103,24 @@ def visualise_soil_texture(outdir, visuals_dir=scratch_dir, stub="Test"):
     # Assign soil texture categories
     soil_texture = np.empty(sand_array.shape, dtype=object)
     
-    # Fudged the boundaries between sand, loamy sand, and sandy loam a little, but the rest of these values should match the soil texture triangle exactly
-    soil_texture[(clay_array < 20) & (silt_array < 50)] = 'Sandy Loam'      # Sandy Loam needs to come before Loam
-    soil_texture[(sand_array >= 70) & (clay_array < 15)] = 'Loamy Sand'     # Loamy Sand needs to come from Sand
-    soil_texture[(sand_array >= 85) & (clay_array < 10)] = 'Sand'
-    soil_texture[(clay_array < 30) & (silt_array >= 50)] = 'Silt Loam'     # Silt Loam needs to come before Silt
-    soil_texture[(clay_array < 15) & (silt_array >= 80)] = 'Silt'
-    soil_texture[(clay_array >= 27) & (clay_array < 40) & (sand_array < 20)] = 'Silty Clay Loam'
-    soil_texture[(clay_array >= 40) & (silt_array >= 40)] = 'Silty Clay'
-    soil_texture[(clay_array >= 40) & (silt_array < 40) & (sand_array < 45)] = 'Clay'
-    soil_texture[(clay_array >= 35) & (sand_array >= 45)] = 'Sandy Clay'
-    soil_texture[(clay_array >= 27) & (clay_array < 40) & (sand_array >= 20) & (sand_array < 45) ] = 'Clay Loam'
-    soil_texture[(clay_array >= 20) & (clay_array < 35) & (sand_array >= 45) & (silt_array < 28)] = 'Sandy Clay Loam'
-    soil_texture[(clay_array >= 15) & (clay_array < 27) & (silt_array >= 28) & (silt_array < 50) & (sand_array < 53)] = 'Loam'
+    # Note that I simplified the boundaries between sand, loamy sand, and sandy loam a little, but the rest of these values should match the soil texture triangle exactly
+    soil_texture[(clay_percent < 20)  & (silt_percent < 50)] = 'Sandy Loam'      # Sandy Loam needs to come before Loam
+    soil_texture[(sand_percent >= 70) & (clay_percent < 15)] = 'Loamy Sand'     # Loamy Sand needs to come from Sand
+    soil_texture[(sand_percent >= 85) & (clay_percent < 10)] = 'Sand'
+    soil_texture[(clay_percent < 30)  & (silt_percent >= 50)] = 'Silt Loam'     # Silt Loam needs to come before Silt
+    soil_texture[(clay_percent < 15)  & (silt_percent >= 80)] = 'Silt'
+    soil_texture[(clay_percent >= 27) & (clay_percent < 40) & (sand_array < 20)] = 'Silty Clay Loam'
+    soil_texture[(clay_percent >= 40) & (silt_percent >= 40)] = 'Silty Clay'
+    soil_texture[(clay_percent >= 40) & (silt_percent < 40) & (sand_array < 45)] = 'Clay'
+    soil_texture[(clay_percent >= 35) & (sand_percent >= 45)] = 'Sandy Clay'
+    soil_texture[(clay_percent >= 27) & (clay_percent < 40) & (sand_array >= 20) & (sand_array < 45) ] = 'Clay Loam'
+    soil_texture[(clay_percent >= 20) & (clay_percent < 35) & (sand_array >= 45) & (silt_array < 28)] = 'Sandy Clay Loam'
+    soil_texture[(clay_percent >= 15) & (clay_percent < 27) & (silt_array >= 28) & (silt_array < 50) & (sand_array < 53)] = 'Loam'
 
-    colour_dict = {
-        'Sandy Loam': "violet",
-        'Loamy Sand': "lightpink",
-        'Sand': "orange",
-        'Silt Loam': "yellowgreen",
-        'Silt': "limegreen",
-        'Silty Clay Loam': "lightseagreen",
-        'Silty Clay': "turquoise",
-        'Clay': "gold",
-        'Sandy Clay': "red",
-        'Clay Loam': "greenyellow",
-        'Sandy Clay Loam': "salmon",
-        'Loam':"chocolate"
-    }
-    colour_dict = {key: value for key, value in colour_dict.items() if key in np.unique(soil_texture)}
-    filename = os.path.join(visuals_dir, f"{stub}_soil_texture.png")
-    plot_categorical(soil_texture, colour_dict, "Soil Texture", filename)
+    return soil_texture
 
-def visualise_soil_pH(outdir, visuals_dir=scratch_dir, stub="Test"):
-    fig, ax = plt.subplots(figsize=(8, 6))
-    filename = os.path.join(outdir, f"{stub}_pH_CaCl2.tif")
-    ds_pH = rxr.open_rasterio(filename)
-    ds_pH_scaled = ds_pH[0].values
-    plt.imshow(ds_pH_scaled, cmap='RdYlGn')
-    plt.colorbar()
-    plt.title("Soil pH")
-    plt.tight_layout()
-    filename = os.path.join(visuals_dir, f"{stub}_pH.png")
-    plt.savefig(filename)
-    print("Saved", filename)
-    plt.show()
 
+# +
 if __name__ == '__main__':
-    slga_soils(buffer=0.0001)
+    slga_soils()
+    soil_texture()

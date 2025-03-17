@@ -1,28 +1,15 @@
 # +
 # Documentation is here: https://www.longpaddock.qld.gov.au/silo/gridded-data/
 
-# +
 # Standard Libraries
 import os
-import glob
 import shutil
 
 # Dependencies
 import requests
 import xarray as xr
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-# -
 
-# Find the paddockTS repo on gadi or locally
-if os.path.expanduser("~").startswith("/home/"):
-    paddockTS_dir = os.path.join(os.path.expanduser("~"), "Projects/PaddockTS")
-else:
-    paddockTS_dir = os.path.dirname(os.getcwd())
-os.chdir(paddockTS_dir)
-from DAESIM_preprocess.util import create_bbox, scratch_dir
-
+# +
 # Taken from https://github.com/Sydney-Informatics-Hub/geodata-harvester/blob/main/src/geodata_harvester/getdata_silo.py
 silo_abbreviations = {
         "daily_rain": "Daily rainfall, mm",
@@ -47,21 +34,18 @@ silo_abbreviations = {
     }
 
 
-SILO_FOLDER="/g/data/xe2/datasets/Climate_SILO"
-
-
-def download_from_SILO(silo_folder=SILO_FOLDER, var="radiation", year="2021"):
+def download_from_SILO(silo_folder=".", var="radiation", year="2021"):
     """Download a NetCDF for the whole of Australia, for a given year and variable"""
-    # Note: I haven't found a way to download only the region of interest from SILO, hence downloading all of Australia
+    # Note: I haven't found a way to download only the region of interest from SILO, hence we are downloading all of Australia
     silo_baseurl = "https://s3-ap-southeast-2.amazonaws.com/silo-open-data/Official/annual/"
     url = silo_baseurl + var + "/" + str(year) + "." + var + ".nc"
     filename = os.path.join(silo_folder, f"{year}.{var}.nc")
 
+    # Takes about 400MB or 5 mins per file
     with requests.get(url, stream=True) as stream:
         with open(filename, "wb") as file:
             shutil.copyfileobj(stream.raw, file)
     print(f"Downloaded {filename}")
-    # Takes about 400MB and 5 mins per file
 
 
 def silo_daily_singleyear(var="radiation", latitude=-34.3890427, longitude=148.469499, buffer=0.1, year="2021", silo_folder=SILO_FOLDER):
@@ -73,7 +57,7 @@ def silo_daily_singleyear(var="radiation", latitude=-34.3890427, longitude=148.4
         download_from_SILO(silo_folder, var, year)
     
     ds = xr.open_dataset(filename)
-    bbox = create_bbox(latitude, longitude, buffer)
+    bbox = [longitude - buffer, latitude - buffer, longitude + buffer, latitude + buffer]
     ds_region = ds.sel(lat=slice(bbox[1], bbox[3]), lon=slice(bbox[0], bbox[2]))
 
     # If the region is too small, then just find a single point
@@ -105,8 +89,7 @@ def silo_daily(variables=["radiation", "et_morton_actual"], lat=-34.3890427, lon
     print("Saved:", filename)
     return ds_concat
 
-
+# +
 # %%time
 if __name__ == '__main__':
-    ds = silo_daily()
-    print(ds)
+    silo_daily()
