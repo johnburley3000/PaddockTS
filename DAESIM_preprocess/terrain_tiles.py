@@ -116,15 +116,19 @@ def terrain_tiles(lat=-34.3890427, lon=148.469499, buffer=0.005, outdir=".", stu
 # -
 
 if __name__ == '__main__':
-
-    # Find the paddockTS repo on gadi or locally. Needed for the terrain_tiles.xml
-    if os.path.expanduser("~").startswith("/home/"):
+    # Change directory to the PaddockTS repo
+    if os.path.expanduser("~").startswith("/home/"):  # Running on Gadi
         paddockTS_dir = os.path.join(os.path.expanduser("~"), "Projects/PaddockTS")
-    else:
-        paddockTS_dir = os.path.dirname(os.getcwd())
+    elif os.path.basename(os.getcwd()) != "PaddockTS":
+        paddockTS_dir = os.path.dirname(os.getcwd())  # Running in a jupyter notebook 
+    else:  # Already running locally from PaddockTS root
+        paddockTS_dir = os.getcwd()
+
     print("Changing directory to:",paddockTS_dir)
     os.chdir(paddockTS_dir)
     
     terrain_tiles()
 
 
+
+os.path.basename(os.getcwd())

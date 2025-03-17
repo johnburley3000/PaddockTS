@@ -12,12 +12,13 @@ import logging
 import os
 import sys
 
-# Change directory and insert it into the python path
-if os.path.expanduser("~").startswith("/home/"):
+# Change directory to the PaddockTS repo
+if os.path.expanduser("~").startswith("/home/"):  # Running on Gadi
     paddockTS_dir = os.path.join(os.path.expanduser("~"), "Projects/PaddockTS")
-else:
-    paddockTS_dir = os.path.dirname(os.getcwd())
-print("Changing directory to:",paddockTS_dir)
+elif os.path.basename(os.getcwd()) != "PaddockTS":
+    paddockTS_dir = os.path.dirname(os.getcwd())  # Running in a jupyter notebook 
+else:  # Already running locally from PaddockTS root
+    paddockTS_dir = os.getcwd()
 os.chdir(paddockTS_dir)
 sys.path.append(paddockTS_dir)
 
