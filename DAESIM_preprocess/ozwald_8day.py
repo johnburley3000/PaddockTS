@@ -103,7 +103,9 @@ def ozwald_8day(variables=["Ssoil", "GPP"], lat=-34.3890427, lon=148.469499, buf
             
     return ds_concat
 
-# +
+
+# -
+
 # %%time
 if __name__ == '__main__':  
     ozwald_8day()

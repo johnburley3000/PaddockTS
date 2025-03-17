@@ -51,9 +51,9 @@ def download_tif(bbox=[148.46449900000002, -34.3940427, 148.474499, -34.38404269
     with open(filename, 'wb') as file:
         file.write(response.read())
 
-def slga_soils(variables=["Clay", "Sand", "Silt", "pH_CaCl2"], lat=-34.3890427, lon=148.469499, buffer=0.005, outdir=".", stub="Test",  depths=["5-15cm"]):
+def slga_soils(variables=["Clay", "Sand", "Silt"], lat=-34.3890427, lon=148.469499, buffer=0.005, outdir="", stub="Test",  depths=["5-15cm"]):
     """Download soil variables from CSIRO"""
-    bbox = [lat - buffer, lon - buffer, lon + buffer, lat + buffer]     # From my experimentation, the asris.csiro API allows a maximum bbox of about 40km (0.2 degrees in each direction)
+    bbox = [lon - buffer, lat - buffer, lon + buffer, lat + buffer]     # From my experimentation, the asris.csiro API allows a maximum bbox of about 40km (0.2 degrees in each direction)
     for depth in depths:
         identifier = identifiers[depth]
         for variable in variables:
@@ -71,20 +71,20 @@ def slga_soils(variables=["Clay", "Sand", "Silt", "pH_CaCl2"], lat=-34.3890427, 
                     print(f"Downloaded {filename}")
                     break
                 except Exception as e:
-                    print(f"Failed to download {variable} {depth}, attempt {attempt + 1} of {max_retries}")
+                    print(f"Failed to download {variable} {depth}, attempt {attempt + 1} of {max_retries}", e)
                     attempt += 1
                     if attempt < max_retries:
                         delay = base_delay * (2 ** attempt) # Exponential backoff
                         print(f"Retrying in {delay:.2f} seconds...")
                         time.sleep(delay)
 
-def soil_texture(outdir=".", stub="Test"):
+def soil_texture(outdir="", stub="Test", depth="5-15cm"):
     """Convert from sand silt and clay percent to the 12 categories in the soil texture triangle"""
 
     # Load the sand, silt and clay layers
-    filename_sand = os.path.join(outdir, f"{stub}_Sand.tif")
-    filename_silt = os.path.join(outdir, f"{stub}_Silt.tif")
-    filename_clay = os.path.join(outdir, f"{stub}_Clay.tif")
+    filename_sand = os.path.join(outdir, f"{stub}_Sand_{depth}.tif")
+    filename_silt = os.path.join(outdir, f"{stub}_Silt_{depth}.tif")
+    filename_clay = os.path.join(outdir, f"{stub}_Clay_{depth}.tif")
                             
     ds_sand = rxr.open_rasterio(filename_sand)
     ds_silt = rxr.open_rasterio(filename_silt)
@@ -123,4 +123,5 @@ def soil_texture(outdir=".", stub="Test"):
 # +
 if __name__ == '__main__':
     slga_soils()
-    soil_texture()
+    textures = soil_texture()
+    print(textures.shape)

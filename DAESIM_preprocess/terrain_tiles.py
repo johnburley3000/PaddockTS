@@ -16,6 +16,13 @@ from scipy.interpolate import griddata
 from scipy.ndimage import zoom
 from pyproj import Transformer
 
+# Find the paddockTS repo on gadi or locally. Needed for the terrain_tiles.xml
+if os.path.expanduser("~").startswith("/home/"):
+    paddockTS_dir = os.path.join(os.path.expanduser("~"), "Projects/PaddockTS")
+else:
+    paddockTS_dir = os.path.dirname(os.getcwd())
+os.chdir(paddockTS_dir)
+
 # +
 def transform_bbox(bbox=[148.464499, -34.394042, 148.474499, -34.384042], inputEPSG="EPSG:4326", outputEPSG="EPSG:3857"):
     transformer = Transformer.from_crs(inputEPSG, outputEPSG)
@@ -108,7 +115,7 @@ def visualise_tif(filename="terrain_tiles.tif", title="Terrain Tiles"):
     plt.ylabel('Latitude')
     plt.show()
 
-def terrain_tiles(lat=-34.3890427, lon=148.469499, buffer=0.005, outdir=".", stub="test", tmp_dir="."):
+def terrain_tiles(lat=-34.3890427, lon=148.469499, buffer=0.005, outdir=".", stub="Test", tmp_dir="."):
     """Download 10m resolution elevation from terrain_tiles"""
     
     # Load the raw data
@@ -121,6 +128,10 @@ def terrain_tiles(lat=-34.3890427, lon=148.469499, buffer=0.005, outdir=".", stu
     filename = os.path.join(outdir, f"{stub}_terrain.tif")
     download_dem(dem, meta, filename)
 
-# +
+
+# -
+
 if __name__ == '__main__':
     terrain_tiles()
+
+

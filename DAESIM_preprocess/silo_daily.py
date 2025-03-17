@@ -34,7 +34,7 @@ silo_abbreviations = {
     }
 
 
-def download_from_SILO(silo_folder=".", var="radiation", year="2021"):
+def download_from_SILO(var="radiation", year="2021", silo_folder="."):
     """Download a NetCDF for the whole of Australia, for a given year and variable"""
     # Note: I haven't found a way to download only the region of interest from SILO, hence we are downloading all of Australia
     silo_baseurl = "https://s3-ap-southeast-2.amazonaws.com/silo-open-data/Official/annual/"
@@ -48,13 +48,15 @@ def download_from_SILO(silo_folder=".", var="radiation", year="2021"):
     print(f"Downloaded {filename}")
 
 
-def silo_daily_singleyear(var="radiation", latitude=-34.3890427, longitude=148.469499, buffer=0.1, year="2021", silo_folder=SILO_FOLDER):
+# -
+
+def silo_daily_singleyear(var="radiation", latitude=-34.3890427, longitude=148.469499, buffer=0.1, year="2020", silo_folder="."):
     """Select the region of interest from the Australia wide NetCDF file"""
     filename = os.path.join(silo_folder, f"{year}.{var}.nc")
     
     if not os.path.exists(filename):
-        print(f"Downloading from SILO: {var} {year} ~400MB, estimated time: 5 mins")
-        download_from_SILO(silo_folder, var, year)
+        print(f"Downloading from SILO: {var} {year} ~400MB")
+        download_from_SILO(var, year, silo_folder)
     
     ds = xr.open_dataset(filename)
     bbox = [longitude - buffer, latitude - buffer, longitude + buffer, latitude + buffer]
@@ -67,7 +69,7 @@ def silo_daily_singleyear(var="radiation", latitude=-34.3890427, longitude=148.4
     return ds_region
 
 
-def silo_daily_multiyear(var="radiation", latitude=-34.3890427, longitude=148.469499, buffer=0.1, years=["2020", "2021"], silo_folder=SILO_FOLDER):
+def silo_daily_multiyear(var="radiation", latitude=-34.3890427, longitude=148.469499, buffer=0.1, years=["2020", "2021"], silo_folder="."):
     dss = []
     for year in years:
         ds = silo_daily_singleyear(var, latitude, longitude, buffer, year, silo_folder)
@@ -76,7 +78,7 @@ def silo_daily_multiyear(var="radiation", latitude=-34.3890427, longitude=148.46
     return ds_concat
 
 
-def silo_daily(variables=["radiation", "et_morton_actual"], lat=-34.3890427, lon=148.469499, buffer=0.1, start_year="2020", end_year="2021", outdir="data", stub="Test", tmp_dir=scratch_dir, silo_folder=SILO_FOLDER):
+def silo_daily(variables=["radiation"], lat=-34.3890427, lon=148.469499, buffer=0.1, start_year="2020", end_year="2020", outdir=".", stub="Test", tmp_dir=".", silo_folder="."):
     dss = []
     years = [str(year) for year in list(range(int(start_year), int(end_year) + 1))]
     for variable in variables:
@@ -89,7 +91,8 @@ def silo_daily(variables=["radiation", "et_morton_actual"], lat=-34.3890427, lon
     print("Saved:", filename)
     return ds_concat
 
-# +
+
 # %%time
 if __name__ == '__main__':
+    # Takes about 5 mins if the SILO netcdf's are not predownloaded
     silo_daily()
