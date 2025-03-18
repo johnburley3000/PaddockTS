@@ -1,5 +1,5 @@
 # +
-# Catalog is here: https://dapds00.nci.org.au/thredds/catalog/ub8/au/OzWALD/daily/meteo/catalog.html
+# Catalog is here: https://thredds.nci.org.au/thredds/catalog/ub8/au/OzWALD/daily/meteo/catalog.html
 
 # +
 # Standard Libraries
@@ -35,18 +35,21 @@ def ozwald_daily_singleyear_thredds(var="VPeff", latitude=-34.3890427, longitude
     time_end = f"{year}-12-31"
     
     base_url = "https://thredds.nci.org.au"
-    # base_url = "https://dapds00.nci.org.au"
     prefix = ".daily" if var == "Pg" else ""
     url = f'{base_url}/thredds/ncss/grid/ub8/au/OzWALD/daily/meteo/{var}/OzWALD{prefix}.{var}.{year}.nc?var={var}&north={north}&west={west}&east={east}&south={south}&time_start={time_start}&time_end={time_end}' 
-    
-    response = requests.get(url)
-    filename = os.path.join(tmp_dir, f"{stub}_{var}_{year}.nc")
-    with open(filename, 'wb') as f:
-        f.write(response.content)
-    print("Downloaded", filename)
-        
-    ds = xr.open_dataset(filename)
-    
+
+    # Check the file exists before downloading it
+    head_response = requests.head(url)
+    if head_response.status_code == 200:
+        response = requests.get(url)
+        filename = os.path.join(tmp_dir, f"{stub}_{var}_{year}.nc")
+        with open(filename, 'wb') as f:
+            f.write(response.content)
+        print("Downloaded", filename)
+        ds = xr.open_dataset(filename)
+    else:
+        return None
+
     return ds
 
 
@@ -58,6 +61,7 @@ def ozwald_daily_singleyear_gdata(var="VPeff", latitude=-34.3890427, longitude=1
     filename = os.path.join(f"/g/data/ub8/au/OzWALD/daily/meteo/{var}/OzWALD{prefix}.{var}.{year}.nc")
 
     # OzWald doesn't have 2024 data in this folder yet.
+    print(filename)
     if not os.path.exists(filename):
         return None
         
@@ -79,7 +83,8 @@ def ozwald_daily_multiyear(var="VPeff", latitude=-34.3890427, longitude=148.4694
             ds_year = ozwald_daily_singleyear_thredds(var, latitude, longitude, buffer, year, stub, tmp_dir)
         else:
             ds_year = ozwald_daily_singleyear_gdata(var, latitude, longitude, buffer, year)
-        dss.append(ds_year)
+        if ds_year:
+            dss.append(ds_year)
     ds_concat = xr.concat(dss, dim='time')
     return ds_concat
 
@@ -123,4 +128,4 @@ def ozwald_daily(variables=["VPeff", "Uavg"], lat=-34.3890427, lon=148.469499, b
 
 # %%time
 if __name__ == '__main__':
-    ozwald_daily()
+    ozwald_daily(start_year="2024", end_year="2026")
