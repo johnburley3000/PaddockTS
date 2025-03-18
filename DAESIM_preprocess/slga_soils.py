@@ -68,6 +68,7 @@ def slga_soils(variables=["Clay", "Sand", "Silt"], lat=-34.3890427, lon=148.4694
         A Tiff file for each variable/depth specified
     
     """
+    buffer = max(0.00001, buffer)
     bbox = [lon - buffer, lat - buffer, lon + buffer, lat + buffer]     # From my experimentation, the asris.csiro API allows a maximum bbox of about 40km (0.2 degrees in each direction)
     for depth in depths:
         identifier = identifiers[depth]

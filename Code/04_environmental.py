@@ -90,6 +90,9 @@ def main(args):
         silo_folder = "/g/data/xe2/datasets/Climate_SILO/"  # We have predownloaded all of the silo variables from 2017 to 2024 in this folder
     else:
         silo_folder = tmpdir
+    
+    # A smaller buffer than this messes up some of the API requests
+    buffer = max(0.00001, buffer)
 
     # Download from OzWald wind and vapour pressure at 5km resolution, rainfall at 4km, and temperature at 250m resolution
     ozwald_daily(["Uavg", "VPeff"], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds)
