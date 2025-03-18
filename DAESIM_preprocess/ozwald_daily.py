@@ -34,8 +34,8 @@ def ozwald_daily_singleyear_thredds(var="VPeff", latitude=-34.3890427, longitude
     time_start = f"{year}-01-01"
     time_end = f"{year}-12-31"
     
-    # base_url = "https://thredds.nci.org.au"  # This is the new url (dapds00 is supposedly deprecated), but LAI only works with the old url
-    base_url = "https://dapds00.nci.org.au"
+    base_url = "https://thredds.nci.org.au"
+    # base_url = "https://dapds00.nci.org.au"
     prefix = ".daily" if var == "Pg" else ""
     url = f'{base_url}/thredds/ncss/grid/ub8/au/OzWALD/daily/meteo/{var}/OzWALD{prefix}.{var}.{year}.nc?var={var}&north={north}&west={west}&east={east}&south={south}&time_start={time_start}&time_end={time_end}' 
     
@@ -85,6 +85,25 @@ def ozwald_daily_multiyear(var="VPeff", latitude=-34.3890427, longitude=148.4694
 
 
 def ozwald_daily(variables=["VPeff", "Uavg"], lat=-34.3890427, lon=148.469499, buffer=0.1, start_year="2020", end_year="2021", outdir=".", stub="Test", tmp_dir=".", thredds=True):
+    """Download daily variables from OzWald at varying resolutions for the region/time of interest
+
+    Parameters
+    ----------
+        variables: See ozwald_daily_abbreviations at the top of this file for a complete list & resolutions
+        lat, lon: Coordinates in WGS 84 (EPSG:4326)
+        buffer: Distance in degrees in a single direction. e.g. 0.01 degrees is ~1km so would give a ~2kmx2km area.
+        start_year, end_year: Inclusive, so setting both to 2020 would give data for the full year.
+        outdir: The directory that the final .NetCDF gets saved. The filename includes the first variable in the csv.
+        stub: The name to be prepended to each file download.
+        tmp_dir: The directory that the temporary NetCDFs get saved if downloading from Thredds. This does not get used if Thredds=False.
+        thredds: A boolean flag to choose between using the public facing API (slower but works locally), or running directly on NCI (requires access to the ub8 project)
+    
+    Returns
+    -------
+        ds_concat: an xarray containing the requested variables in the region of interest for the time period specified
+        A NetCDF file of this xarray gets downloaded to outdir/(stub)_ozwald_daily_(first_variable).nc'
+    """
+
     dss = []
     years = [str(year) for year in list(range(int(start_year), int(end_year) + 1))]
     for variable in variables:

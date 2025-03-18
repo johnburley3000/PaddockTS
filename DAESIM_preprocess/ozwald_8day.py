@@ -5,7 +5,6 @@
 import os
 
 # Dependencies
-import requests
 import xarray as xr
 
 # +
@@ -31,16 +30,7 @@ ozwald_8day_abbreviations = {
 def ozwald_8day_singleyear_thredds(var="Ssoil", latitude=-34.3890427, longitude=148.469499, buffer=0.01, year="2021", stub="Test", tmp_dir="."):
     
     # buffer = 0.0000000001    # Using a buffer less than the grid size of 500m (0.005 degrees) gives you a single point
-    
-    north = latitude + buffer 
-    south = latitude - buffer 
-    west = longitude - buffer
-    east = longitude + buffer
-    
-    time_start = f"{year}-01-01"
-    time_end = f"{year}-12-31"
-    
-    base_url = "https://thredds.nci.org.au"
+
     url = f"https://thredds.nci.org.au/thredds/dodsC/ub8/au/OzWALD/8day/{var}/OzWALD.{var}.{year}.nc"
     ds = xr.open_dataset(url)
 
@@ -88,7 +78,24 @@ def ozwald_8day_multiyear(var="Ssoil", latitude=-34.3890427, longitude=148.46949
 
 
 def ozwald_8day(variables=["Ssoil", "GPP"], lat=-34.3890427, lon=148.469499, buffer=0.01, start_year="2020", end_year="2021", outdir=".", stub="Test", tmp_dir=".", thredds=True):
-    """Download 8day variables from OzWald"""
+    """Download 8day variables from OzWald at 500m resolution for the region/time of interest
+
+    Parameters
+    ----------
+        variables: See ozwald_8day_abbreviations at the top of this file for a complete list
+        lat, lon: Coordinates in WGS 84 (EPSG:4326)
+        buffer: Distance in degrees in a single direction. e.g. 0.01 degrees is ~1km so would give a ~2kmx2km area.
+        start_year, end_year: Inclusive, so setting both to 2020 would give data for the full year.
+        outdir: The directory that the final .NetCDF gets saved.
+        stub: The name to be prepended to each file download.
+        tmp_dir: The directory that the temporary NetCDFs get saved if downloading from Thredds. This does not get used if Thredds=False.
+        thredds: A boolean flag to choose between using the public facing API (slower but works locally), or running directly on NCI (requires access to the ub8 project)
+    
+    Returns
+    -------
+        ds_concat: an xarray containing the requested variables in the region of interest for the time period specified
+        A NetCDF file of this xarray gets downloaded to outdir/(stub)_ozwald_8day.nc'
+    """
     dss = []
     years = [str(year) for year in list(range(int(start_year), int(end_year) + 1))]
     for variable in variables:

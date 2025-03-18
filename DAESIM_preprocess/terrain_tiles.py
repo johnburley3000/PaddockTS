@@ -10,10 +10,7 @@ import os
 # Dependencies
 import numpy as np
 import rasterio
-import matplotlib.pyplot as plt
-import rioxarray as rxr
 from scipy.interpolate import griddata
-from scipy.ndimage import zoom
 from pyproj import Transformer
 
 # +
@@ -82,11 +79,6 @@ def interpolate_nan(filename="output.tif"):
 
     return nearest, meta
 
-def downsample(dem):
-    """Downsample from 10m dem to 30m dem"""
-    zoomed = zoom(dem, 1/3, order=0) 
-    return zoomed
-
 def download_dem(dem, meta, filename="terrain_tiles.tif"):
     meta.update({
         "driver": "GTiff",
@@ -100,7 +92,21 @@ def download_dem(dem, meta, filename="terrain_tiles.tif"):
     print(f"Saved {filename}")
 
 def terrain_tiles(lat=-34.3890427, lon=148.469499, buffer=0.005, outdir=".", stub="Test", tmp_dir="."):
-    """Download 10m resolution elevation from terrain_tiles"""
+    """Download 10m resolution elevation from terrain_tiles
+    
+    Parameters
+    ----------
+        lat, lon: Coordinates in WGS 84 (EPSG:4326)
+        buffer: Distance in degrees in a single direction. e.g. 0.01 degrees is ~1km so would give a ~2kmx2km area
+        outdir: The directory that the tiff file gets saved
+        stub: The name to be prepended to each file download
+        depths: See 'identifiers' at the top of this file for a complete list
+    
+    Downloads
+    ---------
+        A Tiff file of elevation with severe outlier pixels replaced by the nearest neighbour
+
+    """
     
     # Load the raw data
     bbox = [lon - buffer, lat - buffer, lon + buffer, lat + buffer]
@@ -116,7 +122,7 @@ def terrain_tiles(lat=-34.3890427, lon=148.469499, buffer=0.005, outdir=".", stu
 # -
 
 if __name__ == '__main__':
-    # Change directory to the PaddockTS repo
+    # Change directory to the PaddockTS repo so that the 'DAESIM_preprocess/terrain_tiles.xml' is in the pythonpath
     if os.path.expanduser("~").startswith("/home/"):  # Running on Gadi
         paddockTS_dir = os.path.join(os.path.expanduser("~"), "Projects/PaddockTS")
     elif os.path.basename(os.getcwd()) != "PaddockTS":
@@ -128,7 +134,3 @@ if __name__ == '__main__':
     os.chdir(paddockTS_dir)
     
     terrain_tiles()
-
-
-
-os.path.basename(os.getcwd())

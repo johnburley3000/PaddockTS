@@ -1,10 +1,29 @@
 """
 Description:
-This script downloads elevation, soils, climate and canopy heights
+This script downloads climate, soils and elevation data as netcdfs, tiffs and csv files
 
-Requirements:
+Requirements for running on NCI:
+- Projects: ub8 (ANU Water and Landscape Dynamics)
 - Modules: gdal/3.6.4  (for terrain_tiles gdalwarp)
 - Environment base: /g/data/xe2/John/geospatenv
+
+Requirements for running locally:
+- brew install gdal
+- pip install rasterio scipy pyproj owslib rioxarray requests pandas
+
+Inputs:
+- stub name
+- output directory
+- temporary directory
+- coordinates
+- buffer (degrees)
+- start/end date
+- flag to run locally or on NCI
+
+Outputs:
+- NetCDF files of climate variables from OzWald and SILO
+- Tiff files of soil variables from SLGA and elevation from Terrain Tiles
+- csv files of median climate and soil variables for input into DAESim
 
 """
 import argparse
@@ -23,10 +42,10 @@ os.chdir(paddockTS_dir)
 sys.path.append(paddockTS_dir)
 
 from DAESIM_preprocess.terrain_tiles import terrain_tiles
-from DAESIM_preprocess.slga_soils import slga_soils, slga_soils_abbrevations
-from DAESIM_preprocess.ozwald_8day import ozwald_8day, ozwald_8day_abbreviations
-from DAESIM_preprocess.ozwald_daily import ozwald_daily, ozwald_daily_abbreviations
-from DAESIM_preprocess.silo_daily import silo_daily, silo_abbreviations
+from DAESIM_preprocess.slga_soils import slga_soils
+from DAESIM_preprocess.ozwald_8day import ozwald_8day
+from DAESIM_preprocess.ozwald_daily import ozwald_daily
+from DAESIM_preprocess.silo_daily import silo_daily
 from DAESIM_preprocess.daesim_forcing import daesim_forcing, daesim_soils
 
 # Adjust logging configuration for the script
@@ -36,8 +55,11 @@ def parse_arguments():
     parser = argparse.ArgumentParser(
         description="""Download environmental variables for the region of interest and save as lots of .tif and .nc files
         
-Example usage:
-python3 Code/04_environmental.py --stub test --outdir /g/data/xe2/cb8590 --tmpdir /scratch/xe2/cb8590 --lat -34.3890 --lon 148.4695 --buffer 0.01 --start_time '2020-01-01' --end_time '2020-03-31'""",
+Example usage on NCI:
+python3 Code/04_environmental.py --stub test --outdir /g/data/xe2/cb8590 --tmpdir /scratch/xe2/cb8590 --lat -34.3890 --lon 148.4695 --buffer 0.01 --start_time '2020-01-01' --end_time '2020-03-31' --nci True
+
+Example usage locally:
+python3 Code/04_environmental.py --stub test --outdir ~/Desktop --tmpdir ~/Downloads --lat -34.3890 --lon 148.4695 --buffer 0.01 --start_time '2020-01-01' --end_time '2020-03-31' --nci False""",
         formatter_class=argparse.RawTextHelpFormatter
     )
     parser.add_argument("--stub", type=str, required=True, help="Stub name for file naming")
@@ -48,6 +70,7 @@ python3 Code/04_environmental.py --stub test --outdir /g/data/xe2/cb8590 --tmpdi
     parser.add_argument("--buffer", type=float, required=True, help="Buffer in degrees to define the area around the center point")
     parser.add_argument("--start_time", type=str, required=True, help="Start time for the data query (YYYY-MM-DD)")
     parser.add_argument("--end_time", type=str, required=True, help="End time for the data query (YYYY-MM-DD)")
+    parser.add_argument("--nci", type=bool, required=True, help="Flag to run on NCI or in a local python environment")
     return parser.parse_args()
 
 
@@ -60,33 +83,44 @@ def main(args):
     end_year = args.end_time[:4]
     outdir = args.outdir
     tmpdir = args.tmpdir
+    thredds = ~args.nci  # Thredds is a public facing interface that can be used when not running the code directly on NCI
 
-    thredds=True
+    if args.nci:
+        silo_folder = "/g/data/xe2/datasets/Climate_SILO/"  # We have predownloaded all of the silo variables from 2017 to 2024 in this folder
+    else:
+        silo_folder = tmpdir
 
+    # Download from OzWald wind and vapour pressure at 5km resolution, rainfall at 4km, and temperature at 250m resolution
     ozwald_daily(["Uavg", "VPeff"], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds)
     ozwald_daily(["Tmax", "Tmin"], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds)
     ozwald_daily(["Pg"], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds)
 
+    # Download from OzWald soil moisture, runoff, leaf area index and gross primary productivity at 500m resolution
     variables = ["Ssoil", "Qtot", "LAI", "GPP"]
     ozwald_8day(variables, lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds)
 
-    # variables = ["radiation", "vp", "max_temp", "min_temp", "daily_rain", "et_morton_actual", "et_morton_potential"]
-    variables = ["radiation"]
-    ds_silo_daily = silo_daily(variables, lat, lon, buffer, start_year, end_year, outdir, stub)
+    # Download from SILO radiation, vapour pressure, temperature, rainfall, and evapotranspiration at 5km resolution
+    # Note this requires downloading an Australia wide file of ~400MB per variables per year, so takes a long time if not predownloaded
+    variables = ["radiation", "vp", "max_temp", "min_temp", "daily_rain", "et_morton_actual", "et_morton_potential"]
+    ds_silo_daily = silo_daily(variables, lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, silo_folder)
 
+    # Merge the SILO and OzWald climate data into DAESim_forcing.csv
+    # By default, for variables available in both datasets (vapour pressure, temperature, rainfall), the OzWald variables get used for consistency with the 8day variables
     df_climate = daesim_forcing(outdir, stub)
 
-    variables = ['Clay', 'Sand', 'Silt', 'pH_CaCl2']
+    # Download soil variables from SLGA at 90m resolution
     variables = ['Clay', 'Silt', 'Sand', 'pH_CaCl2', 'Bulk_Density', 'Available_Water_Capacity', 'Effective_Cation_Exchange_Capacity', 'Total_Nitrogen', 'Total_Phosphorus']
     depths=['5-15cm', '15-30cm', '30-60cm', '60-100cm']
-    slga_soils(variables, lat, lon, buffer, outdir, stub, depths)
+    slga_soils(variables, lat, lon, buffer, tmpdir, stub, depths)
 
-    df_soils = daesim_soils(outdir, stub)
+    # Merge the soil data into a csv for input into DAESim
+    df_soils = daesim_soils(outdir, stub, tmpdir)
 
+    # Download Terrain Tiles elevation data for calculating topographic variables at 10m resolution
     terrain_tiles(lat, lon, buffer, outdir, stub, tmpdir)
 
 if __name__ == "__main__":
-    args = parse_arguments()
+    # Example args for debugging
     # args = argparse.Namespace(
     #     lat=-34.3890427,
     #     lon=148.469499,
@@ -97,6 +131,8 @@ if __name__ == "__main__":
     #     outdir=".",
     #     tmpdir="."
     # )
+
+    args = parse_arguments()
     main(args)
 
 

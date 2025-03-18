@@ -52,7 +52,22 @@ def download_tif(bbox=[148.46449900000002, -34.3940427, 148.474499, -34.38404269
         file.write(response.read())
 
 def slga_soils(variables=["Clay", "Sand", "Silt"], lat=-34.3890427, lon=148.469499, buffer=0.005, outdir="", stub="Test",  depths=["5-15cm"]):
-    """Download soil variables from CSIRO"""
+    """Download soil variables from CSIRO at 90m resolution for region of interest
+    
+    Parameters
+    ----------
+        variables: See slga_soils_abbrevations at the top of this file for a complete list
+        lat, lon: Coordinates in WGS 84 (EPSG:4326)
+        buffer: Distance in degrees in a single direction. e.g. 0.01 degrees is ~1km so would give a ~2kmx2km area
+        outdir: The directory that the tiff files get saved. I recommend using the 'tmpdir' from the climate downloads to avoid having so many files in the outdir
+        stub: The name to be prepended to each file download
+        depths: See 'identifiers' at the top of this file for a complete list
+    
+    Downloads
+    ---------
+        A Tiff file for each variable/depth specified
+    
+    """
     bbox = [lon - buffer, lat - buffer, lon + buffer, lat + buffer]     # From my experimentation, the asris.csiro API allows a maximum bbox of about 40km (0.2 degrees in each direction)
     for depth in depths:
         identifier = identifiers[depth]
@@ -79,7 +94,7 @@ def slga_soils(variables=["Clay", "Sand", "Silt"], lat=-34.3890427, lon=148.4694
                         time.sleep(delay)
 
 def soil_texture(outdir="", stub="Test", depth="5-15cm"):
-    """Convert from sand silt and clay percent to the 12 categories in the soil texture triangle"""
+    """Convert from sand, silt and clay percent to the 12 categories in the soil texture triangle"""
 
     # Load the sand, silt and clay layers
     filename_sand = os.path.join(outdir, f"{stub}_Sand_{depth}.tif")

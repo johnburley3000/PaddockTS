@@ -78,11 +78,29 @@ def silo_daily_multiyear(var="radiation", latitude=-34.3890427, longitude=148.46
     return ds_concat
 
 
-def silo_daily(variables=["radiation"], lat=-34.3890427, lon=148.469499, buffer=0.1, start_year="2020", end_year="2020", outdir=".", stub="Test", tmp_dir=".", silo_folder="."):
+def silo_daily(variables=["radiation"], lat=-34.3890427, lon=148.469499, buffer=0.1, start_year="2020", end_year="2020", outdir=".", stub="Test", silo_folder="."):
+    """Download daily variables from SILO at 5km resolution for the region/time of interest
+
+    Parameters
+    ----------
+        variables: See silo_abbreviations at the top of this file for a complete list
+        lat, lon: Coordinates in WGS 84 (EPSG:4326)
+        buffer: Distance in degrees in a single direction. e.g. 0.01 degrees is ~1km so would give a ~2kmx2km area.
+        start_year, end_year: Inclusive, so setting both to 2020 would give data for the full year.
+        outdir: The directory that the final .NetCDF gets saved.
+        stub: The name to be prepended to each file download.
+        silo_folder: The directory that Australia wide SILO data gets downloaded. Each variable per year is ~400MB, so this can take a while to download.
+    
+    Returns
+    -------
+        ds_concat: an xarray containing the requested variables in the region of interest for the time period specified
+        A NetCDF file of this xarray gets downloaded to outdir/(stub)_silo_daily.nc'
+    """
+    
     dss = []
     years = [str(year) for year in list(range(int(start_year), int(end_year) + 1))]
     for variable in variables:
-        ds = silo_daily_multiyear(variable, lat, lon, buffer, years)
+        ds = silo_daily_multiyear(variable, lat, lon, buffer, years, silo_folder)
         dss.append(ds)
     ds_concat = xr.merge(dss)
     

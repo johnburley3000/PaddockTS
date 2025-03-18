@@ -50,8 +50,27 @@ def aggregate_pixels(ds):
     return ds
 
 
-def daesim_forcing(outdir=".", stub="DSIM"):
-    """Merge the ozwald and silo netcdf's into a dataframe for input into DAESim"""
+def daesim_forcing(outdir=".", stub="Test"):
+    """Merge the ozwald and silo netcdf's into a dataframe for input into DAESim
+    
+    Parameters
+    ----------
+        outdir: The directory containing input NetCDFs, and for saving the output csv
+        stub: The name that is prepended to each file.
+    
+    Requirements: This function expects 5 NetCDF files to be predownloaded
+    ------------
+        outdir/(stub)_silo_daily.nc: For radiation
+        outdir/(stub)_ozwald_8day.nc: For soil moisture, runoff, LAI, GPP
+        outdir/(stub)_ozwald_daily_Pg.nc: For rainfall 
+        outdir/(stub)_ozwald_daily_Tmax.nc: For maximum and minimum temperatures 
+        outdir/(stub)_ozwald_daily_Uavg: For wind and vapour pressure
+
+    Returns
+    -------
+        df_ordered: A dataframe with all the variables required for input into DAESim
+        A csv file of this dataframe gets downloaded to outdir/(stub)_DAESim_forcing.csv'
+    """
 
     # Open the pre-downloaded netcdf files
     ds_silo_daily = xr.open_dataset(os.path.join(outdir, stub+'_silo_daily.nc'))
@@ -87,20 +106,36 @@ def daesim_forcing(outdir=".", stub="DSIM"):
 
     # Save
     filepath = os.path.join(outdir, stub + "_DAESim_forcing.csv")
-    df.to_csv(filepath)
+    df_ordered.to_csv(filepath)
     print("Saved", filepath)
 
-    return df
+    return df_ordered
 
-# Should check with Yasar & Alex that these are all still required in the latest version of DAESim
-def daesim_soils(outdir=".", stub="DSIM"):
-    """Create a csv with soil inputs required for DAESim"""
+
+def daesim_soils(outdir=".", stub="Test", tmpdir="."):
+    """Merge the soil tiffs into a csv required for DAESim
+    
+    Parameters
+    ----------
+        outdir: The directory for saving the output csv
+        stub: The name that is prepended to each file.
+        tmpdir: The directory containing the input tiff files
+    
+    Requirements: This function expects 9 soil variables x 4 depths = 36 tiff files to be predownloaded
+    ------------
+
+    Returns
+    -------
+        sorted_df: A dataframe with all the variables required for input into DAESim
+        A csv file of this dataframe gets downloaded to outdir/(stub)_DAESim_Soils.csv'
+    
+    """
     variables = ['Clay', 'Silt', 'Sand', 'pH_CaCl2', 'Bulk_Density', 'Available_Water_Capacity', 'Effective_Cation_Exchange_Capacity', 'Total_Nitrogen', 'Total_Phosphorus']
     depths=['5-15cm', '15-30cm', '30-60cm', '60-100cm']
     values = []
     for variable in variables:
         for depth in depths:
-            filename = os.path.join(outdir, f"{stub}_{variable}_{depth}.tif")
+            filename = os.path.join(tmpdir, f"{stub}_{variable}_{depth}.tif")
             ds = rxr.open_rasterio(filename)
             value = float(ds.isel(band=0, x=0, y=0).values)  # Assumes a single point was downloaded
             values.append({
@@ -121,7 +156,7 @@ def daesim_soils(outdir=".", stub="DSIM"):
     sorted_df = df.sort_values(by='depth')
     
     # Save
-    filepath = os.path.join(outdir, stub + "_Soils.csv")
+    filepath = os.path.join(outdir, stub + "_DAESim_Soils.csv")
     sorted_df.to_csv(filepath, index=False)
     print("Saved", filepath)
 
