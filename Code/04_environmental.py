@@ -9,7 +9,8 @@ Requirements for running on NCI:
 
 Requirements for running locally:
 - brew install gdal
-- pip install rasterio scipy pyproj owslib rioxarray requests pandas
+- conda create --name PaddockTS python=3.11
+- pip install rasterio scipy pyproj owslib rioxarray requests pandas netcdf4
 
 Inputs:
 - stub name
