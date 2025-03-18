@@ -56,10 +56,10 @@ def parse_arguments():
         description="""Download environmental variables for the region of interest and save as lots of .tif and .nc files
         
 Example usage on NCI:
-python3 Code/04_environmental.py --stub test --outdir /g/data/xe2/cb8590 --tmpdir /scratch/xe2/cb8590 --lat -34.3890 --lon 148.4695 --buffer 0.01 --start_time '2020-01-01' --end_time '2020-03-31' --nci True
+python3 Code/04_environmental.py --stub Test --outdir /g/data/xe2/cb8590 --tmpdir /scratch/xe2/cb8590 --lat -34.3890 --lon 148.4695 --buffer 0.01 --start_time '2020-01-01' --end_time '2020-03-31' --nci
 
 Example usage locally:
-python3 Code/04_environmental.py --stub test --outdir ~/Desktop --tmpdir ~/Downloads --lat -34.3890 --lon 148.4695 --buffer 0.01 --start_time '2020-01-01' --end_time '2020-03-31' --nci False""",
+python3 Code/04_environmental.py --stub Test --outdir ~/Desktop --tmpdir ~/Downloads --lat -34.3890 --lon 148.4695 --buffer 0.01 --start_time '2020-01-01' --end_time '2020-03-31'""",
         formatter_class=argparse.RawTextHelpFormatter
     )
     parser.add_argument("--stub", type=str, required=True, help="Stub name for file naming")
@@ -70,7 +70,7 @@ python3 Code/04_environmental.py --stub test --outdir ~/Desktop --tmpdir ~/Downl
     parser.add_argument("--buffer", type=float, required=True, help="Buffer in degrees to define the area around the center point")
     parser.add_argument("--start_time", type=str, required=True, help="Start time for the data query (YYYY-MM-DD)")
     parser.add_argument("--end_time", type=str, required=True, help="End time for the data query (YYYY-MM-DD)")
-    parser.add_argument("--nci", type=bool, required=True, help="Flag to run on NCI or in a local python environment")
+    parser.add_argument("--nci", action="store_true", help="Flag to run on NCI or in a local python environment")
     return parser.parse_args()
 
 
@@ -102,7 +102,7 @@ def main(args):
     # Download from SILO radiation, vapour pressure, temperature, rainfall, and evapotranspiration at 5km resolution
     # Note this requires downloading an Australia wide file of ~400MB per variables per year, so takes a long time if not predownloaded
     variables = ["radiation", "vp", "max_temp", "min_temp", "daily_rain", "et_morton_actual", "et_morton_potential"]
-    ds_silo_daily = silo_daily(variables, lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, silo_folder)
+    ds_silo_daily = silo_daily(variables, lat, lon, buffer, start_year, end_year, outdir, stub, silo_folder)
 
     # Merge the SILO and OzWald climate data into DAESim_forcing.csv
     # By default, for variables available in both datasets (vapour pressure, temperature, rainfall), the OzWald variables get used for consistency with the 8day variables
