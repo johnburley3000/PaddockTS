@@ -52,8 +52,10 @@ def interpolate_nan(filename="output.tif"):
     # There are some clearly bad measurements in terrain tiles and this attempts to assign them np.nan.
     threshold = 10
     heights = sorted(set(dem.flatten()))
+    if len(heights) <= 1:
+        return dem, meta
     lowest_correct_height = min(heights)
-    for i in range(len(heights)//2, -1, -1):
+    for i in range(len(heights)//2 - 1, -1, -1):
         if heights[i + 1] - heights[i] > threshold:
             lowest_correct_height = heights[i + 1] 
             break
@@ -107,6 +109,7 @@ def terrain_tiles(lat=-34.3890427, lon=148.469499, buffer=0.005, outdir=".", stu
         A Tiff file of elevation with severe outlier pixels replaced by the nearest neighbour
 
     """
+    buffer = max(0.00002, buffer) # Make sure we download at least 1 pixel
     
     # Load the raw data
     bbox = [lon - buffer, lat - buffer, lon + buffer, lat + buffer]
@@ -134,3 +137,5 @@ if __name__ == '__main__':
     os.chdir(paddockTS_dir)
     
     terrain_tiles()
+
+
