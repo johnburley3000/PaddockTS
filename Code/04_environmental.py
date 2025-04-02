@@ -2,22 +2,27 @@
 Description:
 This script downloads climate, soils and elevation data as netcdfs, tiffs and csv files
 
+Steps for running locally:
+1. Download and install Miniconda from https://www.anaconda.com/download/success. Note the filepath where it gets downloaded, e.g. /opt/miniconda3
+2. Add the miniconda filepath to your ~/.zhrc, e.g. export PATH="/opt/miniconda3/bin:$PATH" 
+3. brew install gdal
+4. git clone https://github.com/johnburley3000/PaddockTS.git
+5. conda create --name PaddockTS python=3.11
+6. conda activate PaddockTS
+7. pip install rasterio scipy pyproj owslib rioxarray requests pandas netcdf4
+8. python3 PaddockTS/Code/04_environmental.py --stub Test --outdir ~/Desktop --tmpdir ~/Downloads --lat -34.3890 --lon 148.4695 --buffer 0.01 --start_time '2020-01-01' --end_time '2020-03-31'
+
 Requirements for running on NCI:
 - Projects: ub8 (ANU Water and Landscape Dynamics)
 - Modules: gdal/3.6.4  (for terrain_tiles gdalwarp)
 - Environment base: /g/data/xe2/John/geospatenv
-
-Requirements for running locally:
-- brew install gdal
-- conda create --name PaddockTS python=3.11
-- pip install rasterio scipy pyproj owslib rioxarray requests pandas netcdf4
 
 Inputs:
 - stub name
 - output directory
 - temporary directory
 - coordinates
-- buffer (degrees)
+- buffer (in degrees in a single direction. For example, 0.01 degrees is about 1km so it would give a 2kmx2km area)
 - start/end date
 - flag to run locally or on NCI
 
@@ -76,6 +81,8 @@ python3 Code/04_environmental.py --stub Test --outdir ~/Desktop --tmpdir ~/Downl
 
 
 def main(args):
+    print("Starting 04_environmental.py")
+
     lat = args.lat
     lon = args.lon
     buffer = args.buffer
