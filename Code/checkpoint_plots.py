@@ -39,13 +39,20 @@ def main():
     # load the silo data
     silo = xr.open_dataset(out_dir+stub+'_silo_daily.nc')
 
-    # TO DO: load the soil moisture dataset
+    # load the oswald data
+    ozwald = xr.open_dataset(out_dir+stub+'_ozwald_8day.nc')
+    #print(ozwald)
+
+    # Average Ssoil over latitude and longitude
+    Ssoil = ozwald['Ssoil'].mean(dim=['latitude', 'longitude'])
+    #print(Ssoil)
 
     # Run the plotting functions:
     pf.plot_indices_timeseries(ds, out_dir, stub)
     pf.plot_paddock_map_auto_rgb(ds, pol, out_dir, stub)
     pf.plot_paddock_map_auto_fourier(raster_path, pol, out_dir, stub)
-    pf.plot_silo_daily(silo, ds, out_dir, stub) # TO DO: add soil moisture plot panel
+    pf.plot_silo_daily(silo, ds, out_dir, stub)
+    pf.plot_env_ts(silo, ds, Ssoil, out_dir, stub)
 
     # Save the RGB image as a TIFF file
     output_name_rgb = os.path.join(out_dir, f'{stub}_thumbs_rgb.tif')
