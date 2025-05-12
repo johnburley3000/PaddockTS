@@ -259,4 +259,94 @@ def plot_silo_daily(silo, ds, out_dir, stub):
     plt.savefig(output_filename, dpi=300, bbox_inches='tight')
     plt.show()
 
+### This is basically replacing the above:
+def plot_env_ts(silo, ds, Ssoil, out_dir, stub):
+    """
+    Create a figure with four panels showing:
+      1. Daily Rain Time Series as a bar plot with downward pointing arrows 
+         indicating Sentinel-2 observation dates.
+      2. Soil Moisture (Ssoil) time series (averaged across the geographic region).
+      3. Daily Temperature Range (with min and max temperatures).
+      4. Actual vs. Potential Evapotranspiration.
+    
+    The x-axis for all panels is based on the daily time axis from the SILO dataset.
+    
+    The figure is saved as:
+        out_dir + stub + '_env_ts.tif'
+    
+    Parameters:
+        silo (xarray.Dataset): SILO daily data containing variables 'daily_rain', 'min_temp', 
+                               'max_temp', 'et_morton_actual', 'et_morton_potential', and 'time'.
+        ds (xarray.Dataset): Dataset whose time coordinate provides the dates for Sentinel-2 observations.
+        Ssoil (xarray.DataArray): Soil moisture time series data (averaged over the geographic region)
+                                  with an 8-day frequency.
+        out_dir (str): Directory path where the output figure will be saved.
+        stub (str): String to be included in the output filename.
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.lines import Line2D
+
+    # Extract the time axis and data from the SILO dataset.
+    time_daily = silo['time'].values
+    daily_rain = silo['daily_rain'].values
+    min_temp = silo['min_temp'].values
+    max_temp = silo['max_temp'].values
+    et_actual = silo['et_morton_actual'].values
+    et_potential = silo['et_morton_potential'].values
+
+    # Create a figure with four vertically stacked subplots sharing the same x-axis.
+    fig, (ax1, ax2, ax3, ax4) = plt.subplots(4, 1, figsize=(12, 8), sharex=True)
+
+    # Panel 1: Daily Rain Time Series.
+    ax1.bar(time_daily, daily_rain, color='blue')
+    ax1.set_ylabel('Daily Rain (mm)')
+    ax1.set_title('Daily Rain Time Series')
+
+    # Draw the figure to get the correct axis limits for arrow placement.
+    fig.canvas.draw()
+    ymin, ymax = ax1.get_ylim()
+    segment_height = (ymax - ymin) / 8
+
+    # Plot a downward pointing arrow at each Sentinel-2 observation time from ds.
+    for t in ds['time'].values:
+        ax1.annotate('',
+                     xy=(t, ymax),
+                     xytext=(t, ymax - segment_height),
+                     arrowprops=dict(facecolor='grey', edgecolor='grey', arrowstyle='<|-', lw=1))
+    
+    # Create a proxy artist for the arrow to include in the legend.
+    arrow_proxy = Line2D([0], [0], marker=r'$\downarrow$', color='grey', linestyle='None',
+                           markersize=10, label='Sentinel-2 observation')
+    ax1.legend(handles=[arrow_proxy], loc='upper right', bbox_to_anchor=(1, 0.9))
+
+    # Panel 2: Soil Moisture (Ssoil) Time Series.
+    # Although Ssoil has an 8-day frequency, the x-axis is set to match the daily SILO time.
+    ax2.plot(Ssoil['time'].values, Ssoil.values, color='purple', label='Soil Moisture')
+    ax2.set_ylabel('Soil Moisture (units)')
+    ax2.set_title('Soil Moisture Time Series')
+    ax2.legend()
+
+    # Panel 3: Daily Temperature Range.
+    ax3.fill_between(time_daily, min_temp, max_temp, color='lightblue', alpha=0.5)
+    ax3.plot(time_daily, min_temp, color='blue', label='Min Temperature')
+    ax3.plot(time_daily, max_temp, color='red', label='Max Temperature')
+    ax3.set_ylabel('Temperature (°C)')
+    ax3.set_title('Daily Temperature Range')
+    ax3.legend()
+
+    # Panel 4: Actual vs. Potential Evapotranspiration.
+    ax4.plot(time_daily, et_actual, color='green', label='Actual ET')
+    ax4.plot(time_daily, et_potential, color='orange', label='Potential ET')
+    ax4.set_xlabel('Time')
+    ax4.set_ylabel('ET (mm/day)')
+    ax4.set_title('Actual vs. Potential Evapotranspiration')
+    ax4.legend()
+
+    # Ensure all panels share the same x-axis range based on the SILO daily time.
+    ax1.set_xlim(time_daily[0], time_daily[-1])
+
+    plt.tight_layout()
+    output_filename = f"{out_dir}{stub}_env_ts.tif"
+    plt.savefig(output_filename, dpi=300, bbox_inches='tight')
+    plt.show()
 
