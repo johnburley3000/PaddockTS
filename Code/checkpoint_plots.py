@@ -48,7 +48,7 @@ def main():
     #print(Ssoil)
 
     # Run the plotting functions:
-    pf.plot_indices_timeseries(ds, out_dir, stub)
+    #pf.plot_indices_timeseries(ds, out_dir, stub)
     pf.plot_paddock_map_auto_rgb(ds, pol, out_dir, stub)
     pf.plot_paddock_map_auto_fourier(raster_path, pol, out_dir, stub)
     pf.plot_silo_daily(silo, ds, out_dir, stub)
