@@ -23,8 +23,6 @@ ozwald_daily_abbreviations = {
 
 
 def ozwald_daily_singleyear_thredds(var="VPeff", latitude=-34.3890427, longitude=148.469499, buffer=0.1, year="2021", stub="Test", tmp_dir="scratch_dir"):
-
-    buffer = max(0.1, buffer)  # Minimum buffer for OzWald rainfall is 0.1 (~1km)
     
     north = latitude + buffer 
     south = latitude - buffer 
@@ -55,8 +53,6 @@ def ozwald_daily_singleyear_thredds(var="VPeff", latitude=-34.3890427, longitude
 
 def ozwald_daily_singleyear_gdata(var="VPeff", latitude=-34.3890427, longitude=148.469499, buffer=0.1, year="2021"):
     
-    buffer = max(0.1, buffer)  # Minimum buffer for OzWald rainfall is 0.1 (~1km)
-
     prefix = ".daily" if var == "Pg" else ""
     filename = os.path.join(f"/g/data/ub8/au/OzWALD/daily/meteo/{var}/OzWALD{prefix}.{var}.{year}.nc")
 
@@ -69,10 +65,12 @@ def ozwald_daily_singleyear_gdata(var="VPeff", latitude=-34.3890427, longitude=1
     bbox = [longitude - buffer, latitude - buffer, longitude + buffer, latitude + buffer]
     ds_region = ds.sel(latitude=slice(bbox[3], bbox[1]), longitude=slice(bbox[0], bbox[2]))
     
-    # If the region is too small, then just find a single point
-    if ds_region[var].shape[1] == 0:
-        ds_region = ds.sel(latitude=latitude, longitude=longitude, method="nearest")
-    
+    # If the buffer was smaller than the pixel size, than just assign a single lat and lon coordinate
+    if len(ds_region.lat) == 0:
+        ds_region = ds_region.drop_dims('lat').expand_dims(lat=1).assign_coords(lat=[latitude])
+    if len(ds_region.lon) == 0:
+        ds_region = ds_region.drop_dims('lon').expand_dims(lon=1).assign_coords(lon=[longitude])
+        
     return ds_region
 
 
@@ -128,4 +126,4 @@ def ozwald_daily(variables=["VPeff", "Uavg"], lat=-34.3890427, lon=148.469499, b
 
 # %%time
 if __name__ == '__main__':
-    ozwald_daily(start_year="2024", end_year="2026")
+    ds = ozwald_daily()

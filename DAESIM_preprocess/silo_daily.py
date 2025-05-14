@@ -69,9 +69,11 @@ def silo_daily_singleyear(var="radiation", latitude=-34.3890427, longitude=148.4
     bbox = [longitude - buffer, latitude - buffer, longitude + buffer, latitude + buffer]
     ds_region = ds.sel(lat=slice(bbox[1], bbox[3]), lon=slice(bbox[0], bbox[2]))
 
-    # If the region is too small, then just find a single point
-    if ds_region[var].shape[1] == 0:
-        ds_region = ds.sel(lat=latitude, lon=longitude, method="nearest")
+    # If the buffer was smaller than the pixel size, than just assign a single lat and lon coordinate
+    if len(ds_region.lat) == 0:
+        ds_region = ds_region.drop_dims('lat').expand_dims(lat=1).assign_coords(lat=[latitude])
+    if len(ds_region.lon) == 0:
+        ds_region = ds_region.drop_dims('lon').expand_dims(lon=1).assign_coords(lon=[longitude])
         
     return ds_region
 
@@ -121,6 +123,4 @@ def silo_daily(variables=["radiation"], lat=-34.3890427, lon=148.469499, buffer=
 # %%time
 if __name__ == '__main__':
     # Takes about 5 mins if the SILO netcdf's are not predownloaded
-    silo_daily(start_year="2025", end_year="2026")
-
-
+    ds = silo_daily()

@@ -28,9 +28,9 @@ ozwald_8day_abbreviations = {
 # This function uses the public facing Thredds API, so does not need to be run on NCI
 # However it doesn't work in a PBS script from my tests
 def ozwald_8day_singleyear_thredds(var="Ssoil", latitude=-34.3890427, longitude=148.469499, buffer=0.01, year="2021", stub="Test", tmp_dir="."):
-    
-    # buffer = 0.0000000001    # Using a buffer less than the grid size of 500m (0.005 degrees) gives you a single point
 
+    buffer = max(0.003, buffer)  # If you specify an area that's too small then no data gets returned from thredds
+    
     url = f"https://thredds.nci.org.au/thredds/dodsC/ub8/au/OzWALD/8day/{var}/OzWALD.{var}.{year}.nc"
 
     try:
@@ -42,9 +42,11 @@ def ozwald_8day_singleyear_thredds(var="Ssoil", latitude=-34.3890427, longitude=
     bbox = [longitude - buffer, latitude - buffer, longitude + buffer, latitude + buffer]
     ds_region = ds.sel(latitude=slice(bbox[3], bbox[1]), longitude=slice(bbox[0], bbox[2]))
 
-    # If the region is too small, then just find a single point
-    if ds_region[var].shape[1] == 0:
-        ds_region = ds.sel(latitude=latitude, longitude=longitude, method="nearest")
+    # If the buffer was smaller than the pixel size, than just assign a single lat and lon coordinate
+    if len(ds_region.latitude) == 0:
+        ds_region = ds_region.drop_dims('latitude').expand_dims(latitude=1).assign_coords(latitude=[latitude])
+    if len(ds_region.longitude) == 0:
+        ds_region = ds_region.drop_dims('longitude').expand_dims(longitude=1).assign_coords(longitude=[longitude])
         
     return ds_region
 
@@ -62,9 +64,11 @@ def ozwald_8day_singleyear_gdata(var="Ssoil", latitude=-34.3890427, longitude=14
     bbox = [longitude - buffer, latitude - buffer, longitude + buffer, latitude + buffer]
     ds_region = ds.sel(latitude=slice(bbox[3], bbox[1]), longitude=slice(bbox[0], bbox[2]))
 
-    # If the region is too small, then just find a single point
-    if ds_region[var].shape[1] == 0:
-        ds_region = ds.sel(latitude=latitude, longitude=longitude, method="nearest")
+    # If the buffer was smaller than the pixel size, than just assign a single lat and lon coordinate
+    if len(ds_region.lat) == 0:
+        ds_region = ds_region.drop_dims('latitude').expand_dims(latitude=1).assign_coords(latitude=[latitude])
+    if len(ds_region.lon) == 0:
+        ds_region = ds_region.drop_dims('longitude').expand_dims(longitude=1).assign_coords(longitude=[longitude])
         
     return ds_region
 
@@ -119,4 +123,4 @@ def ozwald_8day(variables=["Ssoil", "GPP"], lat=-34.3890427, lon=148.469499, buf
 
 # %%time
 if __name__ == '__main__':  
-    ozwald_8day(variables=["Ssoil", "Qtot", "LAI", "GPP"])
+    ds = ozwald_8day()
