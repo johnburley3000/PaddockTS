@@ -14,7 +14,7 @@ t_start=$(date +%s)
 # specify working directory and storage directory:
 wd=$HOME/Projects/PaddockTS
 dir=/g/data/$PROJECT/$USER/PaddockTS_Results/ # apologies, it needs the "/" on the end
-tmpdir=/scratch/$PROJECT/$USER/tmp
+tmpdir=/scratch/$PROJECT/$USER/tmp3
 
 # # Config for John (old):
 # wd=/home/106/jb5097/Projects/PaddockTS
@@ -37,12 +37,12 @@ for d in "$wd" "$dir" "$tmpdir"; do
 done
 
 # params to specify Region/Timeframe of interest
-stub=TEST1 # e.g. <site name>_<buffer>_<years>
-lat=-37.1856746323413
-lon=143.8202752762509
+stub=CANAWINDRAb # e.g. <site name>_<buffer>_<years>
+lat=-33.457
+lon=148.679
 buffer=0.01 #this distance in all directions from (lat,lon). 0.01 degrees is ~1km in each direction which woul mean 2kmx2km total
-start='2023-06-01'
-end='2023-11-01'
+start='2023-04-01'
+end='2023-08-01'
 
 # params for paddock filtering
 min_area_ha=10
@@ -198,7 +198,8 @@ python3 Code/04_environmental.py \
     --lon $lon \
     --buffer $buffer \
     --start_time $start \
-    --end_time $end
+    --end_time $end \
+    --nci
 module purge
 deactivate
 echo "Complete."
@@ -258,5 +259,5 @@ echo "Output files in order created:"
 ls -tr1 "$dir/${stub}"*
 echo
 echo "Output temporary files in order created:"
-ls -tr1 "$tmpdir"
+ls -tr1 "$tmpdir/${stub}"*
 echo "====================================================================="
