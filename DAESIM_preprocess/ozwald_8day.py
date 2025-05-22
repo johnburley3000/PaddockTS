@@ -86,7 +86,7 @@ def ozwald_8day_multiyear(var="Ssoil", latitude=-34.3890427, longitude=148.46949
     return ds_concat
 
 
-def ozwald_8day(variables=["Ssoil", "GPP"], lat=-34.3890427, lon=148.469499, buffer=0.01, start_year="2020", end_year="2021", outdir=".", stub="Test", tmp_dir=".", thredds=True):
+def ozwald_8day(variables=["Ssoil", "GPP"], lat=-34.3890427, lon=148.469499, buffer=0.01, start_year="2020", end_year="2021", outdir=".", stub="Test", tmp_dir=".", thredds=True, save_netcdf=True):
     """Download 8day variables from OzWald at 500m resolution for the region/time of interest
 
     Parameters
@@ -112,10 +112,11 @@ def ozwald_8day(variables=["Ssoil", "GPP"], lat=-34.3890427, lon=148.469499, buf
         dss.append(ds_variable)
     ds_concat = xr.merge(dss)
     
-    filename = os.path.join(outdir, f'{stub}_ozwald_8day.nc')
-    ds_concat.to_netcdf(filename)
-    print("Saved:", filename)
-            
+    if save_netcdf:
+        filename = os.path.join(outdir, f'{stub}_ozwald_8day.nc')
+        ds_concat.to_netcdf(filename)
+        print("Saved:", filename)
+
     return ds_concat
 
 

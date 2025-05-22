@@ -88,7 +88,7 @@ def silo_daily_multiyear(var="radiation", latitude=-34.3890427, longitude=148.46
     return ds_concat
 
 
-def silo_daily(variables=["radiation"], lat=-34.3890427, lon=148.469499, buffer=0.1, start_year="2020", end_year="2020", outdir=".", stub="Test", silo_folder="."):
+def silo_daily(variables=["radiation"], lat=-34.3890427, lon=148.469499, buffer=0.1, start_year="2020", end_year="2020", outdir=".", stub="Test", silo_folder=".", thredds=None, save_netcdf=True):
     """Download daily variables from SILO at 5km resolution for the region/time of interest
 
     Parameters
@@ -100,6 +100,7 @@ def silo_daily(variables=["radiation"], lat=-34.3890427, lon=148.469499, buffer=
         outdir: The directory that the final .NetCDF gets saved.
         stub: The name to be prepended to each file download.
         silo_folder: The directory that Australia wide SILO data gets downloaded. Each variable per year is ~400MB, so this can take a while to download.
+        thredds: Unused - just an input for consistency with ozwald_daily
     
     Returns
     -------
@@ -114,9 +115,11 @@ def silo_daily(variables=["radiation"], lat=-34.3890427, lon=148.469499, buffer=
         dss.append(ds)
     ds_concat = xr.merge(dss)
     
-    filename = os.path.join(outdir, f'{stub}_silo_daily.nc')
-    ds_concat.to_netcdf(filename)
-    print("Saved:", filename)
+    if save_netcdf:
+        filename = os.path.join(outdir, f'{stub}_silo_daily.nc')
+        ds_concat.to_netcdf(filename)
+        print("Saved:", filename)
+        
     return ds_concat
 
 

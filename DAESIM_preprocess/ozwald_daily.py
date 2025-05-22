@@ -56,21 +56,26 @@ def ozwald_daily_singleyear_gdata(var="VPeff", latitude=-34.3890427, longitude=1
     prefix = ".daily" if var == "Pg" else ""
     filename = os.path.join(f"/g/data/ub8/au/OzWALD/daily/meteo/{var}/OzWALD{prefix}.{var}.{year}.nc")
 
-    # OzWald doesn't have 2024 data in this folder yet.
-    print(filename)
+    # OzWald doesn't have 2025 data in this folder yet as of 22/05/2025
     if not os.path.exists(filename):
         return None
         
     ds = xr.open_dataset(filename)
+    print("Loaded", filename)
+    
     bbox = [longitude - buffer, latitude - buffer, longitude + buffer, latitude + buffer]
     ds_region = ds.sel(latitude=slice(bbox[3], bbox[1]), longitude=slice(bbox[0], bbox[2]))
     
+    # Find a single point but keep the lat
+    if buffer < 0.03:
+        ds_region = ds.sel(latitude=[latitude], longitude=[longitude], method='nearest')
+    
     # If the buffer was smaller than the pixel size, than just assign a single lat and lon coordinate
-    if len(ds_region.lat) == 0:
-        ds_region = ds_region.drop_dims('lat').expand_dims(lat=1).assign_coords(lat=[latitude])
-    if len(ds_region.lon) == 0:
-        ds_region = ds_region.drop_dims('lon').expand_dims(lon=1).assign_coords(lon=[longitude])
-        
+    if len(ds_region.latitude) == 0:
+        ds_region = ds_region.drop_dims('latitude').expand_dims(latitude=1).assign_coords(latitude=[latitude])
+    if len(ds_region.longitude) == 0:
+        ds_region = ds_region.drop_dims('longitude').expand_dims(longitude=1).assign_coords(longitude=[longitude])
+           
     return ds_region
 
 
@@ -87,7 +92,7 @@ def ozwald_daily_multiyear(var="VPeff", latitude=-34.3890427, longitude=148.4694
     return ds_concat
 
 
-def ozwald_daily(variables=["VPeff", "Uavg"], lat=-34.3890427, lon=148.469499, buffer=0.1, start_year="2020", end_year="2021", outdir=".", stub="Test", tmp_dir=".", thredds=True):
+def ozwald_daily(variables=["VPeff", "Uavg"], lat=-34.3890427, lon=148.469499, buffer=0.1, start_year="2020", end_year="2021", outdir=".", stub="Test", tmp_dir=".", thredds=True, save_netcdf=True):
     """Download daily variables from OzWald at varying resolutions for the region/time of interest
 
     Parameters
@@ -114,10 +119,11 @@ def ozwald_daily(variables=["VPeff", "Uavg"], lat=-34.3890427, lon=148.469499, b
         dss.append(ds_variable)
     ds_concat = xr.merge(dss)
 
-    # Appending the first variable to the filename, so you can download temperature, rainfall, and wind/humidity separately since they use different grids.
-    filename = os.path.join(outdir, f'{stub}_ozwald_daily_{variables[0]}.nc')
-    ds_concat.to_netcdf(filename)
-    print("Saved:", filename)
+    if save_netcdf:
+        # Appending the first variable to the filename, so you can download temperature, rainfall, and wind/humidity separately since they use different grids.
+        filename = os.path.join(outdir, f'{stub}_ozwald_daily_{variables[0]}.nc')
+        ds_concat.to_netcdf(filename)
+        print("Saved:", filename)
             
     return ds_concat
 

@@ -1,0 +1,31 @@
+#!/bin/bash
+#PBS -N multi-points
+#PBS -q copyq
+#PBS -l mem=4GB
+#PBS -l jobfs=1GB
+#PBS -l ncpus=1
+#PBS -P xe2
+#PBS -l walltime=00:15:00
+#PBS -l storage=gdata/xe2+gdata/ub8
+
+# Notes:
+# 'copyq' queue required for internet access
+# 'ub8' storage access required for OzWald
+
+# Print out input variables to the error log
+echo "Starting"
+###
+
+
+# activate virtual environment:
+source /g/data/xe2/John/geospatenv/bin/activate
+# module load gdal/3.6.4
+# module load netcdf/4.7.3
+
+# Change working directory
+wd=/home/147/cb8590/Projects/PaddockTS
+cd $wd
+
+# Run script:
+python DAESIM_preprocess/multipoints.py 
+
