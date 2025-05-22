@@ -17,54 +17,98 @@ sys.path.append(repo_dir)
 
 import pandas as pd
 import xarray as xr
+import argparse
+
 
 from DAESIM_preprocess.ozwald_daily import ozwald_daily
+from DAESIM_preprocess.ozwald_8day import ozwald_8day
+from DAESIM_preprocess.silo_daily import silo_daily
 
 
 def dataset_to_series(ds):
     return pd.Series(ds.to_array().values.flatten(), index=ds.time.values)
 
 
-filename = "/g/data/xe2/cb8590/Eucalypts/all_euc_sample_metadata_20250525_geo_bioclim.tsv"
-outdir = '/scratch/xe2/cb8590/Eucalypts'
-start_year = "1990"
-end_year = "2030"
-variable = "Tmin"
+def multipoints(df, func, variable="Tmin", start_year="2020", end_year="2021", outdir=".", stub="Test", tmp_dir="."):
+    """Extract data for each lat lon in the dataframe. 
+    Assumes the dataframe has at least columns 'X' and 'Y' corresponding to lon and lat"""
+    
+    dss = []
+    sample_info = [] 
+    for i, row in df.iterrows():
+        lon, lat = row['X'], row['Y']
+        sample_name = row['sample_name']
+        ds = func([variable], lat, lon, 0, start_year, end_year, outdir, stub, outdir, thredds=False, save_netcdf=False)
+        dss.append(ds)
+        sample_info.append(row.to_dict())
+    
+    # Create DataFrame with sample info and time series data
+    das = [dataset_to_series(ds) for ds in dss]
+    result_data = []
+    for i, (info, da) in enumerate(zip(sample_info, das)):
+        
+        # Add date columns to the original columns
+        row_data = info.copy()
+        for date, value in da.items():
+            date_string = str(date)[:10]
+            row_data[date_string] = value
+            
+        result_data.append(row_data)
+    
+    result_df = pd.DataFrame(result_data)
+    return result_df
 
-df_original = pd.read_csv(filename, sep='\t')
-df = df_original[['sample_name', 'X', 'Y']]
 
-# %%time
-dss = []
-sample_info = []  # Store sample info alongside datasets
-for i, row in df[:2].iterrows():
-    lon, lat = row['X'], row['Y']
-    sample_name = row['sample_name']
-    ds = ozwald_daily([variable], lat, lon, 0, start_year, end_year, outdir, "EUC", outdir, False)
-    dss.append(ds)
-    sample_info.append({'sample_name': sample_name, 'lat': lat, 'lon': lon})
+funcs = {
+    'ozwald_daily':ozwald_daily,
+    'silo_daily':silo_daily,
+    'ozwald_8day':ozwald_8day
+}
+
 
 # +
-# Create the time series data
-das = [dataset_to_series(ds) for ds in dss]
+def parse_arguments():
+    """Parse command line arguments with default values."""
+    parser = argparse.ArgumentParser(description='Extract climate data for multiple points')
+    
+    parser.add_argument('--func', default='ozwald_daily', help='Function to use for data extraction (default: ozwald_daily)')
+    parser.add_argument('--variable', default='Tmin', help='Climate variable to extract (default: Tmin)')
+    parser.add_argument('--start_year', default='2020', help='Start year for data extraction (default: 2020)')
+    parser.add_argument('--end_year', default='2030', help='End year for data extraction (default: 2030)')
+    parser.add_argument('--stub', default='EUC', help='Stub name for output files (default: EUC)')
+    parser.add_argument('--outdir', default='/scratch/xe2/cb8590/Eucalypts', help='Output directory (default: /scratch/xe2/cb8590/Eucalypts)')
+    parser.add_argument('--filename_latlon', default='/g/data/xe2/cb8590/Eucalypts/all_euc_sample_metadata_20250525_geo_bioclim.tsv', help='Path to input file with lat/lon coordinates')
+    
+    return parser.parse_args()
 
-# Create DataFrame with sample info and time series data
-result_data = []
-for i, (info, da) in enumerate(zip(sample_info, das)):
-    row_data = {
-        'sample_name': info['sample_name'],
-        'lat': info['lat'],
-        'lon': info['lon']
-    }
-    # Add all the date columns
-    for date, value in da.items():
-        date_string = str(date)[:10]
-        row_data[date_string] = value
-    result_data.append(row_data)
-
-df = pd.DataFrame(result_data)
-# -
-
-filename_out = f"euc_{variable}_{start_year}_{end_year}.tsv"
-df.to_csv(filename_out, index=False, sep='\t')
-print("Saved", filename_out)
+if __name__ == '__main__':
+    
+    # Parse command line arguments
+    args = parse_arguments()
+    
+    func = args.func
+    variable = args.variable
+    start_year = args.start_year
+    end_year = args.end_year
+    stub = args.stub
+    outdir = args.outdir
+    filename_latlon = args.filename_latlon
+    
+    # Read and process data
+    print(f"Reading data from: {filename_latlon}")
+    df = pd.read_csv(filename_latlon, sep='\t')
+    # df = df_original[['sample_name', 'X', 'Y']]
+    
+    df = df[:4]
+    print(f"Processing {len(df)} samples")
+    
+    # Extract climate data
+    print(f"Extracting {variable} data from {start_year} to {end_year}")
+    df = multipoints(df, funcs[func], variable, start_year, end_year, outdir, stub, outdir)
+    
+    # Save results
+    filename_out = f"{stub}_{func}_{variable}_{start_year}_{end_year}.tsv"
+    df.to_csv(filename_out, index=False, sep='\t')
+    
+    print(f"Saved: {filename_out}")
+    print(f"Output contains {len(df)} rows and {len(df.columns)} columns")

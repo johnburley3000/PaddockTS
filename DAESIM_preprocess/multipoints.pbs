@@ -27,5 +27,5 @@ wd=/home/147/cb8590/Projects/PaddockTS
 cd $wd
 
 # Run script:
-python DAESIM_preprocess/multipoints.py 
+python DAESIM_preprocess/multipoints.py --start_year 1990
 
