@@ -73,12 +73,15 @@ def parse_arguments():
     
     parser.add_argument('--func', default='ozwald_daily', help='Function to use for data extraction (default: ozwald_daily)')
     parser.add_argument('--variable', default='Tmin', help='Climate variable to extract (default: Tmin)')
-    parser.add_argument('--start_year', default='2020', help='Start year for data extraction (default: 2020)')
+    parser.add_argument('--start_year', default='1880', help='Start year for data extraction (default: 1880)')
     parser.add_argument('--end_year', default='2030', help='End year for data extraction (default: 2030)')
     parser.add_argument('--stub', default='EUC', help='Stub name for output files (default: EUC)')
     parser.add_argument('--outdir', default='/scratch/xe2/cb8590/Eucalypts', help='Output directory (default: /scratch/xe2/cb8590/Eucalypts)')
+    parser.add_argument('--tmpdir', default='/scratch/xe2/cb8590/Eucalypts', help='Output directory (default: /scratch/xe2/cb8590/Eucalypts)')
     parser.add_argument('--filename_latlon', default='/g/data/xe2/cb8590/Eucalypts/all_euc_sample_metadata_20250525_geo_bioclim.tsv', help='Path to input file with lat/lon coordinates')
+    parser.add_argument('--max_samples', type=int, default=None, help='Maximum number of samples to process (default: None)')
     
+
     return parser.parse_args()
 
 if __name__ == '__main__':
@@ -92,19 +95,21 @@ if __name__ == '__main__':
     end_year = args.end_year
     stub = args.stub
     outdir = args.outdir
+    tmpdir = args.tmpdir
     filename_latlon = args.filename_latlon
+    max_samples = args.max_samples
     
     # Read and process data
     print(f"Reading data from: {filename_latlon}")
     df = pd.read_csv(filename_latlon, sep='\t')
-    # df = df_original[['sample_name', 'X', 'Y']]
     
-    df = df[:4]
+    if max_samples:
+        df = df[:max_samples]
     print(f"Processing {len(df)} samples")
     
     # Extract climate data
     print(f"Extracting {variable} data from {start_year} to {end_year}")
-    df = multipoints(df, funcs[func], variable, start_year, end_year, outdir, stub, outdir)
+    df = multipoints(df, funcs[func], variable, start_year, end_year, outdir, stub, tmpdir)
     
     # Save results
     filename_out = f"{stub}_{func}_{variable}_{start_year}_{end_year}.tsv"

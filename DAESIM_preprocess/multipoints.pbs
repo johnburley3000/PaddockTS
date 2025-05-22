@@ -1,11 +1,11 @@
 #!/bin/bash
-#PBS -N multi-points
+#PBS -N multipoints
 #PBS -q copyq
 #PBS -l mem=4GB
 #PBS -l jobfs=1GB
 #PBS -l ncpus=1
 #PBS -P xe2
-#PBS -l walltime=00:15:00
+#PBS -l walltime=10:00:00
 #PBS -l storage=gdata/xe2+gdata/ub8
 
 # Notes:
@@ -27,5 +27,8 @@ wd=/home/147/cb8590/Projects/PaddockTS
 cd $wd
 
 # Run script:
-python DAESIM_preprocess/multipoints.py --start_year 1990
+# python DAESIM_preprocess/multipoints.py --func ozwald_daily --variable Tmin
+# python DAESIM_preprocess/multipoints.py --func ozwald_daily --variable Tmin --max_samples 4
+# python DAESIM_preprocess/multipoints.py --func silo_daily --start_year 2023 --variable min_temp --tmpdir /g/data/xe2/datasets/Climate_SILO --max_samples 4
+python DAESIM_preprocess/multipoints.py --func silo_daily --variable max_temp --tmpdir /g/data/xe2/datasets/Climate_SILO
 

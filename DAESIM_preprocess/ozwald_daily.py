@@ -61,7 +61,7 @@ def ozwald_daily_singleyear_gdata(var="VPeff", latitude=-34.3890427, longitude=1
         return None
         
     ds = xr.open_dataset(filename)
-    print("Loaded", filename)
+    # print("Loaded", filename)
     
     bbox = [longitude - buffer, latitude - buffer, longitude + buffer, latitude + buffer]
     ds_region = ds.sel(latitude=slice(bbox[3], bbox[1]), longitude=slice(bbox[0], bbox[2]))
