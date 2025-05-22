@@ -39,6 +39,9 @@ def main():
     # load the silo data
     silo = xr.open_dataset(out_dir+stub+'_silo_daily.nc')
 
+    # Average silo over latitude and longitude (or just removes the lat, lon dimensions if it's a single point)
+    silo = silo.mean(dim=['lat', 'lon'])
+
     # load the oswald data
     ozwald = xr.open_dataset(out_dir+stub+'_ozwald_8day.nc')
     #print(ozwald)
