@@ -18,6 +18,7 @@ sys.path.append(repo_dir)
 # +
 # Standard Libraries
 import shutil
+import argparse
 
 # Dependencies
 import requests
@@ -48,7 +49,7 @@ silo_abbreviations = {
     }
 
 
-def download_from_SILO(var=default_var, year=default_year, silo_folder="."):
+def download_from_SILO(var="radiation", year="2020", silo_folder="."):
     """Download a NetCDF for the whole of Australia, for a given year and variable"""
     # I haven't found a way to download only the region of interest from SILO, hence we are downloading all of Australia
     silo_baseurl = "https://s3-ap-southeast-2.amazonaws.com/silo-open-data/Official/annual/"
@@ -64,8 +65,6 @@ def download_from_SILO(var=default_var, year=default_year, silo_folder="."):
                 shutil.copyfileobj(stream.raw, file)
         print(f"Downloaded {filename}")
 
-
-# -
 
 def silo_daily_singleyear(var="radiation", latitude=-34.3890427, longitude=148.469499, buffer=0.1, year="2020", silo_folder="."):
     """Select the region of interest from the Australia wide NetCDF file"""
@@ -144,19 +143,20 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description="""Download daily variables from SILO at 5km resolution for the region/time of interest
     Note: This will take ~5 mins and 400MB per variable year if downloading for the first time.""")
     
-    parser.add_argument('--variables', default=["radiation", "daily_rain"], help='Function to use for data extraction (default: ["radiation", "daily_rain"])')
+    parser.add_argument('--variables', default=["radiation", "daily_rain"], help=f'List of variables to download. Options are: {list(silo_abbreviations.keys())})')
     parser.add_argument('--lat', default=-34.389, help='Latitude in EPSG:4326 (default: -34.389)')
-    parser.add_argument('--lon', default=148.469, help='Longitude in EPSG:4326 (default: -34.389)')
-    parser.add_argument('--start_year', default='1889', help='Inclusive, and the minimum start year is 1889. Setting the start and end year to the same value will get all data for that year.')
-    parser.add_argument('--end_year', default='2100', help='Specifying a larger end_year than available will automatically give data up to the most recent date (currently 2024)')
+    parser.add_argument('--lon', default=148.469, help='Longitude in EPSG:4326 (default: 148.469499)')
+    parser.add_argument('--buffer', default=0.1, help='Buffer in each direction in degrees (default is 0.1, or about 20kmx20km)')
+    parser.add_argument('--start_year', default='2020', help='Inclusive, and the minimum start year is 1889. Setting the start and end year to the same value will get all data for that year.')
+    parser.add_argument('--end_year', default='2021', help='Specifying a larger end_year than available will automatically give data up to the most recent date (currently 2024)')
     parser.add_argument('--outdir', default='.', help='Directory for the output NetCDF file (default is the current directory)')
     parser.add_argument('--stub', default='TEST', help='The name to be prepended to each file download. (default: TEST)')
     parser.add_argument('--tmpdir', default='.', help='Directory for copying files from the SILO AWS folder for the whole of Australia (default is the current directory)')
     
     return parser.parse_args()
+# -
 
-
-
+# +
 if __name__ == '__main__':
     
     args = parse_arguments()
@@ -164,11 +164,12 @@ if __name__ == '__main__':
     variables = args.variables
     lat = args.lat
     lon = args.lon
+    buffer = args.buffer
     start_year = args.start_year
     end_year = args.end_year
     outdir = args.outdir
     stub = args.stub
     tmpdir = args.tmpdir
     
-    silo_daily(variables, lat, lon, start_year, end_year, outdir, stub, tmpdir)
+    silo_daily(variables, lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir)
     
