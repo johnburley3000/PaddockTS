@@ -65,10 +65,18 @@ def silo_daily_singleyear(var="radiation", latitude=-34.3890427, longitude=148.4
     except Exception as e:
         # Likely no data for the specified year
         return None
-        
+    
+    if 'crs' in list(ds.data_vars):
+        ds = ds.drop_vars('crs')
+    
     bbox = [longitude - buffer, latitude - buffer, longitude + buffer, latitude + buffer]
     ds_region = ds.sel(lat=slice(bbox[1], bbox[3]), lon=slice(bbox[0], bbox[2]))
 
+    # Find a single point but keep the lat
+    min_buffer_size = 0.03
+    if buffer < min_buffer_size:
+        ds_region = ds.sel(lat=[latitude], lon=[longitude], method='nearest')
+    
     # If the buffer was smaller than the pixel size, than just assign a single lat and lon coordinate
     if len(ds_region.lat) == 0:
         ds_region = ds_region.drop_dims('lat').expand_dims(lat=1).assign_coords(lat=[latitude])
