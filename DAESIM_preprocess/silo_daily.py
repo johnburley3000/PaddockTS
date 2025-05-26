@@ -1,8 +1,22 @@
 # +
-# Documentation is here: https://www.longpaddock.qld.gov.au/silo/gridded-data/
+# Documentation for the SILO variables is here: https://www.longpaddock.qld.gov.au/silo/gridded-data
+# -
 
+# Change directory to this repo - this should work on gadi or locally via python or jupyter.
+# Unfortunately, this needs to be in all files that can be run directly & use local imports.
+import os, sys
+repo_name = "PaddockTS"
+if os.path.expanduser("~").startswith("/home/"):  # Running on Gadi
+    repo_dir = os.path.join(os.path.expanduser("~"), f"Projects/{repo_name}")
+elif os.path.basename(os.getcwd()) != repo_name:  # Running in a jupyter notebook 
+    repo_dir = os.path.dirname(os.getcwd())       
+else:                                             # Already running from root of this repo. 
+    repo_dir = os.getcwd()
+os.chdir(repo_dir)
+sys.path.append(repo_dir)
+
+# +
 # Standard Libraries
-import os
 import shutil
 
 # Dependencies
@@ -34,9 +48,9 @@ silo_abbreviations = {
     }
 
 
-def download_from_SILO(var="radiation", year="2021", silo_folder="."):
+def download_from_SILO(var=default_var, year=default_year, silo_folder="."):
     """Download a NetCDF for the whole of Australia, for a given year and variable"""
-    # Note: I haven't found a way to download only the region of interest from SILO, hence we are downloading all of Australia
+    # I haven't found a way to download only the region of interest from SILO, hence we are downloading all of Australia
     silo_baseurl = "https://s3-ap-southeast-2.amazonaws.com/silo-open-data/Official/annual/"
     url = silo_baseurl + var + "/" + str(year) + "." + var + ".nc"
     filename = os.path.join(silo_folder, f"{year}.{var}.nc")
@@ -72,17 +86,11 @@ def silo_daily_singleyear(var="radiation", latitude=-34.3890427, longitude=148.4
     bbox = [longitude - buffer, latitude - buffer, longitude + buffer, latitude + buffer]
     ds_region = ds.sel(lat=slice(bbox[1], bbox[3]), lon=slice(bbox[0], bbox[2]))
 
-    # Find a single point but keep the lat
     min_buffer_size = 0.03
     if buffer < min_buffer_size:
+        # Find a single point but keep the lat and lon dimensions for consistency
         ds_region = ds.sel(lat=[latitude], lon=[longitude], method='nearest')
     
-    # If the buffer was smaller than the pixel size, than just assign a single lat and lon coordinate
-    if len(ds_region.lat) == 0:
-        ds_region = ds_region.drop_dims('lat').expand_dims(lat=1).assign_coords(lat=[latitude])
-    if len(ds_region.lon) == 0:
-        ds_region = ds_region.drop_dims('lon').expand_dims(lon=1).assign_coords(lon=[longitude])
-        
     return ds_region
 
 
@@ -96,7 +104,7 @@ def silo_daily_multiyear(var="radiation", latitude=-34.3890427, longitude=148.46
     return ds_concat
 
 
-def silo_daily(variables=["radiation"], lat=-34.3890427, lon=148.469499, buffer=0.1, start_year="2020", end_year="2020", outdir=".", stub="Test", silo_folder=".", thredds=None, save_netcdf=True):
+def silo_daily(variables=["radiation"], lat=-34.3890427, lon=148.469499, buffer=0.1, start_year="2020", end_year="2020", outdir=".", stub="TEST", tmpdir=".", thredds=None, save_netcdf=True):
     """Download daily variables from SILO at 5km resolution for the region/time of interest
 
     Parameters
@@ -107,19 +115,19 @@ def silo_daily(variables=["radiation"], lat=-34.3890427, lon=148.469499, buffer=
         start_year, end_year: Inclusive, so setting both to 2020 would give data for the full year.
         outdir: The directory that the final .NetCDF gets saved.
         stub: The name to be prepended to each file download.
-        silo_folder: The directory that Australia wide SILO data gets downloaded. Each variable per year is ~400MB, so this can take a while to download.
-        thredds: Unused - just an input for consistency with ozwald_daily
-    
+        tmpdir: The directory that Australia wide SILO data gets downloaded. Each variable per year is ~400MB, so this can take a while to download.
+        thredds: Unused - just an input for consistency with ozwald_daily.
+        save_netcdf: Whether to save the xarray to file or not. This gets downloaded to 'outdir/(stub)_silo_daily.nc'.
+        
     Returns
     -------
         ds_concat: an xarray containing the requested variables in the region of interest for the time period specified
-        A NetCDF file of this xarray gets downloaded to outdir/(stub)_silo_daily.nc'
     """
     
     dss = []
     years = [str(year) for year in list(range(int(start_year), int(end_year) + 1))]
     for variable in variables:
-        ds = silo_daily_multiyear(variable, lat, lon, buffer, years, silo_folder)
+        ds = silo_daily_multiyear(variable, lat, lon, buffer, years, tmpdir)
         dss.append(ds)
     ds_concat = xr.merge(dss)
     
@@ -131,7 +139,36 @@ def silo_daily(variables=["radiation"], lat=-34.3890427, lon=148.469499, buffer=
     return ds_concat
 
 
-# %%time
+def parse_arguments():
+    """Parse command line arguments with default values."""
+    parser = argparse.ArgumentParser(description="""Download daily variables from SILO at 5km resolution for the region/time of interest
+    Note: This will take ~5 mins and 400MB per variable year if downloading for the first time.""")
+    
+    parser.add_argument('--variables', default=["radiation", "daily_rain"], help='Function to use for data extraction (default: ["radiation", "daily_rain"])')
+    parser.add_argument('--lat', default=-34.389, help='Latitude in EPSG:4326 (default: -34.389)')
+    parser.add_argument('--lon', default=148.469, help='Longitude in EPSG:4326 (default: -34.389)')
+    parser.add_argument('--start_year', default='1889', help='Inclusive, and the minimum start year is 1889. Setting the start and end year to the same value will get all data for that year.')
+    parser.add_argument('--end_year', default='2100', help='Specifying a larger end_year than available will automatically give data up to the most recent date (currently 2024)')
+    parser.add_argument('--outdir', default='.', help='Directory for the output NetCDF file (default is the current directory)')
+    parser.add_argument('--stub', default='TEST', help='The name to be prepended to each file download. (default: TEST)')
+    parser.add_argument('--tmpdir', default='.', help='Directory for copying files from the SILO AWS folder for the whole of Australia (default is the current directory)')
+    
+    return parser.parse_args()
+
+
+
 if __name__ == '__main__':
-    # Takes about 5 mins if the SILO netcdf's are not predownloaded
-    ds = silo_daily()
+    
+    args = parse_arguments()
+    
+    variables = args.variables
+    lat = args.lat
+    lon = args.lon
+    start_year = args.start_year
+    end_year = args.end_year
+    outdir = args.outdir
+    stub = args.stub
+    tmpdir = args.tmpdir
+    
+    silo_daily(variables, lat, lon, start_year, end_year, outdir, stub, tmpdir)
+    

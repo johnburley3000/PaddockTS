@@ -18,6 +18,7 @@ sys.path.append(repo_dir)
 import pandas as pd
 import xarray as xr
 import argparse
+import pickle
 
 
 from DAESIM_preprocess.ozwald_daily import ozwald_daily
@@ -38,9 +39,16 @@ def multipoints(df, func, variable="Tmin", start_year="2020", end_year="2021", o
     for i, row in df.iterrows():
         lon, lat = row['X'], row['Y']
         sample_name = row['sample_name']
-        ds = func([variable], lat, lon, 0, start_year, end_year, outdir, stub, outdir, thredds=False, save_netcdf=False)
+        ds = func([variable], lat, lon, 0, start_year, end_year, outdir, stub, tmp_dir, thredds=False, save_netcdf=False)
+        print(f'time: {len(ds.time)}, lat: {len(ds.lat)}, lon: {len(ds.lon)}, for {sample_name}, {lat}, {lon}')
         dss.append(ds)
         sample_info.append(row.to_dict())
+    
+    # Save the dss as a pickle for debugging
+    filename = f'/scratch/xe2/cb8590/{variable}_{start_year}_{end_year}_{stub}_dss.pickle'
+    with open(filename, 'wb') as handle:
+        pickle.dump(dss, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        print('saved', filename)
     
     # Create DataFrame with sample info and time series data
     das = [dataset_to_series(ds) for ds in dss]
@@ -66,7 +74,6 @@ funcs = {
 }
 
 
-# +
 def parse_arguments():
     """Parse command line arguments with default values."""
     parser = argparse.ArgumentParser(description='Extract climate data for multiple points')
@@ -112,7 +119,7 @@ if __name__ == '__main__':
     df = multipoints(df, funcs[func], variable, start_year, end_year, outdir, stub, tmpdir)
     
     # Save results
-    filename_out = f"{stub}_{func}_{variable}_{start_year}_{end_year}.tsv"
+    filename_out = os.path.join(outdir, f"{stub}_{func}_{variable}_{start_year}_{end_year}.tsv")
     df.to_csv(filename_out, index=False, sep='\t')
     
     print(f"Saved: {filename_out}")
