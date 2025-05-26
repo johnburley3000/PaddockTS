@@ -1,0 +1,40 @@
+#!/bin/bash
+#PBS -N dieback_region
+#PBS -q normal
+#PBS -l mem=48GB
+#PBS -l jobfs=1GB
+#PBS -l ncpus=1
+#PBS -P xe2
+#PBS -l walltime=00:15:00
+#PBS -l storage=gdata/xe2+gdata/ub8
+
+# Notes:
+# 'copyq' queue required for internet access
+# 'ub8' storage access required for OzWald
+
+# Print out input variables to the error log
+echo "Starting"
+###
+
+
+# activate virtual environment:
+source /g/data/xe2/John/geospatenv/bin/activate
+# module load gdal/3.6.4
+# module load netcdf/4.7.3
+
+# Change working directory
+wd=/home/147/cb8590/Projects/PaddockTS
+cd $wd
+
+# Run script:
+variable=min_temp
+lat=-36.354585
+lon=148.974753
+variable=0.01
+start_year=2020
+end_year=2021
+outdir=/g/data/xe2/cb8590/Eucalypts
+stub=EUC_($variable)_($buffer)_($start_year)_($end_year)
+tmpdir=/g/data/xe2/datasets/Climate_SILO
+
+python DAESIM_preprocess/silo_daily.py --variable variable --lat lat --lon lon --buffer buffer --start_year start_year --end_year end_year --outdir outdir --stub stub --tmpdir tmpdir

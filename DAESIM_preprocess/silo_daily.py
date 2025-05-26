@@ -114,7 +114,7 @@ def silo_daily(variables=["radiation"], lat=-34.3890427, lon=148.469499, buffer=
         start_year, end_year: Inclusive, so setting both to 2020 would give data for the full year.
         outdir: The directory that the final .NetCDF gets saved.
         stub: The name to be prepended to each file download.
-        tmpdir: The directory that Australia wide SILO data gets downloaded. Each variable per year is ~400MB, so this can take a while to download.
+        tmpdir: The directory that Australia wide SILO data gets downloaded. Each variable per year is ~400MB, so this can take a while to download. Use "/g/data/xe2/datasets/Climate_SILO" when running on NCI gadi under the xe2 project
         thredds: Unused - just an input for consistency with ozwald_daily.
         save_netcdf: Whether to save the xarray to file or not. This gets downloaded to 'outdir/(stub)_silo_daily.nc'.
         
@@ -144,15 +144,15 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description="""Download daily variables from SILO at 5km resolution for the region/time of interest
     Note: This will take ~5 mins and 400MB per variable year if downloading for the first time.""")
     
-    parser.add_argument('--variables', default=["radiation", "daily_rain"], help=f'List of variables to download. Options are: {list(silo_abbreviations.keys())})')
-    parser.add_argument('--lat', default=-34.389, help='Latitude in EPSG:4326 (default: -34.389)')
-    parser.add_argument('--lon', default=148.469, help='Longitude in EPSG:4326 (default: 148.469)')
-    parser.add_argument('--buffer', default=0.1, help='Buffer in each direction in degrees (default is 0.1, or about 20kmx20km)')
+    parser.add_argument('--variable', default="radiation", help=f"Default is 'radiation', and options are: {list(silo_abbreviations.keys())}")
+    parser.add_argument('--lat', default='-34.389', help='Latitude in EPSG:4326 (default: -34.389)')
+    parser.add_argument('--lon', default='148.469', help='Longitude in EPSG:4326 (default: 148.469)')
+    parser.add_argument('--buffer', default='0.1', help='Buffer in each direction in degrees (default is 0.1, or about 20kmx20km)')
     parser.add_argument('--start_year', default='2020', help='Inclusive, and the minimum start year is 1889. Setting the start and end year to the same value will get all data for that year.')
     parser.add_argument('--end_year', default='2021', help='Specifying a larger end_year than available will automatically give data up to the most recent date (currently 2025)')
     parser.add_argument('--outdir', default='.', help='Directory for the output NetCDF file (default is the current directory)')
     parser.add_argument('--stub', default='TEST', help='The name to be prepended to each file download. (default: TEST)')
-    parser.add_argument('--tmpdir', default='.', help='Directory for copying files from the SILO AWS folder for the whole of Australia (default is the current directory)')
+    parser.add_argument('--tmpdir', default='.', help='Directory for copying files from the SILO AWS folder for the whole of Australia (default is the current directory). Use "/g/data/xe2/datasets/Climate_SILO" when running on NCI gadi under the xe2 project.')
     
     return parser.parse_args()
 # -
@@ -162,15 +162,15 @@ if __name__ == '__main__':
     
     args = parse_arguments()
     
-    variables = args.variables
-    lat = args.lat
-    lon = args.lon
-    buffer = args.buffer
+    variable = args.variable
+    lat = float(args.lat)
+    lon = float(args.lon)
+    buffer = float(args.buffer)
     start_year = args.start_year
     end_year = args.end_year
     outdir = args.outdir
     stub = args.stub
     tmpdir = args.tmpdir
     
-    silo_daily(variables, lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir)
+    silo_daily([variable], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir)
     
