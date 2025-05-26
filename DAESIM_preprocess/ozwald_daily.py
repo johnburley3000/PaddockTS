@@ -125,8 +125,7 @@ def ozwald_daily(variables=["VPeff", "Uavg"], lat=-34.3890427, lon=148.469499, b
 
 def parse_arguments():
     """Parse command line arguments with default values."""
-    parser = argparse.ArgumentParser(description="""Download daily variables from SILO at 5km resolution for the region/time of interest
-    Note: This will take ~5 mins and 400MB per variable year if downloading for the first time.""")
+    parser = argparse.ArgumentParser(description="""Download daily variables from OzWald at varying resolutions (depending on the variable) for the region/time of interest""")
     
     parser.add_argument('--variable', default="VPeff", help=f"Default is 'VPeff', and options are: {list(ozwald_daily_abbreviations.keys())}")
     parser.add_argument('--lat', default='-34.389', help='Latitude in EPSG:4326 (default: -34.389)')
@@ -159,7 +158,3 @@ if __name__ == '__main__':
     
     ozwald_daily([variable], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir)
     
-
-# # %%time
-# if __name__ == '__main__':
-#     ds = ozwald_daily()

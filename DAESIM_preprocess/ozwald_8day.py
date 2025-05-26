@@ -3,6 +3,7 @@
 
 # Standard Libraries
 import os
+import argparse
 
 # Dependencies
 import xarray as xr
@@ -105,6 +106,8 @@ def ozwald_8day(variables=["Ssoil", "GPP"], lat=-34.3890427, lon=148.469499, buf
         ds_concat: an xarray containing the requested variables in the region of interest for the time period specified
         A NetCDF file of this xarray gets downloaded to outdir/(stub)_ozwald_8day.nc'
     """
+    print(f"Starting ozwald_8day")
+
     dss = []
     years = [str(year) for year in list(range(int(start_year), int(end_year) + 1))]
     for variable in variables:
@@ -119,9 +122,38 @@ def ozwald_8day(variables=["Ssoil", "GPP"], lat=-34.3890427, lon=148.469499, buf
 
     return ds_concat
 
-
+def parse_arguments():
+    """Parse command line arguments with default values."""
+    parser = argparse.ArgumentParser(description="""Download 8 day variables from OzWald at 500m resolution for the region/time of interest""")
+    
+    parser.add_argument('--variable', default="Ssoil", help=f"Default is 'Ssoil', and options are: {list(ozwald_8day_abbreviations.keys())}")
+    parser.add_argument('--lat', default='-34.389', help='Latitude in EPSG:4326 (default: -34.389)')
+    parser.add_argument('--lon', default='148.469', help='Longitude in EPSG:4326 (default: 148.469)')
+    parser.add_argument('--buffer', default='0.01', help='Buffer in each direction in degrees (default is 0.01, or about 2kmx2km)')
+    parser.add_argument('--start_year', default='2020', help='Inclusive, and the minimum start year is 2000. Setting the start and end year to the same value will get all data for that year.')
+    parser.add_argument('--end_year', default='2021', help='Specifying a larger end_year than available will automatically give data up to the most recent date (currently 2024)')
+    parser.add_argument('--outdir', default='.', help='Directory for the output NetCDF file (default is the current directory)')
+    parser.add_argument('--stub', default='TEST', help='The name to be prepended to each file download. (default: TEST)')
+    parser.add_argument('--tmpdir', default='.', help='The directory that the temporary NetCDFs get saved when downloading from Thredds. This does not get used if Thredds=False. (default is the current directory)')
+    parser.add_argument('--thredds', default=True, help='A boolean flag to choose between using the public facing Thredds API (slower but works locally), or running directly on NCI (requires access to the ub8 project). (default: True)')
+    
+    return parser.parse_args()
 # -
 
-# %%time
-if __name__ == '__main__':  
-    ds = ozwald_8day()
+# +
+if __name__ == '__main__':
+    
+    args = parse_arguments()
+    
+    variable = args.variable
+    lat = float(args.lat)
+    lon = float(args.lon)
+    buffer = float(args.buffer)
+    start_year = args.start_year
+    end_year = args.end_year
+    outdir = args.outdir
+    stub = args.stub
+    tmpdir = args.tmpdir
+    
+    ozwald_8day([variable], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir)
+    
