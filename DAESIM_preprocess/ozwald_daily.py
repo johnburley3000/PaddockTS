@@ -1,9 +1,10 @@
 # +
-# Catalog is here: https://thredds.nci.org.au/thredds/catalog/ub8/au/OzWALD/daily/meteo/catalog.html
+# Catalog of OzWald daily variables is here: https://thredds.nci.org.au/thredds/catalog/ub8/au/OzWALD/daily/meteo/catalog.html
 
 # +
 # Standard Libraries
 import os
+import argparse
 
 # Dependencies
 import requests
@@ -22,7 +23,7 @@ ozwald_daily_abbreviations = {
 }
 
 
-def ozwald_daily_singleyear_thredds(var="VPeff", latitude=-34.3890427, longitude=148.469499, buffer=0.1, year="2021", stub="Test", tmp_dir="scratch_dir"):
+def ozwald_daily_singleyear_thredds(var="VPeff", latitude=-34.3890427, longitude=148.469499, buffer=0.1, year="2021", stub="TEST", tmp_dir="scratch_dir"):
     
     north = latitude + buffer 
     south = latitude - buffer 
@@ -66,24 +67,18 @@ def ozwald_daily_singleyear_gdata(var="VPeff", latitude=-34.3890427, longitude=1
     bbox = [longitude - buffer, latitude - buffer, longitude + buffer, latitude + buffer]
     ds_region = ds.sel(latitude=slice(bbox[3], bbox[1]), longitude=slice(bbox[0], bbox[2]))
     
-    # Find a single point but keep the lat
     if buffer < 0.03:
+        # Find a single point but keep the lat and lon dimensions for consistency
         ds_region = ds.sel(latitude=[latitude], longitude=[longitude], method='nearest')
     
-    # If the buffer was smaller than the pixel size, than just assign a single lat and lon coordinate
-    if len(ds_region.latitude) == 0:
-        ds_region = ds_region.drop_dims('latitude').expand_dims(latitude=1).assign_coords(latitude=[latitude])
-    if len(ds_region.longitude) == 0:
-        ds_region = ds_region.drop_dims('longitude').expand_dims(longitude=1).assign_coords(longitude=[longitude])
-           
     return ds_region
 
 
-def ozwald_daily_multiyear(var="VPeff", latitude=-34.3890427, longitude=148.469499, buffer=0.1, years=["2020", "2021"], stub="Test", tmp_dir=".", thredds=True):
+def ozwald_daily_multiyear(var="VPeff", latitude=-34.3890427, longitude=148.469499, buffer=0.1, years=["2020", "2021"], stub="TEST", tmpdir=".", thredds=True):
     dss = []
     for year in years:
         if thredds:
-            ds_year = ozwald_daily_singleyear_thredds(var, latitude, longitude, buffer, year, stub, tmp_dir)
+            ds_year = ozwald_daily_singleyear_thredds(var, latitude, longitude, buffer, year, stub, tmpdir)
         else:
             ds_year = ozwald_daily_singleyear_gdata(var, latitude, longitude, buffer, year)
         if ds_year:
@@ -92,7 +87,7 @@ def ozwald_daily_multiyear(var="VPeff", latitude=-34.3890427, longitude=148.4694
     return ds_concat
 
 
-def ozwald_daily(variables=["VPeff", "Uavg"], lat=-34.3890427, lon=148.469499, buffer=0.1, start_year="2020", end_year="2021", outdir=".", stub="Test", tmp_dir=".", thredds=True, save_netcdf=True):
+def ozwald_daily(variables=["VPeff", "Uavg"], lat=-34.3890427, lon=148.469499, buffer=0.1, start_year="2020", end_year="2021", outdir=".", stub="TEST", tmpdir=".", thredds=True, save_netcdf=True):
     """Download daily variables from OzWald at varying resolutions for the region/time of interest
 
     Parameters
@@ -103,7 +98,7 @@ def ozwald_daily(variables=["VPeff", "Uavg"], lat=-34.3890427, lon=148.469499, b
         start_year, end_year: Inclusive, so setting both to 2020 would give data for the full year.
         outdir: The directory that the final .NetCDF gets saved. The filename includes the first variable in the csv.
         stub: The name to be prepended to each file download.
-        tmp_dir: The directory that the temporary NetCDFs get saved if downloading from Thredds. This does not get used if Thredds=False.
+        tmpdir: The directory that the temporary NetCDFs get saved when downloading from Thredds. This does not get used if Thredds=False.
         thredds: A boolean flag to choose between using the public facing API (slower but works locally), or running directly on NCI (requires access to the ub8 project)
     
     Returns
@@ -111,16 +106,16 @@ def ozwald_daily(variables=["VPeff", "Uavg"], lat=-34.3890427, lon=148.469499, b
         ds_concat: an xarray containing the requested variables in the region of interest for the time period specified
         A NetCDF file of this xarray gets downloaded to outdir/(stub)_ozwald_daily_(first_variable).nc'
     """
+    print(f"Starting ozwald_daily")
 
     dss = []
     years = [str(year) for year in list(range(int(start_year), int(end_year) + 1))]
     for variable in variables:
-        ds_variable = ozwald_daily_multiyear(variable, lat, lon, buffer, years, stub, tmp_dir, thredds)
+        ds_variable = ozwald_daily_multiyear(variable, lat, lon, buffer, years, stub, tmpdir, thredds)
         dss.append(ds_variable)
     ds_concat = xr.merge(dss)
 
     if save_netcdf:
-        # Appending the first variable to the filename, so you can download temperature, rainfall, and wind/humidity separately since they use different grids.
         filename = os.path.join(outdir, f'{stub}_ozwald_daily_{variables[0]}.nc')
         ds_concat.to_netcdf(filename)
         print("Saved:", filename)
@@ -128,8 +123,43 @@ def ozwald_daily(variables=["VPeff", "Uavg"], lat=-34.3890427, lon=148.469499, b
     return ds_concat
 
 
+def parse_arguments():
+    """Parse command line arguments with default values."""
+    parser = argparse.ArgumentParser(description="""Download daily variables from SILO at 5km resolution for the region/time of interest
+    Note: This will take ~5 mins and 400MB per variable year if downloading for the first time.""")
+    
+    parser.add_argument('--variables', default=["VPeff", "Uavg"], help=f'List of variables to download. Options are: {list(ozwald_daily_abbreviations.keys())})')
+    parser.add_argument('--lat', default=-34.389, help='Latitude in EPSG:4326 (default: -34.389)')
+    parser.add_argument('--lon', default=148.469, help='Longitude in EPSG:4326 (default: 148.469)')
+    parser.add_argument('--buffer', default=0.1, help='Buffer in each direction in degrees (default is 0.1, or about 20kmx20km)')
+    parser.add_argument('--start_year', default='2020', help='Inclusive, and the minimum start year is 2000. Setting the start and end year to the same value will get all data for that year.')
+    parser.add_argument('--end_year', default='2021', help='Specifying a larger end_year than available will automatically give data up to the most recent date (currently 2024)')
+    parser.add_argument('--outdir', default='.', help='Directory for the output NetCDF file (default is the current directory)')
+    parser.add_argument('--stub', default='TEST', help='The name to be prepended to each file download. (default: TEST)')
+    parser.add_argument('--tmpdir', default='.', help='The directory that the temporary NetCDFs get saved when downloading from Thredds. This does not get used if Thredds=False. (default is the current directory)')
+    parser.add_argument('--thredds', default=True, help='A boolean flag to choose between using the public facing Thredds API (slower but works locally), or running directly on NCI (requires access to the ub8 project). (default: True)')
+    
+    return parser.parse_args()
 # -
 
-# %%time
+# +
 if __name__ == '__main__':
-    ds = ozwald_daily()
+    
+    args = parse_arguments()
+    
+    variables = args.variables
+    lat = args.lat
+    lon = args.lon
+    buffer = args.buffer
+    start_year = args.start_year
+    end_year = args.end_year
+    outdir = args.outdir
+    stub = args.stub
+    tmpdir = args.tmpdir
+    
+    ozwald_daily(variables, lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir)
+    
+
+# # %%time
+# if __name__ == '__main__':
+#     ds = ozwald_daily()
