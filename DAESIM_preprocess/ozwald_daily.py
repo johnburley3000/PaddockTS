@@ -155,6 +155,7 @@ if __name__ == '__main__':
     outdir = args.outdir
     stub = args.stub
     tmpdir = args.tmpdir
+    thredds = args.thredds
     
-    ozwald_daily([variable], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir)
+    ozwald_daily([variable], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds=thredds)
     

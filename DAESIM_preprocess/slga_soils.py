@@ -51,6 +51,48 @@ def download_tif(bbox=[148.46449900000002, -34.3940427, 148.474499, -34.38404269
     with open(filename, 'wb') as file:
         file.write(response.read())
 
+
+def soil_texture(outdir=".", stub="TEST", depth="5-15cm"):
+    """Convert from sand, silt and clay percent to the 12 categories in the soil texture triangle"""
+
+    # Load the sand, silt and clay layers
+    filename_sand = os.path.join(outdir, f"{stub}_Sand_{depth}.tif")
+    filename_silt = os.path.join(outdir, f"{stub}_Silt_{depth}.tif")
+    filename_clay = os.path.join(outdir, f"{stub}_Clay_{depth}.tif")
+                            
+    ds_sand = rxr.open_rasterio(filename_sand)
+    ds_silt = rxr.open_rasterio(filename_silt)
+    ds_clay = rxr.open_rasterio(filename_clay)
+    
+    sand_array = ds_sand.isel(band=0).values
+    silt_array = ds_silt.isel(band=0).values
+    clay_array = ds_clay.isel(band=0).values
+    
+    # The sand, silt and clay percent don't necessarily add up to 100% originally, because they get predicted by separate models
+    total_percent = sand_array + silt_array + clay_array
+    sand_percent = (sand_array / total_percent) * 100
+    silt_percent = (silt_array / total_percent) * 100
+    clay_percent = (clay_array / total_percent) * 100
+
+    # Assign soil texture categories
+    soil_texture = np.empty(sand_array.shape, dtype=object)
+    
+    # I simplified the boundaries between sand, loamy sand, and sandy loam a little, but the rest of these values should match the soil texture triangle exactly
+    soil_texture[(clay_percent < 20)  & (silt_percent < 50)] = 'Sandy Loam'      # Sandy Loam needs to come before Loam
+    soil_texture[(sand_percent >= 70) & (clay_percent < 15)] = 'Loamy Sand'     # Loamy Sand needs to come from Sand
+    soil_texture[(sand_percent >= 85) & (clay_percent < 10)] = 'Sand'
+    soil_texture[(clay_percent < 30)  & (silt_percent >= 50)] = 'Silt Loam'     # Silt Loam needs to come before Silt
+    soil_texture[(clay_percent < 15)  & (silt_percent >= 80)] = 'Silt'
+    soil_texture[(clay_percent >= 27) & (clay_percent < 40) & (sand_array < 20)] = 'Silty Clay Loam'
+    soil_texture[(clay_percent >= 40) & (silt_percent >= 40)] = 'Silty Clay'
+    soil_texture[(clay_percent >= 40) & (silt_percent < 40) & (sand_array < 45)] = 'Clay'
+    soil_texture[(clay_percent >= 35) & (sand_percent >= 45)] = 'Sandy Clay'
+    soil_texture[(clay_percent >= 27) & (clay_percent < 40) & (sand_array >= 20) & (sand_array < 45) ] = 'Clay Loam'
+    soil_texture[(clay_percent >= 20) & (clay_percent < 35) & (sand_array >= 45) & (silt_array < 28)] = 'Sandy Clay Loam'
+    soil_texture[(clay_percent >= 15) & (clay_percent < 27) & (silt_array >= 28) & (silt_array < 50) & (sand_array < 53)] = 'Loam'
+
+    return soil_texture
+
 def slga_soils(variables=["Clay", "Sand", "Silt"], lat=-34.3890427, lon=148.469499, buffer=0.005, outdir="", stub="Test",  depths=["5-15cm"]):
     """Download soil variables from CSIRO at 90m resolution for region of interest
     
@@ -93,48 +135,6 @@ def slga_soils(variables=["Clay", "Sand", "Silt"], lat=-34.3890427, lon=148.4694
                         delay = base_delay * (2 ** attempt) # Exponential backoff
                         print(f"Retrying in {delay:.2f} seconds...")
                         time.sleep(delay)
-
-def soil_texture(outdir="", stub="Test", depth="5-15cm"):
-    """Convert from sand, silt and clay percent to the 12 categories in the soil texture triangle"""
-
-    # Load the sand, silt and clay layers
-    filename_sand = os.path.join(outdir, f"{stub}_Sand_{depth}.tif")
-    filename_silt = os.path.join(outdir, f"{stub}_Silt_{depth}.tif")
-    filename_clay = os.path.join(outdir, f"{stub}_Clay_{depth}.tif")
-                            
-    ds_sand = rxr.open_rasterio(filename_sand)
-    ds_silt = rxr.open_rasterio(filename_silt)
-    ds_clay = rxr.open_rasterio(filename_clay)
-    
-    sand_array = ds_sand.isel(band=0).values
-    silt_array = ds_silt.isel(band=0).values
-    clay_array = ds_clay.isel(band=0).values
-    
-    # The sand, silt and clay percent don't necessarily add up to 100% originally, because they get predicted by separate models
-    total_percent = sand_array + silt_array + clay_array
-    sand_percent = (sand_array / total_percent) * 100
-    silt_percent = (silt_array / total_percent) * 100
-    clay_percent = (clay_array / total_percent) * 100
-
-    # Assign soil texture categories
-    soil_texture = np.empty(sand_array.shape, dtype=object)
-    
-    # Note that I simplified the boundaries between sand, loamy sand, and sandy loam a little, but the rest of these values should match the soil texture triangle exactly
-    soil_texture[(clay_percent < 20)  & (silt_percent < 50)] = 'Sandy Loam'      # Sandy Loam needs to come before Loam
-    soil_texture[(sand_percent >= 70) & (clay_percent < 15)] = 'Loamy Sand'     # Loamy Sand needs to come from Sand
-    soil_texture[(sand_percent >= 85) & (clay_percent < 10)] = 'Sand'
-    soil_texture[(clay_percent < 30)  & (silt_percent >= 50)] = 'Silt Loam'     # Silt Loam needs to come before Silt
-    soil_texture[(clay_percent < 15)  & (silt_percent >= 80)] = 'Silt'
-    soil_texture[(clay_percent >= 27) & (clay_percent < 40) & (sand_array < 20)] = 'Silty Clay Loam'
-    soil_texture[(clay_percent >= 40) & (silt_percent >= 40)] = 'Silty Clay'
-    soil_texture[(clay_percent >= 40) & (silt_percent < 40) & (sand_array < 45)] = 'Clay'
-    soil_texture[(clay_percent >= 35) & (sand_percent >= 45)] = 'Sandy Clay'
-    soil_texture[(clay_percent >= 27) & (clay_percent < 40) & (sand_array >= 20) & (sand_array < 45) ] = 'Clay Loam'
-    soil_texture[(clay_percent >= 20) & (clay_percent < 35) & (sand_array >= 45) & (silt_array < 28)] = 'Sandy Clay Loam'
-    soil_texture[(clay_percent >= 15) & (clay_percent < 27) & (silt_array >= 28) & (silt_array < 50) & (sand_array < 53)] = 'Loam'
-
-    return soil_texture
-
 
 # +
 if __name__ == '__main__':

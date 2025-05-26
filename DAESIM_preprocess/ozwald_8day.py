@@ -28,7 +28,7 @@ ozwald_8day_abbreviations = {
 
 # This function uses the public facing Thredds API, so does not need to be run on NCI
 # However it doesn't work in a PBS script from my tests
-def ozwald_8day_singleyear_thredds(var="Ssoil", latitude=-34.3890427, longitude=148.469499, buffer=0.01, year="2021", stub="Test", tmp_dir="."):
+def ozwald_8day_singleyear_thredds(var="Ssoil", latitude=-34.3890427, longitude=148.469499, buffer=0.01, year="2021"):
 
     buffer = max(0.003, buffer)  # If you specify an area that's too small then no data gets returned from thredds
     
@@ -74,11 +74,11 @@ def ozwald_8day_singleyear_gdata(var="Ssoil", latitude=-34.3890427, longitude=14
     return ds_region
 
 
-def ozwald_8day_multiyear(var="Ssoil", latitude=-34.3890427, longitude=148.469499, buffer=0.01, years=["2020", "2021"], stub="Test", tmp_dir=".", thredds=True):
+def ozwald_8day_multiyear(var="Ssoil", latitude=-34.3890427, longitude=148.469499, buffer=0.01, years=["2020", "2021"], thredds=True):
     dss = []
     for year in years:
         if thredds:
-            ds_year = ozwald_8day_singleyear_thredds(var, latitude, longitude, buffer, year, stub, tmp_dir)
+            ds_year = ozwald_8day_singleyear_thredds(var, latitude, longitude, buffer, year)
         else:
             ds_year = ozwald_8day_singleyear_gdata(var, latitude, longitude, buffer, year)
         if ds_year:
@@ -87,7 +87,7 @@ def ozwald_8day_multiyear(var="Ssoil", latitude=-34.3890427, longitude=148.46949
     return ds_concat
 
 
-def ozwald_8day(variables=["Ssoil", "GPP"], lat=-34.3890427, lon=148.469499, buffer=0.01, start_year="2020", end_year="2021", outdir=".", stub="Test", tmp_dir=".", thredds=True, save_netcdf=True):
+def ozwald_8day(variables=["Ssoil", "GPP"], lat=-34.3890427, lon=148.469499, buffer=0.01, start_year="2020", end_year="2021", outdir=".", stub="TEST", tmpdir=None, thredds=True, save_netcdf=True):
     """Download 8day variables from OzWald at 500m resolution for the region/time of interest
 
     Parameters
@@ -98,7 +98,7 @@ def ozwald_8day(variables=["Ssoil", "GPP"], lat=-34.3890427, lon=148.469499, buf
         start_year, end_year: Inclusive, so setting both to 2020 would give data for the full year.
         outdir: The directory that the final .NetCDF gets saved.
         stub: The name to be prepended to each file download.
-        tmp_dir: The directory that the temporary NetCDFs get saved if downloading from Thredds. This does not get used if Thredds=False.
+        tmpdir: Unused - just an input for consistency with silo_daily.
         thredds: A boolean flag to choose between using the public facing API (slower but works locally), or running directly on NCI (requires access to the ub8 project)
     
     Returns
@@ -111,7 +111,7 @@ def ozwald_8day(variables=["Ssoil", "GPP"], lat=-34.3890427, lon=148.469499, buf
     dss = []
     years = [str(year) for year in list(range(int(start_year), int(end_year) + 1))]
     for variable in variables:
-        ds_variable = ozwald_8day_multiyear(variable, lat, lon, buffer, years, stub, tmp_dir, thredds=thredds)
+        ds_variable = ozwald_8day_multiyear(variable, lat, lon, buffer, years, thredds)
         dss.append(ds_variable)
     ds_concat = xr.merge(dss)
     
@@ -134,7 +134,6 @@ def parse_arguments():
     parser.add_argument('--end_year', default='2021', help='Specifying a larger end_year than available will automatically give data up to the most recent date (currently 2024)')
     parser.add_argument('--outdir', default='.', help='Directory for the output NetCDF file (default is the current directory)')
     parser.add_argument('--stub', default='TEST', help='The name to be prepended to each file download. (default: TEST)')
-    parser.add_argument('--tmpdir', default='.', help='The directory that the temporary NetCDFs get saved when downloading from Thredds. This does not get used if Thredds=False. (default is the current directory)')
     parser.add_argument('--thredds', default=True, help='A boolean flag to choose between using the public facing Thredds API (slower but works locally), or running directly on NCI (requires access to the ub8 project). (default: True)')
     
     return parser.parse_args()
@@ -153,7 +152,7 @@ if __name__ == '__main__':
     end_year = args.end_year
     outdir = args.outdir
     stub = args.stub
-    tmpdir = args.tmpdir
+    thredds=args.thredds
     
-    ozwald_8day([variable], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir)
+    ozwald_8day([variable], lat, lon, buffer, start_year, end_year, outdir, stub, thredds=thredds)
     
