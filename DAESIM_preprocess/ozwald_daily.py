@@ -128,10 +128,10 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description="""Download daily variables from SILO at 5km resolution for the region/time of interest
     Note: This will take ~5 mins and 400MB per variable year if downloading for the first time.""")
     
-    parser.add_argument('--variables', default=["VPeff", "Uavg"], help=f'List of variables to download. Options are: {list(ozwald_daily_abbreviations.keys())})')
-    parser.add_argument('--lat', default=-34.389, help='Latitude in EPSG:4326 (default: -34.389)')
-    parser.add_argument('--lon', default=148.469, help='Longitude in EPSG:4326 (default: 148.469)')
-    parser.add_argument('--buffer', default=0.1, help='Buffer in each direction in degrees (default is 0.1, or about 20kmx20km)')
+    parser.add_argument('--variable', default="VPeff", help=f"Default is 'VPeff', and options are: {list(ozwald_daily_abbreviations.keys())}")
+    parser.add_argument('--lat', default='-34.389', help='Latitude in EPSG:4326 (default: -34.389)')
+    parser.add_argument('--lon', default='148.469', help='Longitude in EPSG:4326 (default: 148.469)')
+    parser.add_argument('--buffer', default='0.1', help='Buffer in each direction in degrees (default is 0.1, or about 20kmx20km)')
     parser.add_argument('--start_year', default='2020', help='Inclusive, and the minimum start year is 2000. Setting the start and end year to the same value will get all data for that year.')
     parser.add_argument('--end_year', default='2021', help='Specifying a larger end_year than available will automatically give data up to the most recent date (currently 2024)')
     parser.add_argument('--outdir', default='.', help='Directory for the output NetCDF file (default is the current directory)')
@@ -147,17 +147,17 @@ if __name__ == '__main__':
     
     args = parse_arguments()
     
-    variables = args.variables
-    lat = args.lat
-    lon = args.lon
-    buffer = args.buffer
+    variable = args.variable
+    lat = float(args.lat)
+    lon = float(args.lon)
+    buffer = float(args.buffer)
     start_year = args.start_year
     end_year = args.end_year
     outdir = args.outdir
     stub = args.stub
     tmpdir = args.tmpdir
     
-    ozwald_daily(variables, lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir)
+    ozwald_daily([variable], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir)
     
 
 # # %%time
