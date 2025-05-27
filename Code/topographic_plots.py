@@ -8,11 +8,10 @@ paddockTS_dir = os.path.join(os.path.expanduser('~'), "Projects/PaddockTS")
 os.chdir(paddockTS_dir)
 sys.path.append(paddockTS_dir)
 
-from DAESIM_preprocess.topography import pysheds_accumulation, calculate_slope
+from DAESIM_preprocess.topography import pysheds_accumulation, calculate_slope, add_numpy_band
 
 import numpy as np
 import pickle
-import xarray as xr
 import rioxarray as rxr
 import geopandas as gpd
 from scipy.ndimage import gaussian_filter
@@ -46,21 +45,6 @@ def add_tiff_band(ds, variable, resampling_method, out_dir, stub):
     array = rxr.open_rasterio(filename)
     reprojected = array.rio.reproject_match(ds, resampling=resampling_method)
     ds[variable] = reprojected.isel(band=0).drop_vars('band')
-    return ds
-
-def add_numpy_band(ds, variable, array, affine, resampling_method):
-    """Add a new band to the xarray from a numpy array and affine using the given resampling method"""
-    da = xr.DataArray(
-        array, 
-        dims=["y", "x"], 
-        attrs={
-            "transform": affine,
-            "crs": "EPSG:3857"
-        }
-    )
-    da.rio.write_crs("EPSG:3857", inplace=True)
-    reprojected = da.rio.reproject_match(ds, resampling=resampling_method)
-    ds[variable] = reprojected
     return ds
 
 def main():
