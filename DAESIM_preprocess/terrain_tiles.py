@@ -3,9 +3,21 @@
 # Modules: gdal/3.6.4  
 # Environment base: /g/data/xe2/John/geospatenv
 
+# Change directory so that 'DAESIM_preprocess/terrain_tiles.xml' is in the pythonpath
+import os, sys
+repo_name = "PaddockTS"
+if os.path.expanduser("~").startswith("/home/"):  # Running on Gadi
+    repo_dir = os.path.join(os.path.expanduser("~"), f"Projects/{repo_name}")
+elif os.path.basename(os.getcwd()) != repo_name:  # Running in a jupyter notebook 
+    repo_dir = os.path.dirname(os.getcwd())       
+else:                                             # Already running from root of this repo. 
+    repo_dir = os.getcwd()
+os.chdir(repo_dir)
+sys.path.append(repo_dir)
+
 # Standard library
 import subprocess
-import os
+import argparse
 
 # Dependencies
 import numpy as np
@@ -37,7 +49,7 @@ def run_gdalwarp(bbox=[148.464499, -34.394042, 148.474499, -34.3840426], filenam
         xml, filename
     ]
     result = subprocess.run(command, capture_output=True, text=True)
-    # print("Terrain Tiles STDOUT:", result.stdout, flush=True)
+    # print("Terrain Tiles STDOUT:", result.stdout, flush=True)  # Debugging if something isn't working
     # print("Terrain Tiles STDERR:", result.stderr, flush=True)
     print(f"Downloaded {filename}")
 
@@ -93,27 +105,28 @@ def download_dem(dem, meta, filename="terrain_tiles.tif"):
         dst.write(dem, 1)
     print(f"Saved {filename}")
 
-def terrain_tiles(lat=-34.3890427, lon=148.469499, buffer=0.005, outdir=".", stub="Test", tmp_dir="."):
+def terrain_tiles(lat=-34.3890427, lon=148.469499, buffer=0.005, outdir=".", stub="TEST", tmpdir="."):
     """Download 10m resolution elevation from terrain_tiles
     
     Parameters
     ----------
-        lat, lon: Coordinates in WGS 84 (EPSG:4326)
-        buffer: Distance in degrees in a single direction. e.g. 0.01 degrees is ~1km so would give a ~2kmx2km area
-        outdir: The directory that the tiff file gets saved
-        stub: The name to be prepended to each file download
-        depths: See 'identifiers' at the top of this file for a complete list
+        lat, lon: Coordinates in WGS 84 (EPSG:4326).
+        buffer: Distance in degrees in a single direction. e.g. 0.01 degrees is ~1km so would give a ~2kmx2km area.
+        outdir: The directory to save the final cleaned tiff file.
+        stub: The name to be prepended to each file download.
+        tmpdir: The directory to save the raw uncleaned tiff file.
     
     Downloads
     ---------
         A Tiff file of elevation with severe outlier pixels replaced by the nearest neighbour
 
     """
+    print(f"Starting terrain_tiles.py")
     buffer = max(0.00002, buffer) # Make sure we download at least 1 pixel
     
     # Load the raw data
     bbox = [lon - buffer, lat - buffer, lon + buffer, lat + buffer]
-    filename = os.path.join(tmp_dir, f"{stub}_terrain_original.tif")
+    filename = os.path.join(tmpdir, f"{stub}_terrain_original.tif")
     run_gdalwarp(bbox, filename)
 
     # Fix bad measurements
@@ -121,21 +134,34 @@ def terrain_tiles(lat=-34.3890427, lon=148.469499, buffer=0.005, outdir=".", stu
     filename = os.path.join(outdir, f"{stub}_terrain.tif")
     download_dem(dem, meta, filename)
 
+    return dem
 
+
+def parse_arguments():
+    """Parse command line arguments with default values."""
+    parser = argparse.ArgumentParser(description="""Download daily variables from SILO at 5km resolution for the region/time of interest
+    Note: This will take ~5 mins and 400MB per variable year if downloading for the first time.""")
+    
+    parser.add_argument('--lat', default='-34.389', help='Latitude in EPSG:4326 (default: -34.389)')
+    parser.add_argument('--lon', default='148.469', help='Longitude in EPSG:4326 (default: 148.469)')
+    parser.add_argument('--buffer', default='0.1', help='Buffer in each direction in degrees (default is 0.1, or about 20kmx20km)')
+    parser.add_argument('--outdir', default='.', help='The directory to save the final cleaned tiff file.')
+    parser.add_argument('--stub', default='TEST', help='The name to be prepended to each file download. (default: TEST)')
+    parser.add_argument('--tmpdir', default='.', help='The directory to save the raw uncleaned tiff file.')
+    
+    return parser.parse_args()
 # -
 
+# +
 if __name__ == '__main__':
-    # Change directory to the PaddockTS repo so that the 'DAESIM_preprocess/terrain_tiles.xml' is in the pythonpath
-    if os.path.expanduser("~").startswith("/home/"):  # Running on Gadi
-        paddockTS_dir = os.path.join(os.path.expanduser("~"), "Projects/PaddockTS")
-    elif os.path.basename(os.getcwd()) != "PaddockTS":
-        paddockTS_dir = os.path.dirname(os.getcwd())  # Running in a jupyter notebook 
-    else:  # Already running locally from PaddockTS root
-        paddockTS_dir = os.getcwd()
-
-    print("Changing directory to:",paddockTS_dir)
-    os.chdir(paddockTS_dir)
     
-    terrain_tiles()
-
-
+    args = parse_arguments()
+    
+    lat = float(args.lat)
+    lon = float(args.lon)
+    buffer = float(args.buffer)
+    outdir = args.outdir
+    stub = args.stub
+    tmpdir = args.tmpdir
+    
+    terrain_tiles(lat, lon, buffer, outdir, stub, tmpdir)
