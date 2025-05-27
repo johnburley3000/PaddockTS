@@ -1,3 +1,5 @@
+# Terrain Tiles documentation is here: https://github.com/tilezen/joerd/blob/master/docs/data-sources.md
+
 # +
 # # NCI ARE Setup
 # Modules: gdal/3.6.4  
@@ -32,13 +34,45 @@ def transform_bbox(bbox=[148.464499, -34.394042, 148.474499, -34.384042], inputE
     x2,y2 = transformer.transform(bbox[3], bbox[2])
     return (x1, y1, x2, y2)
 
-def run_gdalwarp(bbox=[148.464499, -34.394042, 148.474499, -34.3840426], filename="output.tif"):
+def generate_xml(tile_level=14, filename="terrain_tiles.xml"):
+    xml_string = f"""<GDAL_WMS>
+  <Service name="TMS">
+    <ServerUrl>https://s3.amazonaws.com/elevation-tiles-prod/geotiff/${{z}}/${{x}}/${{y}}.tif</ServerUrl>
+  </Service>
+  <DataWindow>
+    <UpperLeftX>-20037508.34</UpperLeftX>
+    <UpperLeftY>20037508.34</UpperLeftY>
+    <LowerRightX>20037508.34</LowerRightX>
+    <LowerRightY>-20037508.34</LowerRightY>
+    <TileLevel>{tile_level}</TileLevel>
+    <TileCountX>1</TileCountX>
+    <TileCountY>1</TileCountY>
+    <YOrigin>top</YOrigin>
+  </DataWindow>
+  <Projection>EPSG:3857</Projection>
+  <BlockSizeX>512</BlockSizeX>
+  <BlockSizeY>512</BlockSizeY>
+  <BandsCount>1</BandsCount>
+  <DataType>Int16</DataType>
+  <ZeroBlockHttpCodes>403,404</ZeroBlockHttpCodes>
+  <DataValues>
+    <NoData>-32768</NoData>
+  </DataValues>
+  <Cache/>
+</GDAL_WMS>"""
+
+    with open(filename, "w", encoding="utf-8") as f:
+        f.write(xml_string)
+
+
+def run_gdalwarp(bbox=[148.464499, -34.394042, 148.474499, -34.3840426], filename="output.tif", tile_level=14, debug=False):
     """Use gdalwarp to download a tif from terrain tiles"""
 
     if os.path.exists(filename):
         os.remove(filename)
     
-    xml=os.path.join("DAESIM_preprocess/terrain_tiles.xml")
+    xml_path=os.path.join("DAESIM_preprocess/terrain_tiles.xml")
+    generate_xml(tile_level, xml_path)      # tile_level=14 means 10m tiles. 
         
     bbox_3857 = transform_bbox(bbox)
     min_x, min_y, max_x, max_y = bbox_3857
@@ -46,11 +80,12 @@ def run_gdalwarp(bbox=[148.464499, -34.394042, 148.474499, -34.3840426], filenam
         "gdalwarp",
         "-of", "GTiff",
         "-te", str(min_x), str(min_y), str(max_x), str(max_y),
-        xml, filename
+        xml_path, filename
     ]
     result = subprocess.run(command, capture_output=True, text=True)
-    # print("Terrain Tiles STDOUT:", result.stdout, flush=True)  # Debugging if something isn't working
-    # print("Terrain Tiles STDERR:", result.stderr, flush=True)
+    if debug:
+        print("Terrain Tiles STDOUT:", result.stdout, flush=True)  # Debugging if something isn't working
+        print("Terrain Tiles STDERR:", result.stderr, flush=True)
     print(f"Downloaded {filename}")
 
 def interpolate_nan(filename="output.tif"):
@@ -105,7 +140,7 @@ def download_dem(dem, meta, filename="terrain_tiles.tif"):
         dst.write(dem, 1)
     print(f"Saved {filename}")
 
-def terrain_tiles(lat=-34.3890427, lon=148.469499, buffer=0.005, outdir=".", stub="TEST", tmpdir="."):
+def terrain_tiles(lat=-34.3890427, lon=148.469499, buffer=0.005, outdir=".", stub="TEST", tmpdir=".", tile_level=14, interpolate=True):
     """Download 10m resolution elevation from terrain_tiles
     
     Parameters
@@ -115,6 +150,8 @@ def terrain_tiles(lat=-34.3890427, lon=148.469499, buffer=0.005, outdir=".", stu
         outdir: The directory to save the final cleaned tiff file.
         stub: The name to be prepended to each file download.
         tmpdir: The directory to save the raw uncleaned tiff file.
+        tile_level: The zoom level to determine the pixel size in the resulting tif. See documentation link at the top of this file for more info. 
+        interpolate: Boolean flag to decide whether to try to fix bad values or not. 
     
     Downloads
     ---------
@@ -127,14 +164,13 @@ def terrain_tiles(lat=-34.3890427, lon=148.469499, buffer=0.005, outdir=".", stu
     # Load the raw data
     bbox = [lon - buffer, lat - buffer, lon + buffer, lat + buffer]
     filename = os.path.join(tmpdir, f"{stub}_terrain_original.tif")
-    run_gdalwarp(bbox, filename)
+    run_gdalwarp(bbox, filename, tile_level)
 
-    # Fix bad measurements
-    dem, meta = interpolate_nan(filename)        
-    filename = os.path.join(outdir, f"{stub}_terrain.tif")
-    download_dem(dem, meta, filename)
-
-    return dem
+    if interpolate:
+        # Fix bad measurements
+        dem, meta = interpolate_nan(filename)        
+        filename = os.path.join(outdir, f"{stub}_terrain.tif")
+        download_dem(dem, meta, filename)
 
 
 def parse_arguments():
@@ -148,7 +184,9 @@ def parse_arguments():
     parser.add_argument('--outdir', default='.', help='The directory to save the final cleaned tiff file.')
     parser.add_argument('--stub', default='TEST', help='The name to be prepended to each file download. (default: TEST)')
     parser.add_argument('--tmpdir', default='.', help='The directory to save the raw uncleaned tiff file.')
-    
+    parser.add_argument('--tile_level', default='14', help='The zoom level described by terrain tiles documentation (default is 14, which means 10m pixels): https://github.com/tilezen/joerd/blob/master/docs/data-sources.md')
+    parser.add_argument('--just_download', default=False, action="store_true", help='Boolean flag to skip the nearest neighbour interpolation for bad values')
+
     return parser.parse_args()
 # -
 
@@ -163,5 +201,7 @@ if __name__ == '__main__':
     outdir = args.outdir
     stub = args.stub
     tmpdir = args.tmpdir
+    tile_level = args.tile_level
+    interpolate = not args.just_download
     
-    terrain_tiles(lat, lon, buffer, outdir, stub, tmpdir)
+    terrain_tiles(lat, lon, buffer, outdir, stub, tmpdir, tile_level, interpolate)
