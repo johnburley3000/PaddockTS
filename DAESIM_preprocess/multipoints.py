@@ -124,3 +124,9 @@ if __name__ == '__main__':
     
     print(f"Saved: {filename_out}")
     print(f"Output contains {len(df)} rows and {len(df.columns)} columns")
+
+# ds = xr.open_dataset('/g/data/xe2/cb8590/Eucalypts/EUC_min_temp_0.1_2020_2025_silo_daily.nc')
+
+# ds
+
+

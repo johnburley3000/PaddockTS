@@ -136,8 +136,7 @@ def parse_arguments():
     parser.add_argument('--outdir', default='.', help='Directory for the output NetCDF file (default is the current directory)')
     parser.add_argument('--stub', default='TEST', help='The name to be prepended to each file download. (default: TEST)')
     parser.add_argument('--tmpdir', default='.', help='The directory that the temporary NetCDFs get saved when downloading from Thredds. This does not get used if Thredds=False. (default is the current directory)')
-    parser.add_argument('--thredds', default=True, help='A boolean flag to choose between using the public facing Thredds API (slower but works locally), or running directly on NCI (requires access to the ub8 project). (default: True)')
-    
+    parser.add_argument('--nci', default=False, action="store_true", help='A boolean flag to choose between using the public facing Thredds API (slower but works locally), or running directly on NCI (requires access to the ub8 project). (default is to use Thredds)')
     return parser.parse_args()
 # -
 
@@ -155,7 +154,7 @@ if __name__ == '__main__':
     outdir = args.outdir
     stub = args.stub
     tmpdir = args.tmpdir
-    thredds = args.thredds
+    thredds = not args.nci
     
     ozwald_daily([variable], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds=thredds)
     

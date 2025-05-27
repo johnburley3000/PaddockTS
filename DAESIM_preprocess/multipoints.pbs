@@ -1,11 +1,11 @@
 #!/bin/bash
 #PBS -N multipoints
-#PBS -q copyq
+#PBS -q normal
 #PBS -l mem=48GB
 #PBS -l jobfs=1GB
 #PBS -l ncpus=1
 #PBS -P xe2
-#PBS -l walltime=10:00:00
+#PBS -l walltime=04:00:00
 #PBS -l storage=gdata/xe2+gdata/ub8
 
 # Notes:
@@ -29,5 +29,5 @@ cd $wd
 # Run script:
 # python DAESIM_preprocess/multipoints.py --func ozwald_daily --variable Tmin --max_samples 4
 # python DAESIM_preprocess/multipoints.py --func ozwald_daily --variable Tmax --start_year 1990 --end_year 2010 
-python DAESIM_preprocess/multipoints.py --func silo_daily --variable max_temp --tmpdir /g/data/xe2/datasets/Climate_SILO
+python DAESIM_preprocess/multipoints.py --func silo_daily --variable min_temp --tmpdir /g/data/xe2/datasets/Climate_SILO --start_year 2010 --end_year 2020
 
