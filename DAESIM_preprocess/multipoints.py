@@ -40,7 +40,6 @@ def multipoints(df, func, variable="Tmin", start_year="2020", end_year="2021", o
         lon, lat = row['X'], row['Y']
         sample_name = row['sample_name']
         ds = func([variable], lat, lon, 0, start_year, end_year, outdir, stub, tmp_dir, thredds=False, save_netcdf=False)
-        print(f'time: {len(ds.time)}, lat: {len(ds.lat)}, lon: {len(ds.lon)}, for {sample_name}, {lat}, {lon}')
         dss.append(ds)
         sample_info.append(row.to_dict())
     

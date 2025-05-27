@@ -122,7 +122,7 @@ def silo_daily(variables=["radiation"], lat=-34.3890427, lon=148.469499, buffer=
     -------
         ds_concat: an xarray containing the requested variables in the region of interest for the time period specified
     """
-    print(f"Starting silo_daily")
+    print(f"Starting silo_daily for stub {stub}")
     
     dss = []
     years = [str(year) for year in list(range(int(start_year), int(end_year) + 1))]
