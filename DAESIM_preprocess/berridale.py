@@ -1,4 +1,5 @@
 import pandas as pd
+import geopandas as gpd
 import xarray as xr
 import matplotlib.pyplot as plt
 
@@ -58,67 +59,12 @@ save_tif((ds_ozwald['Tmin'] < -1).sum(dim="time").astype(float), 'ozwald_days_be
 save_tif((ds_ozwald['Tmin'] < -5).sum(dim="time").astype(float), 'ozwald_days_below_neg5')
 save_tif((ds_ozwald['Tmin'] < -10).sum(dim="time").astype(float), 'ozwald_days_below_neg10')
 
-tmin = ds_ozwald['Tmin']
+# Load the roads for overlaying with the video
+gdf_filename = '/g/data/xe2/cb8590/Open_Street_Maps/berridale_main_roads.gpkg'
+gdf = gpd.read_file(gdf_filename)
+gdf = gdf[['geometry']]
 
-from matplotlib.animation import FuncAnimation
-
-# +
-# %%time
-# Generate a gif of the minimum temperature
-fig, ax = plt.subplots(figsize=(6, 5))
-vmin = float(tmin.min())
-vmax = float(tmin.max())
-img = ax.imshow(tmin.isel(time=0), cmap='coolwarm', vmin=vmin, vmax=vmax)
-cbar = plt.colorbar(img, ax=ax)
-title = ax.set_title("")
-
-def update(frame):
-    data = tmin.isel(time=frame)
-    img.set_array(data)
-    time_str = str(tmin.time[frame].values)[:10]
-    title.set_text(f"Min Temperature: {time_str}")
-    return [img, title]
-
-ani = FuncAnimation(fig, update, frames=len(tmin.time), interval=50, blit=True)
-
-# Save to mp4
-filename = '/scratch/xe2/cb8590/tmp/tmin_animation.mp4'
-ani.save(filename, fps=20, dpi=150)
-plt.close()
-# -
-
-import imageio.v3 as iio
-from tqdm import tqdm
-
-# +
-# %%time
-
-images = []
-vmin = float(tmin.min())
-vmax = float(tmin.max())
-
-for i in tqdm(range(0, len(tmin.time), 10)):  # sample every 10th frame for faster GIF
-    fig, ax = plt.subplots(figsize=(6, 5))
-    im = ax.imshow(tmin.isel(time=i), cmap='coolwarm', vmin=vmin, vmax=vmax)
-    time_str = str(tmin.time[i].values)[:10]
-    ax.set_title(f"Min Temperature: {time_str}")
-    plt.axis('off')
-    plt.tight_layout()
-    fig.canvas.draw()
-
-    # Convert figure to numpy array
-    image = np.frombuffer(fig.canvas.tostring_rgb(), dtype='uint8')
-    image = image.reshape(fig.canvas.get_width_height()[::-1] + (3,))
-    images.append(image)
-    plt.close()
-
-# Save to GIF
-filename = '/scratch/xe2/cb8590/tmp/tmin_animation.gif'
-iio.imwrite(filename, images, duration=0.1)
-
-# -
-
-limit = 100
+limit = 365
 ds_small = ds_ozwald.isel(time=slice(0,limit))
 
 # %%time
@@ -131,8 +77,9 @@ xr_animation(
     interval=100,
     width_pixels=300,
     show_text="Tmin",
+    show_gdf=gdf[['geometry']]
 )
 plt.close()
 Video(filename, embed=True)
 
-
+# !du -sh /scratch/xe2/cb8590/tmp/ozwald_xr_animation_365points.mp4
