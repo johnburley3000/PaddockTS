@@ -55,9 +55,9 @@ def calculate_TWI(acc, slope):
     """Calculate the topographic wetness index based on upstream area and local slope
         TWI = ln( accumulation / tan(slope) )
     """
-    slope_radians = np.radians(slope)
-    slope_radians[slope_radians == 0] = np.finfo(float).eps     # Avoid division by 0
-    twi = np.log(acc / np.tan(slope_radians))
+    ratio_acc_slope = acc / np.tan(np.radians(slope))
+    ratio_acc_slope[ratio_acc_slope <= 0] = 1     # Avoid division by 0
+    twi = np.log(ratio_acc_slope)
     return twi
 
 
@@ -77,7 +77,7 @@ def add_numpy_band(ds, variable, array, affine, resampling_method):
     return ds
 
 
-def topography(outdir=".", stub="TEST", smooth=True, sigma=5):
+def topography(outdir=".", stub="TEST", smooth=True, sigma=5, ds=None):
     """Derive topographic variables from the elevation. 
     This function assumes there already exists a file named (outdir)/(stub)_terrain.tif"
     
@@ -88,6 +88,7 @@ def topography(outdir=".", stub="TEST", smooth=True, sigma=5):
         smooth: boolean to determine whether to apply a gaussian filter to the elevation before deriving topographic variables. 
                 This is necessary when using terrain tiles to remove artifacts from the elevation being stored as ints.
         sigma: smoothing parameter to use for the gaussian filter. Not used if smooth=False. 
+        ds: The output of terrain_tiles so that you don't have to re-load the tif again.
     
     Downloads
     ---------
@@ -96,13 +97,15 @@ def topography(outdir=".", stub="TEST", smooth=True, sigma=5):
     """
     print(f"Starting topography.py")
 
-    terrain_tif = os.path.join(outdir, f"{stub}_terrain.tif")
-    if not os.path.exists(terrain_tif):
-        raise Exception("{terrain_tif} does not exist. Please run terrain_tiles.py first.")
-
-    da = rxr.open_rasterio(terrain_tif).isel(band=0).drop_vars('band')
-    ds = da.to_dataset(name='elevation')
-    ds.rio.write_crs("EPSG:4326", inplace=True)
+    if not ds:
+        print("Loading the pre-downloaded terrain tif")
+        terrain_tif = os.path.join(outdir, f"{stub}_terrain.tif")
+        if not os.path.exists(terrain_tif):
+            raise Exception("{terrain_tif} does not exist. Please run terrain_tiles.py first.")
+        da = rxr.open_rasterio(terrain_tif).isel(band=0).drop_vars('band')
+        ds = da.to_dataset(name='elevation')
+    
+    ds.rio.write_crs("EPSG:3857", inplace=True)
 
     if smooth:
         print("Smoothing the terrain using a gaussian filter")
@@ -159,15 +162,15 @@ if __name__ == '__main__':
     topography(outdir, stub, smooth, sigma)
 
 # +
-# # # Change directory to the PaddockTS repo
-# import os, sys
-# if os.path.expanduser("~").startswith("/home/"):  # Running on Gadi
-#     paddockTS_dir = os.path.join(os.path.expanduser("~"), "Projects/PaddockTS")
-# elif os.path.basename(os.getcwd()) != "PaddockTS":
-#     paddockTS_dir = os.path.dirname(os.getcwd())  # Running in a jupyter notebook 
-# else:  # Already running locally from PaddockTS root
-#     paddockTS_dir = os.getcwd()
-# os.chdir(paddockTS_dir)
-# sys.path.append(paddockTS_dir)
+# # Change directory to the PaddockTS repo
+import os, sys
+if os.path.expanduser("~").startswith("/home/"):  # Running on Gadi
+    paddockTS_dir = os.path.join(os.path.expanduser("~"), "Projects/PaddockTS")
+elif os.path.basename(os.getcwd()) != "PaddockTS":
+    paddockTS_dir = os.path.dirname(os.getcwd())  # Running in a jupyter notebook 
+else:  # Already running locally from PaddockTS root
+    paddockTS_dir = os.getcwd()
+os.chdir(paddockTS_dir)
+sys.path.append(paddockTS_dir)
 
-# ds = topography()
+ds = topography()

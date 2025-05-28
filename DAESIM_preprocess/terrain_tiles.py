@@ -160,6 +160,7 @@ def create_xarray(dem, meta):
         attrs={
             "crs": crs.to_string(),
             "transform": transform,  
+            "nodata": meta["nodata"]
         },
         name="elevation"
     )
