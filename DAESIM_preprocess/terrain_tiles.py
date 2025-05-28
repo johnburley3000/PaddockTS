@@ -162,7 +162,7 @@ def create_xarray(dem, meta):
             "transform": transform,  
             "nodata": meta["nodata"]
         },
-        name="elevation"
+        name="terrain"
     )
     dem_ds = dem_da.to_dataset()
     return dem_ds

@@ -103,7 +103,7 @@ def topography(outdir=".", stub="TEST", smooth=True, sigma=5, ds=None):
         if not os.path.exists(terrain_tif):
             raise Exception("{terrain_tif} does not exist. Please run terrain_tiles.py first.")
         da = rxr.open_rasterio(terrain_tif).isel(band=0).drop_vars('band')
-        ds = da.to_dataset(name='elevation')
+        ds = da.to_dataset(name='terrain')
     
     ds.rio.write_crs("EPSG:3857", inplace=True)
 
@@ -111,7 +111,7 @@ def topography(outdir=".", stub="TEST", smooth=True, sigma=5, ds=None):
         print("Smoothing the terrain using a gaussian filter")
         terrain_tif = os.path.join(outdir, f"{stub}_terrain_smoothed.tif")
         sigma = int(sigma)
-        dem = ds['elevation'].values
+        dem = ds['terrain'].values
         dem_smooth = gaussian_filter(dem.astype(float), sigma=sigma)
         ds['dem_smooth'] = (["y", "x"], dem_smooth)
         ds["dem_smooth"].rio.to_raster(terrain_tif)

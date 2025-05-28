@@ -99,22 +99,18 @@ def multipoints_topography(df, outdir=".", stub="TEST", tmp_dir="."):
         pickle.dump(dss, handle, protocol=pickle.HIGHEST_PROTOCOL)
         print('Saved:', filename)
     
-    # Make sure we get all 5 variables.
-                            
-    # Create DataFrame with sample info and time series data
-    das = [dataset_to_series(ds) for ds in dss]
+    # Create a dataframe with these 5 variables
+    topographic_variables = ['terrain', 'accumulation', 'aspect', 'slope', 'twi']
     result_data = []
-    for i, (info, da) in enumerate(zip(sample_info, das)):
-        
-        # Add date columns to the original columns
+    for i, (info, ds) in enumerate(zip(sample_info, dss)):
         row_data = info.copy()
-        for date, value in da.items():
-            date_string = str(date)[:10]
-            row_data[date_string] = value
-            
+        center_point = ds.isel(x=round(len(ds.x)/2), y=round(len(ds.y)/2))
+        for topographic_variable in topographic_variables:
+            row_data[topographic_variable] = float(center_point[topographic_variable])
         result_data.append(row_data)
-    
+
     result_df = pd.DataFrame(result_data)
+    
     return result_df
 
 
@@ -171,58 +167,3 @@ if __name__ == '__main__':
     
     print(f"Saved: {filename_out}")
     print(f"Output contains {len(df)} rows and {len(df.columns)} columns")
-
-# +
-stub = "TEST"
-outdir = "/scratch/xe2/cb8590/tmp"
-tmpdir = "/scratch/xe2/cb8590/tmp"
-filename_latlon = '/g/data/xe2/cb8590/Eucalypts/all_euc_sample_metadata_20250525_geo_bioclim.tsv'
-max_samples = 10
-
-print(f"Reading data from: {filename_latlon}")
-df = pd.read_csv(filename_latlon, sep='\t')
-
-if max_samples:
-    df = df[:max_samples]
-print(f"Processing {len(df)} samples")
-
-# +
-# i = 0
-# row = df.iloc[0]
-# dss = []
-# sample_info = [] 
-# lon, lat = row['X'], row['Y']
-# sample_name = row['sample_name']
-# ds_terrain = terrain_tiles(lat, lon, 0.01, outdir, stub, tmpdir, tile_level=14, interpolate=True)
-# ds = topography(outdir, stub, True, 5, ds_terrain)
-# -
-
-# %%time
-dss = []
-sample_info = [] 
-for i, row in df.iterrows():
-    lon, lat = row['X'], row['Y']
-    sample_name = row['sample_name']
-    ds_terrain = terrain_tiles(lat, lon, 0.01, outdir, stub, tmpdir, tile_level=14, interpolate=True)
-    ds = topography(outdir, stub, True, 5, ds_terrain)
-    dss.append(ds)
-    sample_info.append(row.to_dict())
-
-
-# +
-# das = [dataset_to_series(ds) for ds in dss]
-# result_data = []
-# for i, (info, da) in enumerate(zip(sample_info, das)):
-
-#     # Add date columns to the original columns
-#     row_data = info.copy()
-#     for date, value in da.items():
-#         date_string = str(date)[:10]
-#         row_data[date_string] = value
-
-#     result_data.append(row_data)
-
-# result_df = pd.DataFrame(result_data)
-# -
-
-
