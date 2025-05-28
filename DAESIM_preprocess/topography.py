@@ -77,7 +77,7 @@ def add_numpy_band(ds, variable, array, affine, resampling_method):
     return ds
 
 
-def topography(outdir=".", stub="TEST", smooth=True, sigma=5, ds=None):
+def topography(outdir=".", stub="TEST", smooth=True, sigma=5, ds=None, savetifs=True, verbose=True):
     """Derive topographic variables from the elevation. 
     This function assumes there already exists a file named (outdir)/(stub)_terrain.tif"
     
@@ -108,32 +108,39 @@ def topography(outdir=".", stub="TEST", smooth=True, sigma=5, ds=None):
     ds.rio.write_crs("EPSG:3857", inplace=True)
 
     if smooth:
-        print("Smoothing the terrain using a gaussian filter")
+        if verbose:
+            print("Smoothing the terrain using a gaussian filter")
         terrain_tif = os.path.join(outdir, f"{stub}_terrain_smoothed.tif")
         sigma = int(sigma)
         dem = ds['terrain'].values
         dem_smooth = gaussian_filter(dem.astype(float), sigma=sigma)
         ds['dem_smooth'] = (["y", "x"], dem_smooth)
         ds["dem_smooth"].rio.to_raster(terrain_tif)
-
-    print("Calculating accumulation")
+    
+    if verbose:
+        print("Calculating accumulation")
     grid, dem, fdir, acc = pysheds_accumulation(terrain_tif)
     aspect = fdir.astype('uint8')
 
-    print("Calculating slope and TWI")
+    if verbose:
+        print("Calculating slope and TWI")
     slope = calculate_slope(terrain_tif)
     twi = calculate_TWI(acc, slope)
 
-    print("Saving the tif files")
     ds['accumulation'] = (["y", "x"], acc)
     ds['aspect'] = (["y", "x"], aspect)
     ds['slope'] = (["y", "x"], slope)
     ds['twi'] = (["y", "x"], twi)
-    for topographic_variable in topographic_variables:
-        filepath = os.path.join(outdir, f"{stub}_{topographic_variable}.tif")
-        ds[topographic_variable].rio.to_raster(filepath)
-        print("Saved:", filepath)
-        
+
+    if savetifs:
+        if verbose:
+            print("Saving the tif files")
+        for topographic_variable in topographic_variables:
+            filepath = os.path.join(outdir, f"{stub}_{topographic_variable}.tif")
+            ds[topographic_variable].rio.to_raster(filepath)
+            if verbose:
+                print("Saved:", filepath)
+            
     return ds
 
 
@@ -160,17 +167,3 @@ if __name__ == '__main__':
     sigma = args.sigma
 
     topography(outdir, stub, smooth, sigma)
-
-# +
-# # Change directory to the PaddockTS repo
-import os, sys
-if os.path.expanduser("~").startswith("/home/"):  # Running on Gadi
-    paddockTS_dir = os.path.join(os.path.expanduser("~"), "Projects/PaddockTS")
-elif os.path.basename(os.getcwd()) != "PaddockTS":
-    paddockTS_dir = os.path.dirname(os.getcwd())  # Running in a jupyter notebook 
-else:  # Already running locally from PaddockTS root
-    paddockTS_dir = os.getcwd()
-os.chdir(paddockTS_dir)
-sys.path.append(paddockTS_dir)
-
-ds = topography()

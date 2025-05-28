@@ -5,7 +5,7 @@
 #PBS -l jobfs=1GB
 #PBS -l ncpus=1
 #PBS -P xe2
-#PBS -l walltime=04:00:00
+#PBS -l walltime=24:00:00
 #PBS -l storage=gdata/xe2+gdata/ub8
 
 # Notes:
@@ -19,7 +19,7 @@ echo "Starting"
 
 # activate virtual environment:
 source /g/data/xe2/John/geospatenv/bin/activate
-# module load gdal/3.6.4
+module load gdal/3.6.4
 # module load netcdf/4.7.3
 
 # Change working directory
@@ -27,7 +27,8 @@ wd=/home/147/cb8590/Projects/PaddockTS
 cd $wd
 
 # Run script:
-# python DAESIM_preprocess/multipoints.py --func ozwald_daily --variable Tmin --max_samples 4
-# python DAESIM_preprocess/multipoints.py --func ozwald_daily --variable Tmax --start_year 1990 --end_year 2010 
-python DAESIM_preprocess/multipoints.py --func silo_daily --variable max_temp --tmpdir /g/data/xe2/datasets/Climate_SILO --outdir /scratch/xe2/cb8590/Eucalypts --start_year 2020 --end_year 2025
+# python DAESIM_preprocess/multipoints.py --func ozwald_daily --variable Tmin --max_samples 4 --stub EUC
+# python DAESIM_preprocess/multipoints.py --func ozwald_daily --variable Tmax --start_year 1990 --end_year 2010 --stub EUC
+# python DAESIM_preprocess/multipoints.py --func silo_daily --variable max_temp --tmpdir /g/data/xe2/datasets/Climate_SILO --outdir /scratch/xe2/cb8590/Eucalypts --start_year 2020 --end_year 2025 --stub EUC
+python DAESIM_preprocess/multipoints.py --func topography  --tmpdir /scratch/xe2/cb8590/tmp --outdir /scratch/xe2/cb8590/Eucalypts --stub EUC
 

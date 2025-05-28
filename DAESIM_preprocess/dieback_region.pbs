@@ -56,7 +56,7 @@ lon=148.830894
 buffer=0.6
 outdir=/scratch/xe2/cb8590/Eucalypts
 tmpdir=/scratch/xe2/cb8590/tmp
-tile_level=10
+tile_level=3
 stub=BERRIDALE_buffer_${buffer}degrees_tile_level${tile_level}
 python DAESIM_preprocess/terrain_tiles.py --lat $lat --lon $lon --buffer $buffer --outdir $outdir --stub $stub --tmpdir $tmpdir --tile_level $tile_level
 

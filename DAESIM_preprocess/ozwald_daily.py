@@ -13,8 +13,8 @@ import xarray as xr
 # +
 ozwald_daily_abbreviations = {
     "Pg" : "Gross precipitation",  # 4km grid
-    "Tmax" : "Maximum temperature",  # 250m grid
-    "Tmin" : "Minimum temperature",  # 250m grid
+    "Tmax" : "Maximum temperature",  # 500m grid
+    "Tmin" : "Minimum temperature",  # 500m grid
     "Uavg" : "Average 24h windspeed",  # 5km grid
     "Ueff" : "Effective daytime windspeed",  # 5km grid
     "VPeff" : "Volume of effective rainfall",  # 5km grid

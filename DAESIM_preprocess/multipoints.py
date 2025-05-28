@@ -89,7 +89,7 @@ def multipoints_topography(df, outdir=".", stub="TEST", tmp_dir="."):
         lon, lat = row['X'], row['Y']
         sample_name = row['sample_name']
         ds_terrain = terrain_tiles(lat, lon, 0.01, outdir, stub, tmpdir, tile_level=14, interpolate=True)
-        ds = topography(outdir, stub, True, 5, ds_terrain)
+        ds = topography(outdir, stub, True, 5, ds_terrain, False, False)
         dss.append(ds)
         sample_info.append(row.to_dict())
     
@@ -156,14 +156,17 @@ if __name__ == '__main__':
     if func == 'topography':
         print(f"Downloading terrain tiles and extracting topographic data")
         df = multipoints_topography(df, outdir, stub, tmpdir)
+        if max_samples:
+            name = f"{stub}_topography_{max_samples}.tsv"
+        else:
+            name = f"{stub}_topography.tsv"
+        filename_out = os.path.join(outdir, name)
     else:
         # Extract time series data
         print(f"Extracting {variable} data from {start_year} to {end_year}")
         df = multipoints(df, funcs[func], variable, start_year, end_year, outdir, stub, tmpdir)
-
-    # Save results
-    filename_out = os.path.join(outdir, f"{stub}_{func}_{variable}_{start_year}_{end_year}.tsv")
-    df.to_csv(filename_out, index=False, sep='\t')
+        filename_out = os.path.join(outdir, f"{stub}_{func}_{variable}_{start_year}_{end_year}.tsv")
     
+    df.to_csv(filename_out, index=False, sep='\t')
     print(f"Saved: {filename_out}")
     print(f"Output contains {len(df)} rows and {len(df.columns)} columns")
