@@ -24,6 +24,16 @@ import pickle
 from DAESIM_preprocess.ozwald_daily import ozwald_daily
 from DAESIM_preprocess.ozwald_8day import ozwald_8day
 from DAESIM_preprocess.silo_daily import silo_daily
+from DAESIM_preprocess.terrain_tiles import terrain_tiles
+from DAESIM_preprocess.topography import topography
+
+funcs = {
+    'ozwald_daily':ozwald_daily,
+    'silo_daily':silo_daily,
+    'ozwald_8day':ozwald_8day,
+    'terrain_tiles':terrain_tiles,
+    'topography':topography
+}
 
 
 def dataset_to_series(ds):
@@ -66,12 +76,6 @@ def multipoints(df, func, variable="Tmin", start_year="2020", end_year="2021", o
     return result_df
 
 
-funcs = {
-    'ozwald_daily':ozwald_daily,
-    'silo_daily':silo_daily,
-    'ozwald_8day':ozwald_8day
-}
-
 
 def parse_arguments():
     """Parse command line arguments with default values."""
@@ -87,7 +91,6 @@ def parse_arguments():
     parser.add_argument('--filename_latlon', default='/g/data/xe2/cb8590/Eucalypts/all_euc_sample_metadata_20250525_geo_bioclim.tsv', help='Path to input file with lat/lon coordinates')
     parser.add_argument('--max_samples', type=int, default=None, help='Maximum number of samples to process (default: None)')
     
-
     return parser.parse_args()
 
 if __name__ == '__main__':

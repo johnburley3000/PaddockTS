@@ -100,15 +100,17 @@ def topography(outdir=".", stub="TEST", smooth=True, sigma=5):
     if not os.path.exists(terrain_tif):
         raise Exception("{terrain_tif} does not exist. Please run terrain_tiles.py first.")
 
-    ds = rxr.open_rasterio(terrain_tif)
+    da = rxr.open_rasterio(terrain_tif).isel(band=0).drop_vars('band')
+    ds = da.to_dataset(name='elevation')
+    ds.rio.write_crs("EPSG:4326", inplace=True)
 
     if smooth:
         print("Smoothing the terrain using a gaussian filter")
         terrain_tif = os.path.join(outdir, f"{stub}_terrain_smoothed.tif")
         sigma = int(sigma)
-        dem = ds.isel(band=0).drop_vars('band').values
+        dem = ds['elevation'].values
         dem_smooth = gaussian_filter(dem.astype(float), sigma=sigma)
-        ds = add_numpy_band(ds, "dem_smooth", dem_smooth, ds.rio.transform(), Resampling.average)
+        ds['dem_smooth'] = (["y", "x"], dem_smooth)
         ds["dem_smooth"].rio.to_raster(terrain_tif)
 
     print("Calculating accumulation")
@@ -120,14 +122,16 @@ def topography(outdir=".", stub="TEST", smooth=True, sigma=5):
     twi = calculate_TWI(acc, slope)
 
     print("Saving the tif files")
-    ds = add_numpy_band(ds, "accumulation", acc, grid.affine, Resampling.max)
-    ds = add_numpy_band(ds, "aspect", aspect, grid.affine, Resampling.nearest)
-    ds = add_numpy_band(ds, "slope", slope, grid.affine, Resampling.average)
-    ds = add_numpy_band(ds, "twi", twi, grid.affine, Resampling.max)
+    ds['accumulation'] = (["y", "x"], acc)
+    ds['aspect'] = (["y", "x"], aspect)
+    ds['slope'] = (["y", "x"], slope)
+    ds['twi'] = (["y", "x"], twi)
     for topographic_variable in topographic_variables:
         filepath = os.path.join(outdir, f"{stub}_{topographic_variable}.tif")
         ds[topographic_variable].rio.to_raster(filepath)
         print("Saved:", filepath)
+        
+    return ds
 
 
 def parse_arguments():
@@ -155,7 +159,7 @@ if __name__ == '__main__':
     topography(outdir, stub, smooth, sigma)
 
 # +
-# # Change directory to the PaddockTS repo
+# # # Change directory to the PaddockTS repo
 # import os, sys
 # if os.path.expanduser("~").startswith("/home/"):  # Running on Gadi
 #     paddockTS_dir = os.path.join(os.path.expanduser("~"), "Projects/PaddockTS")
@@ -166,11 +170,4 @@ if __name__ == '__main__':
 # os.chdir(paddockTS_dir)
 # sys.path.append(paddockTS_dir)
 
-# outdir = "."
-# stub="TEST"
-# terrain_tif = os.path.join(outdir, f"{stub}_terrain.tif")
-# ds = rxr.open_rasterio(terrain_tif)
-
-# -
-
-
+# ds = topography()

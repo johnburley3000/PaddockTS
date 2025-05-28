@@ -26,6 +26,9 @@ import numpy as np
 import rasterio
 from scipy.interpolate import griddata
 from pyproj import Transformer
+import xarray as xr
+import rioxarray as rxr
+from affine import Affine
 
 # +
 def transform_bbox(bbox=[148.464499, -34.394042, 148.474499, -34.384042], inputEPSG="EPSG:4326", outputEPSG="EPSG:3857"):
@@ -140,6 +143,29 @@ def download_dem(dem, meta, filename="terrain_tiles.tif"):
         dst.write(dem, 1)
     print(f"Saved {filename}")
 
+def create_xarray(dem, meta):
+    """Convert the cleaned dem into an xarray, without re-writing and re-reading to file"""
+    transform = meta['transform']
+    height = meta['height']
+    width = meta['width']
+    crs = meta['crs']
+
+    x_coords = transform.c + np.arange(width) * transform.a
+    y_coords = transform.f + np.arange(height) * transform.e 
+
+    dem_da = xr.DataArray(
+        dem,
+        dims=("y", "x"),
+        coords={"x": x_coords, "y": y_coords},
+        attrs={
+            "crs": crs.to_string(),
+            "transform": transform,  
+        },
+        name="elevation"
+    )
+    dem_ds = dem_da.to_dataset()
+    return dem_ds
+    
 def terrain_tiles(lat=-34.3890427, lon=148.469499, buffer=0.005, outdir=".", stub="TEST", tmpdir=".", tile_level=14, interpolate=True):
     """Download 10m resolution elevation from terrain_tiles
     
@@ -161,7 +187,7 @@ def terrain_tiles(lat=-34.3890427, lon=148.469499, buffer=0.005, outdir=".", stu
     print(f"Starting terrain_tiles.py")
     buffer = max(0.00002, buffer) # Make sure we download at least 1 pixel
     
-    # Load the raw data
+    # Download the raw data from terrain tiles
     bbox = [lon - buffer, lat - buffer, lon + buffer, lat + buffer]
     filename = os.path.join(tmpdir, f"{stub}_terrain_original.tif")
     run_gdalwarp(bbox, filename, tile_level)
@@ -171,12 +197,17 @@ def terrain_tiles(lat=-34.3890427, lon=148.469499, buffer=0.005, outdir=".", stu
         dem, meta = interpolate_nan(filename)        
         filename = os.path.join(outdir, f"{stub}_terrain.tif")
         download_dem(dem, meta, filename)
+        ds = create_xarray(dem, meta)
+    else:
+        # We could use rxr.open_rasterio() but the purpose of the interpolate flag is to reduce computational overhead, so I think it's better not to reload the tif here.  
+        ds = None
+        
+    return ds
 
 
 def parse_arguments():
     """Parse command line arguments with default values."""
-    parser = argparse.ArgumentParser(description="""Download daily variables from SILO at 5km resolution for the region/time of interest
-    Note: This will take ~5 mins and 400MB per variable year if downloading for the first time.""")
+    parser = argparse.ArgumentParser(description="""Download elevation data from the MapZen Terrain Tiles API.""")
     
     parser.add_argument('--lat', default='-34.389', help='Latitude in EPSG:4326 (default: -34.389)')
     parser.add_argument('--lon', default='148.469', help='Longitude in EPSG:4326 (default: 148.469)')
@@ -185,12 +216,11 @@ def parse_arguments():
     parser.add_argument('--stub', default='TEST', help='The name to be prepended to each file download. (default: TEST)')
     parser.add_argument('--tmpdir', default='.', help='The directory to save the raw uncleaned tiff file.')
     parser.add_argument('--tile_level', default='14', help='The zoom level described by terrain tiles documentation (default is 14, which means 10m pixels): https://github.com/tilezen/joerd/blob/master/docs/data-sources.md')
-    parser.add_argument('--just_download', default=False, action="store_true", help='Boolean flag to skip the nearest neighbour interpolation for bad values')
+    parser.add_argument('--just_download', default=False, action="store_true", help='Boolean flag to skip the nearest neighbour interpolation for bad values.')
 
     return parser.parse_args()
 # -
 
-# +
 if __name__ == '__main__':
     
     args = parse_arguments()
