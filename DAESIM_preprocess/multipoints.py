@@ -29,6 +29,7 @@ from DAESIM_preprocess.ozwald_8day import ozwald_8day
 from DAESIM_preprocess.silo_daily import silo_daily
 from DAESIM_preprocess.terrain_tiles import terrain_tiles
 from DAESIM_preprocess.topography import topography
+from DAESIM_preprocess.slga_soils import slga_soils, slga_soils_abbrevations, identifiers
 
 funcs = {
     'ozwald_daily':ozwald_daily,
@@ -114,6 +115,41 @@ def multipoints_topography(df, outdir=".", stub="TEST", tmp_dir="."):
     return result_df
 
 
+def multipoints_soils(df, variable="Clay", depth="5-15cm", outdir=".", stub="TEST", tmp_dir="."):
+    """Download soil data for each point. 
+    Assumes the dataframe has at least columns 'X' and 'Y' corresponding to lon and lat"""    
+    dss = []
+    sample_info = [] 
+    for i, row in df.iterrows():
+        lon, lat = row['X'], row['Y']
+        sample_name = row['sample_name']
+        for variable in slga_soils_abbrevations.keys():
+            for depth in identifiers.keys():
+                ds = slga_soils([variable], lat, lon, 0, outdir, stub, tmpdir, [depth])
+                dss.append(ds)
+        sample_info.append(row.to_dict())
+    
+    # Save the dss as a pickle for debugging if needed
+    # filename = os.path.join(tmp_dir, f'{variable}_{start_year}_{end_year}_{stub}_dss.pickle')
+    # with open(filename, 'wb') as handle:
+    #     pickle.dump(dss, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    #     print('Saved:', filename)
+    
+    # # Create a dataframe with these 5 variables
+    # topographic_variables = ['terrain', 'accumulation', 'aspect', 'slope', 'twi']
+    # result_data = []
+    # for i, (info, ds) in enumerate(zip(sample_info, dss)):
+    #     row_data = info.copy()
+    #     center_point = ds.isel(x=round(len(ds.x)/2), y=round(len(ds.y)/2))
+    #     for topographic_variable in topographic_variables:
+    #         row_data[topographic_variable] = float(center_point[topographic_variable])
+    #     result_data.append(row_data)
+
+    result_df = pd.DataFrame(result_data)
+    
+    return result_df
+
+
 def parse_arguments():
     """Parse command line arguments with default values."""
     parser = argparse.ArgumentParser(description='Extract climate data for multiple points')
@@ -127,7 +163,8 @@ def parse_arguments():
     parser.add_argument('--tmpdir', default='/scratch/xe2/cb8590/Eucalypts', help='Output directory (default: /scratch/xe2/cb8590/Eucalypts)')
     parser.add_argument('--filename_latlon', default='/g/data/xe2/cb8590/Eucalypts/all_euc_sample_metadata_20250525_geo_bioclim.tsv', help='Path to input file with lat/lon coordinates')
     parser.add_argument('--max_samples', type=int, default=None, help='Maximum number of samples to process (default: None)')
-    
+    parser.add_argument('--start_index', type=int, default=0, help='Index to start at in the latlon dataframe (default: 0)')
+
     return parser.parse_args()
 
 if __name__ == '__main__':
@@ -144,20 +181,23 @@ if __name__ == '__main__':
     tmpdir = args.tmpdir
     filename_latlon = args.filename_latlon
     max_samples = args.max_samples
+    start_index = args.start_index
     
     # Read and process data
     print(f"Reading data from: {filename_latlon}")
     df = pd.read_csv(filename_latlon, sep='\t')
     
+    if start_index:
+        df = df[start_index:]
     if max_samples:
         df = df[:max_samples]
-    print(f"Processing {len(df)} samples")
+    print(f"Processing {len(df)} samples, starting at index {start_index}")
     
     if func == 'topography':
         print(f"Downloading terrain tiles and extracting topographic data")
         df = multipoints_topography(df, outdir, stub, tmpdir)
         if max_samples:
-            name = f"{stub}_topography_{max_samples}.tsv"
+            name = f"{stub}_topography_{start_index}_{start_index + len(df)}.tsv"
         else:
             name = f"{stub}_topography.tsv"
         filename_out = os.path.join(outdir, name)
