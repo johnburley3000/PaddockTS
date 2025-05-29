@@ -73,6 +73,8 @@ cold_days = ds_ozwald['Tmin'] < -1
 cold_days_monthly = cold_days.resample(time='1MS').sum(dim='time')
 cold_days_monthly = cold_days_monthly.to_dataset(name='cold_day_count')
 
+np.max(cold_days_monthly['cold_day_count'].values)
+
 # Create a video of the num cold days per month from ozwald
 filename = '/scratch/xe2/cb8590/tmp/ozwald_number_cold_days_per_month.mp4'
 xr_animation(
@@ -84,7 +86,7 @@ xr_animation(
     show_text="OzWALD num days < -1°",
     show_gdf=gdf[['geometry']],
     gdf_kwargs={"edgecolor": "black", "linewidth": 1},
-    imshow_kwargs={"cmap": "Blues"},
+    imshow_kwargs={"cmap": "Blues", "vmin": 0, "vmax": np.max(cold_days_monthly["cold_day_count"].values)},
     colorbar_kwargs={"colors": "black"}
 )
 plt.close()
@@ -107,60 +109,12 @@ xr_animation(
     show_text="SILO num days < -1°",
     show_gdf=gdf[['geometry']],
     gdf_kwargs={"edgecolor": "black", "linewidth": 1},
-    imshow_kwargs={"cmap": "Blues"},
+    imshow_kwargs={"cmap": "Blues", "vmin": 0, "vmax": np.max(cold_years["cold_day_count"].values)},
     colorbar_kwargs={"colors": "black"}
 )
 plt.close()
 Video(filename, embed=True)
 
-# Inspect one of the .nc files
-filename = '/g/data/xe2/cb8590/Eucalypts/BERRIDALE_buffer_0.6degrees_Tmax_2000_2024_ozwald_daily.nc'
-ds_ozwald_max = xr.load_dataset(filename)
-ds_ozwald_max.rio.write_crs("EPSG:4326", inplace=True)
+import numpy as np
 
-hot_days = ds_ozwald_max['Tmax'] > 30
-hot_months = hot_days.resample(time='1MS').sum(dim='time')
-hot_months = hot_months.to_dataset(name='hot_day_count')
-
-filename = '/scratch/xe2/cb8590/tmp/ozwald_number_hot_days_per_month.mp4'
-xr_animation(
-    ds=hot_months,
-    output_path=filename,
-    bands="hot_day_count",
-    interval=100,
-    width_pixels=300,
-    show_text="OzWALD num days > 30°",
-    show_gdf=gdf[['geometry']],
-    gdf_kwargs={"edgecolor": "black", "linewidth": 1},
-    imshow_kwargs={"cmap": "Reds"},
-    colorbar_kwargs={"colors": "black"}
-)
-plt.close()
-Video(filename, embed=True)
-
-# SILO hot days per year
-filename = '/g/data/xe2/cb8590/Eucalypts/BERRIDALE_buffer_0.6degrees_max_temp_1889_2025_silo_daily.nc'
-ds_silo_max = xr.load_dataset(filename)
-ds_silo_max.rio.write_crs("EPSG:4326", inplace=True)
-
-hot_days_silo = ds_silo_max['max_temp'] > 30
-hot_years_silo = hot_days_silo.resample(time='1YS').sum(dim='time')
-hot_years_silo = hot_years_silo.to_dataset(name='hot_day_count')
-
-filename = '/scratch/xe2/cb8590/tmp/silo_number_hot_days_per_year.mp4'
-xr_animation(
-    ds=hot_years_silo,
-    output_path=filename,
-    bands="hot_day_count",
-    interval=200,
-    width_pixels=300,
-    show_text="SILO num days > 30°",
-    show_gdf=gdf[['geometry']],
-    gdf_kwargs={"edgecolor": "black", "linewidth": 1},
-    imshow_kwargs={"cmap": "Reds"},
-    colorbar_kwargs={"colors": "black"}
-)
-plt.close()
-Video(filename, embed=True)
-
-
+np.max(cold_years['cold_day_count'].values)
