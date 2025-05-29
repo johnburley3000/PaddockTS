@@ -112,7 +112,7 @@ def ozwald_8day(variables=["Ssoil", "GPP"], lat=-34.3890427, lon=148.469499, buf
         dss.append(ds_variable)
     ds_concat = xr.merge(dss)
     
-    filename = os.path.join(outdir, f'{stub}_ozwald_8day.nc')
+    filename = os.path.join(tmp_dir, f'{stub}_ozwald_8day.nc')
     ds_concat.to_netcdf(filename)
     print("Saved:", filename)
             

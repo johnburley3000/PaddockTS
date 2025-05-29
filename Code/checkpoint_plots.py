@@ -16,12 +16,14 @@ Example usage:
 python3 Code/checkpoint_plots.py TEST5 /g/data/xe2/John/Data/PadSeg/ """)
     parser.add_argument('stub', type=str, help='Stub name for file naming.')
     parser.add_argument('base_directory', type=str, help='Base directory for input/output files.')
+    parser.add_argument('tmpdir', type=str, help='directory to read in some data, e.g. silo, ozwald.')
     return parser.parse_args()
 
 def main():
     args = parse_arguments()
     stub = args.stub
     out_dir = args.base_directory
+    tmpdir = args.tmpdir+'/'
 
     ## Open the satellite data stack
     with open(out_dir+stub+'_ds2i.pkl', 'rb') as handle:
@@ -37,13 +39,13 @@ def main():
     raster_path = out_dir+stub+'.tif'
 
     # load the silo data
-    silo = xr.open_dataset(out_dir+stub+'_silo_daily.nc')
+    silo = xr.open_dataset(tmpdir+stub+'_silo_daily.nc')
 
     # Average silo over latitude and longitude (or just removes the lat, lon dimensions if it's a single point)
     silo = silo.mean(dim=['lat', 'lon'])
 
     # load the oswald data
-    ozwald = xr.open_dataset(out_dir+stub+'_ozwald_8day.nc')
+    ozwald = xr.open_dataset(tmpdir+stub+'_ozwald_8day.nc')
     #print(ozwald)
 
     # Average Ssoil over latitude and longitude

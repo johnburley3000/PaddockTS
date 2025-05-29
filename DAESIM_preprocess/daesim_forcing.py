@@ -74,10 +74,10 @@ def daesim_forcing(outdir=".", stub="Test", tmp_dir = "."):
 
     # Open the pre-downloaded netcdf files
     ds_silo_daily = xr.open_dataset(os.path.join(tmp_dir, stub+'_silo_daily.nc'))
-    ds_ozwald_8day = xr.open_dataset(os.path.join(outdir, stub+'_ozwald_8day.nc'))
-    ds_ozwald_daily_Pg = xr.open_dataset(os.path.join(outdir, stub+'_ozwald_daily_Pg.nc'))
-    ds_ozwald_daily_Tmax = xr.open_dataset(os.path.join(outdir, stub+'_ozwald_daily_Tmax.nc'))
-    ds_ozwald_daily_Uavg = xr.open_dataset(os.path.join(outdir, stub+'_ozwald_daily_Uavg.nc'))
+    ds_ozwald_8day = xr.open_dataset(os.path.join(tmp_dir, stub+'_ozwald_8day.nc'))
+    ds_ozwald_daily_Pg = xr.open_dataset(os.path.join(tmp_dir, stub+'_ozwald_daily_Pg.nc'))
+    ds_ozwald_daily_Tmax = xr.open_dataset(os.path.join(tmp_dir, stub+'_ozwald_daily_Tmax.nc'))
+    ds_ozwald_daily_Uavg = xr.open_dataset(os.path.join(tmp_dir, stub+'_ozwald_daily_Uavg.nc'))
 
     # Make silo coordinates match ozwald 
     if 'crs' in ds_silo_daily.data_vars:

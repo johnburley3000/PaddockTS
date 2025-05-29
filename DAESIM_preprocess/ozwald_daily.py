@@ -115,7 +115,7 @@ def ozwald_daily(variables=["VPeff", "Uavg"], lat=-34.3890427, lon=148.469499, b
     ds_concat = xr.merge(dss)
 
     # Appending the first variable to the filename, so you can download temperature, rainfall, and wind/humidity separately since they use different grids.
-    filename = os.path.join(outdir, f'{stub}_ozwald_daily_{variables[0]}.nc')
+    filename = os.path.join(tmp_dir, f'{stub}_ozwald_daily_{variables[0]}.nc')
     ds_concat.to_netcdf(filename)
     print("Saved:", filename)
             
