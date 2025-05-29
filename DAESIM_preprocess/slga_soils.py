@@ -4,6 +4,7 @@
 # Standard Libraries
 import os
 import time
+import argparse
 
 # Dependencies
 import numpy as np
@@ -136,8 +137,34 @@ def slga_soils(variables=["Clay", "Sand", "Silt"], lat=-34.3890427, lon=148.4694
                         print(f"Retrying in {delay:.2f} seconds...")
                         time.sleep(delay)
 
+def parse_arguments():
+    """Parse command line arguments with default values."""
+    parser = argparse.ArgumentParser(description="""Download variables from the Soils and Landscapes Grid of Australia (SLGA) at 90m resolution for the region of interest""")
+    
+    parser.add_argument('--variable', default="Clay", help=f"Default is 'Clay', and options are: {list(slga_soils_abbrevations.keys())}")
+    parser.add_argument('--lat', default='-34.389', help='Latitude in EPSG:4326 (default: -34.389)')
+    parser.add_argument('--lon', default='148.469', help='Longitude in EPSG:4326 (default: 148.469)')
+    parser.add_argument('--buffer', default='0.1', help='Buffer in each direction in degrees (default is 0.1, or about 20kmx20km)')
+    parser.add_argument('--outdir', default='.', help='Directory for the output NetCDF file (default is the current directory)')
+    parser.add_argument('--stub', default='TEST', help='The name to be prepended to each file download. (default: TEST)')
+    parser.add_argument('--depth', default="5-15cm", help=f"Default is '5-15cm', and options are: {list(identifiers.keys())}")
+
+    return parser.parse_args()
+# -
+
 # +
 if __name__ == '__main__':
-    slga_soils()
-    textures = soil_texture()
-    print(textures.shape)
+    
+    args = parse_arguments()
+    
+    variable = args.variable
+    lat = float(args.lat)
+    lon = float(args.lon)
+    buffer = float(args.buffer)
+    start_year = args.start_year
+    end_year = args.end_year
+    outdir = args.outdir
+    stub = args.stub
+    tmpdir = args.tmpdir
+    
+    slga_soils([variable], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir)
