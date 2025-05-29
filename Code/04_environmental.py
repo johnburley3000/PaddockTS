@@ -113,11 +113,11 @@ def main(args):
     # Download from SILO radiation, vapour pressure, temperature, rainfall, and evapotranspiration at 5km resolution
     # Note this requires downloading an Australia wide file of ~400MB per variables per year, so takes a long time if not predownloaded
     variables = ["radiation", "vp", "max_temp", "min_temp", "daily_rain", "et_morton_actual", "et_morton_potential"]
-    ds_silo_daily = silo_daily(variables, lat, lon, buffer, start_year, end_year, outdir, stub, silo_folder)
+    ds_silo_daily = silo_daily(variables, lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, silo_folder)
 
     # Merge the SILO and OzWald climate data into DAESim_forcing.csv
     # By default, for variables available in both datasets (vapour pressure, temperature, rainfall), the OzWald variables get used for consistency with the 8day variables
-    df_climate = daesim_forcing(outdir, stub)
+    df_climate = daesim_forcing(outdir, stub, tmp_dir)
 
     # Download soil variables from SLGA at 90m resolution
     variables = ['Clay', 'Silt', 'Sand', 'pH_CaCl2', 'Bulk_Density', 'Available_Water_Capacity', 'Effective_Cation_Exchange_Capacity', 'Total_Nitrogen', 'Total_Phosphorus']

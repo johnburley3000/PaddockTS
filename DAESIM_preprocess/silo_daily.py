@@ -67,8 +67,15 @@ def silo_daily_singleyear(var="radiation", latitude=-34.3890427, longitude=148.4
         return None
         
     bbox = [longitude - buffer, latitude - buffer, longitude + buffer, latitude + buffer]
-    ds_region = ds.sel(lat=slice(bbox[1], bbox[3]), lon=slice(bbox[0], bbox[2]))
 
+    if buffer < 0.05:
+        ds_region = ds.sel(
+            lat=[latitude],
+            lon=[longitude],
+            method="nearest")
+    else:
+        ds_region = ds.sel(lat=slice(bbox[1], bbox[3]), lon=slice(bbox[0], bbox[2]))
+        
     # If the buffer was smaller than the pixel size, than just assign a single lat and lon coordinate
     if len(ds_region.lat) == 0:
         ds_region = ds_region.drop_dims('lat').expand_dims(lat=1).assign_coords(lat=[latitude])
@@ -88,14 +95,14 @@ def silo_daily_multiyear(var="radiation", latitude=-34.3890427, longitude=148.46
     return ds_concat
 
 
-def silo_daily(variables=["radiation"], lat=-34.3890427, lon=148.469499, buffer=0.1, start_year="2020", end_year="2020", outdir=".", stub="Test", silo_folder="."):
+def silo_daily(variables=["radiation"], lat=-34.3890427, lon=148.469499, buffer=0.1, start_year="2020", end_year="2020", outdir=".", stub="Test", tmp_dir=".", silo_folder=".",):
     """Download daily variables from SILO at 5km resolution for the region/time of interest
 
     Parameters
     ----------
         variables: See silo_abbreviations at the top of this file for a complete list
         lat, lon: Coordinates in WGS 84 (EPSG:4326)
-        buffer: Distance in degrees in a single direction. e.g. 0.01 degrees is ~1km so would give a ~2kmx2km area.
+        buffer: Distance in degrees in a single direction. e.g. If < 0.05, will return netcdf with data for single point; if > 0.05, netcdf may have multiple lat/lon.
         start_year, end_year: Inclusive, so setting both to 2020 would give data for the full year.
         outdir: The directory that the final .NetCDF gets saved.
         stub: The name to be prepended to each file download.
@@ -114,7 +121,7 @@ def silo_daily(variables=["radiation"], lat=-34.3890427, lon=148.469499, buffer=
         dss.append(ds)
     ds_concat = xr.merge(dss)
     
-    filename = os.path.join(outdir, f'{stub}_silo_daily.nc')
+    filename = os.path.join(tmp_dir, f'{stub}_silo_daily.nc')
     ds_concat.to_netcdf(filename)
     print("Saved:", filename)
     return ds_concat
@@ -123,4 +130,25 @@ def silo_daily(variables=["radiation"], lat=-34.3890427, lon=148.469499, buffer=
 # %%time
 if __name__ == '__main__':
     # Takes about 5 mins if the SILO netcdf's are not predownloaded
-    ds = silo_daily()
+    ds = silo_daily(outdir = "/g/data/xe2/jb5097/PaddockTS_Results/",
+                   stub = "CANOWINDRAb",
+                   silo_folder = "/g/data/xe2/datasets/Climate_SILO/",
+                   lat=-33.457, lon=148.82,
+                   buffer = 1)
+
+# +
+# =====================================================================
+# Running PaddockTS developmental version with the following settings:
+#   Stub:                       CANAWINDRAb
+#   Latitude:                   -33.457
+#   Longitude:                  148.679
+#   Buffer (degrees):           0.01
+#   Time range:                 2023-04-01 to 2023-08-01
+#   Minimum area (ha):          10
+#   Maximum area (ha):          1500
+#   Max perimeter/area:         40
+#   Sentinel-2 download mode:   NCI
+#   SAMGeo Model:               sam_vit_h_4b8939.pth
+#   Saving results to:          /g/data/xe2/jb5097/PaddockTS_Results/
+#   Saving temporary files to:  /scratch/xe2/jb5097/tmp3
+# =====================================================================

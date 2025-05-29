@@ -50,7 +50,7 @@ def aggregate_pixels(ds):
     return ds
 
 
-def daesim_forcing(outdir=".", stub="Test"):
+def daesim_forcing(outdir=".", stub="Test", tmp_dir = "."):
     """Merge the ozwald and silo netcdf's into a dataframe for input into DAESim
     
     Parameters
@@ -73,7 +73,7 @@ def daesim_forcing(outdir=".", stub="Test"):
     """
 
     # Open the pre-downloaded netcdf files
-    ds_silo_daily = xr.open_dataset(os.path.join(outdir, stub+'_silo_daily.nc'))
+    ds_silo_daily = xr.open_dataset(os.path.join(tmp_dir, stub+'_silo_daily.nc'))
     ds_ozwald_8day = xr.open_dataset(os.path.join(outdir, stub+'_ozwald_8day.nc'))
     ds_ozwald_daily_Pg = xr.open_dataset(os.path.join(outdir, stub+'_ozwald_daily_Pg.nc'))
     ds_ozwald_daily_Tmax = xr.open_dataset(os.path.join(outdir, stub+'_ozwald_daily_Tmax.nc'))
@@ -110,6 +110,7 @@ def daesim_forcing(outdir=".", stub="Test"):
     print("Saved", filepath)
 
     return df_ordered
+
 
 
 def daesim_soils(outdir=".", stub="Test", tmpdir="."):
@@ -163,7 +164,11 @@ def daesim_soils(outdir=".", stub="Test", tmpdir="."):
     return sorted_df
 
 if __name__ == '__main__':
-    outdir = "."
-    stub = "Test"
+    outdir = "/g/data/xe2/jb5097/PaddockTS_Results/"
+    stub = "CANAWINDRAb"
     daesim_forcing(outdir, stub)
     daesim_soils(outdir, stub)
+
+
+
+
