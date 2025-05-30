@@ -131,7 +131,7 @@ def ozwald_daily(variables=["VPeff", "Uavg"], lat=-34.3890427, lon=148.469499, b
         for ax, var in zip(axes, variables):
             ds_point[var].plot(ax=ax, add_legend=False)
             ax.set_xlabel("")
-        filename = os.path.join(outdir, f'{stub}_ozwald_daily.png')
+        filename = os.path.join(outdir, f'{stub}_ozwald_daily_{variables[0]}.png')
         plt.savefig(filename, dpi=300, bbox_inches='tight')
         print("Saved:", filename)
 

@@ -4,9 +4,11 @@
 # Standard Libraries
 import os
 import argparse
+from contextlib import redirect_stderr, redirect_stdout
 
 # Dependencies
 import xarray as xr
+
 
 # +
 ozwald_8day_abbreviations = {
@@ -25,6 +27,16 @@ ozwald_8day_abbreviations = {
     "Ssoil": "Soil profile moisture change"
 }
 
+# Ignore messages like "Error:curl error: SSL connect error" when searching for a year that doesn't exist
+def open_dataset_silently(url):
+    try:
+        with open(os.devnull, 'w') as devnull, \
+             redirect_stdout(devnull), \
+             redirect_stderr(devnull):
+            ds = xr.open_dataset(url, engine="netcdf4")
+        return ds
+    except Exception:
+        return None
 
 # This function uses the public facing Thredds API, so does not need to be run on NCI
 # However it doesn't work in a PBS script from my tests
@@ -33,12 +45,7 @@ def ozwald_8day_singleyear_thredds(var="Ssoil", latitude=-34.3890427, longitude=
     buffer = max(0.003, buffer)  # If you specify an area that's too small then no data gets returned from thredds
     
     url = f"https://thredds.nci.org.au/thredds/dodsC/ub8/au/OzWALD/8day/{var}/OzWALD.{var}.{year}.nc"
-
-    try:
-        ds = xr.open_dataset(url, engine="netcdf4")
-    except Exception as e:
-        # Likely no data for the specified year
-        return None
+    ds = open_dataset_silently(url)
 
     bbox = [longitude - buffer, latitude - buffer, longitude + buffer, latitude + buffer]
     ds_region = ds.sel(latitude=slice(bbox[3], bbox[1]), longitude=slice(bbox[0], bbox[2]))

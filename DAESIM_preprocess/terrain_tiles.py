@@ -187,6 +187,7 @@ def terrain_tiles(lat=-34.3890427, lon=148.469499, buffer=0.005, outdir=".", stu
     """
     print(f"Starting terrain_tiles.py")
     buffer = max(0.00002, buffer) # Make sure we download at least 1 pixel
+    # Perhaps we should also force a maximum buffer, but then this would have to be dependent on the tile_level.
     
     # Download the raw data from terrain tiles
     bbox = [lon - buffer, lat - buffer, lon + buffer, lat + buffer]

@@ -94,7 +94,7 @@ def soil_texture(outdir=".", stub="TEST", depth="5-15cm"):
 
     return soil_texture
 
-def slga_soils(variables=["Clay", "Sand", "Silt"], lat=-34.3890427, lon=148.469499, buffer=0.005, outdir="", stub="Test",  depths=["5-15cm"]):
+def slga_soils(variables=["Clay", "Sand", "Silt"], lat=-34.3890427, lon=148.469499, buffer=0.005, outdir="", stub="TEST",  depths=["5-15cm"]):
     """Download soil variables from CSIRO at 90m resolution for region of interest
     
     Parameters

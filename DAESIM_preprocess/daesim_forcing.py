@@ -33,24 +33,13 @@ abbreviations = {
     }
 
 
+# This function is much simpler now that we enforce every ds to have a latitude, longitude and time dimension
 def aggregate_pixels(ds):
-    """Find the median of all pixels for each timepoint, or drop that dimension if it only has one coordinate"""
-    dims = ds.dims
-    if "latitude" in dims and "longitude" in dims:
-        ds = ds.median(dim=["latitude", "longitude"])
-    elif "latitude" in dims:  
-        ds = ds.median(dim=["latitude"])
-    elif "longitude" in dims: 
-        ds = ds.median(dim=["longitude"])
-    coords = ds.coords
-    if "latitude" in coords:
-        ds = ds.drop_vars(["latitude"])
-    if "longitude" in coords:
-        ds = ds.drop_vars(["longitude"])
+    ds = ds.median(dim=["latitude", "longitude"])
     return ds
 
 
-def daesim_forcing(outdir=".", stub="Test"):
+def daesim_forcing(outdir=".", stub="TEST"):
     """Merge the ozwald and silo netcdf's into a dataframe for input into DAESim
     
     Parameters
