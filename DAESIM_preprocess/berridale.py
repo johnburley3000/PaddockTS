@@ -186,3 +186,19 @@ gdf = gpd.GeoDataFrame(
 filename = '/scratch/xe2/cb8590/Eucalypts/BERRIDALE_frost_days_ozwald_2000-2020.gpkg'
 gdf.to_file(filename, layer='frost_days', driver="GPKG")
 filename
+
+# +
+# Check the topography per point looks good
+df1 = pd.read_csv('/scratch/xe2/cb8590/Eucalypts/EUC_topography_0_1000.tsv', sep='\t')
+df2 = pd.read_csv('/scratch/xe2/cb8590/Eucalypts/EUC_topography_1000_2000.tsv', sep='\t')
+df3 = pd.read_csv('/scratch/xe2/cb8590/Eucalypts/EUC_topography_2000_3000.tsv', sep='\t')
+df4 = pd.read_csv('/scratch/xe2/cb8590/Eucalypts/EUC_topography_3000_3888.tsv', sep='\t')
+
+df = pd.concat([df1, df2, df3, df4])
+df.to_csv('/scratch/xe2/cb8590/Eucalypts/EUC_topography.tsv', sep='\t', index=False)
+# -
+
+df = pd.read_csv('/g/data/xe2/cb8590/Eucalypts/EUC_topography.tsv', sep='\t')
+original_columns = ['sample_name', 'species', 'X', 'Y', 'datum', 'elevation']  # There are also 11 bio columns 
+new_columns = ['terrain', 'accumulation', 'aspect', 'slope', 'twi']
+df[original_columns + new_columns].head()
