@@ -1,6 +1,6 @@
 #!/bin/bash
 #PBS -N dieback_region
-#PBS -q normal
+#PBS -q copyq
 #PBS -l mem=48GB
 #PBS -l jobfs=1GB
 #PBS -l ncpus=1
@@ -19,15 +19,14 @@ echo "Starting"
 
 # activate virtual environment:
 source /g/data/xe2/John/geospatenv/bin/activate
-# module load gdal/3.6.4
+module load gdal/3.6.4
 # module load netcdf/4.7.3
 
 # Change working directory
 wd=/home/147/cb8590/Projects/PaddockTS
 cd $wd
 
-# Run script:
-# SILO variables
+# # SILO variables
 # variable=min_temp
 # lat=-36.370998
 # lon=148.830894
@@ -37,20 +36,27 @@ cd $wd
 # outdir=/g/data/xe2/cb8590/Eucalypts
 # tmpdir=/g/data/xe2/datasets/Climate_SILO
 # stub=BERRIDALE_buffer_${buffer}degrees_${variable}__${start_year}_${end_year}
+# python DAESIM_preprocess/silo_daily.py --variable $variable --lat $lat --lon $lon --buffer $buffer --start_year $start_year --end_year $end_year --outdir $outdir --stub $stub --tmpdir $tmpdir
 
-# Ozwald variables
-variable=Tmax
+# # Ozwald variables
+# variable=Tmax
+# lat=-36.370998
+# lon=148.830894
+# buffer=0.6
+# start_year=2000
+# end_year=2024
+# outdir=/g/data/xe2/cb8590/Eucalypts
+# tmpdir=/scratch/xe2/cb8590/tmp
+# stub=BERRIDALE_buffer_${buffer}degrees_${variable}_${start_year}_${end_year}
+# python DAESIM_preprocess/ozwald_daily.py --variable $variable --lat $lat --lon $lon --buffer $buffer --start_year $start_year --end_year $end_year --outdir $outdir --stub $stub --tmpdir $tmpdir --nci
+
+# Terrain tiles
 lat=-36.370998
 lon=148.830894
 buffer=0.6
-start_year=2000
-end_year=2024
-outdir=/g/data/xe2/cb8590/Eucalypts
+outdir=/scratch/xe2/cb8590/Eucalypts
 tmpdir=/scratch/xe2/cb8590/tmp
-stub=BERRIDALE_buffer_${buffer}degrees_${variable}_${start_year}_${end_year}
+tile_level=3
+stub=BERRIDALE_buffer_${buffer}degrees_tile_level${tile_level}
+python DAESIM_preprocess/terrain_tiles.py --lat $lat --lon $lon --buffer $buffer --outdir $outdir --stub $stub --tmpdir $tmpdir --tile_level $tile_level
 
-echo $stub
-echo thredds in pbs $thredds
-
-# python DAESIM_preprocess/silo_daily.py --variable $variable --lat $lat --lon $lon --buffer $buffer --start_year $start_year --end_year $end_year --outdir $outdir --stub $stub --tmpdir $tmpdir
-python DAESIM_preprocess/ozwald_daily.py --variable $variable --lat $lat --lon $lon --buffer $buffer --start_year $start_year --end_year $end_year --outdir $outdir --stub $stub --tmpdir $tmpdir --nci
