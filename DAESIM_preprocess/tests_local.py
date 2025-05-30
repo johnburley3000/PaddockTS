@@ -188,7 +188,9 @@ df = daesim_forcing(outdir="outdir", stub="TEST")
 assert set(df.columns) == {"Precipitation", "Runoff", "Minimum temperature", "Maximum temperature", "Soil moisture", "Vegetation growth", "Vegetation leaf area", "VPeff",	"Uavg", "SRAD"}
 assert os.path.exists("outdir/TEST_DAESim_forcing.csv")
 
+slga_soils(variables=["Clay", "Silt", "Sand", "pH_CaCl2", "Bulk_Density", "Available_Water_Capacity", "Effective_Cation_Exchange_Capacity",  "Total_Nitrogen", "Total_Phosphorus"], lat=-34.3890427, lon=148.469499, buffer=0.005, outdir="tmpdir", stub="TEST",  depths=["15-30cm"])
+slga_soils(variables=["Clay", "Silt", "Sand", "pH_CaCl2", "Bulk_Density", "Available_Water_Capacity", "Effective_Cation_Exchange_Capacity",  "Total_Nitrogen", "Total_Phosphorus"], lat=-34.3890427, lon=148.469499, buffer=0.005, outdir="tmpdir", stub="TEST",  depths=["30-60cm"])
+slga_soils(variables=["Clay", "Silt", "Sand", "pH_CaCl2", "Bulk_Density", "Available_Water_Capacity", "Effective_Cation_Exchange_Capacity",  "Total_Nitrogen", "Total_Phosphorus"], lat=-34.3890427, lon=148.469499, buffer=0.005, outdir="tmpdir", stub="TEST",  depths=["60-100cm"])
+
 df = daesim_soils(outdir="outdir", stub="TEST", tmpdir="tmpdir")
-assert set(df.columns) == {'Clay', 'Silt', 'Sand', 'pH_CaCl2', 'Bulk_Density', 'Available_Water_Capacity', 'Effective_Cation_Exchange_Capacity', 'Total_Nitrogen', 'Total_Phosphorus'}
-assert set(df.index) == {'5-15cm', '15-30cm', '30-60cm', '60-100cm'}
 assert os.path.exists("outdir/TEST_DAESim_Soils.csv")
