@@ -87,7 +87,7 @@ def ozwald_daily_multiyear(var="VPeff", latitude=-34.3890427, longitude=148.4694
     return ds_concat
 
 
-def ozwald_daily(variables=["VPeff", "Uavg"], lat=-34.3890427, lon=148.469499, buffer=0.1, start_year="2020", end_year="2021", outdir=".", stub="TEST", tmpdir=".", thredds=True, save_netcdf=True):
+def ozwald_daily(variables=["VPeff", "Uavg"], lat=-34.3890427, lon=148.469499, buffer=0.1, start_year="2020", end_year="2021", outdir=".", stub="TEST", tmpdir=".", thredds=True, save_netcdf=True, plot=True):
     """Download daily variables from OzWald at varying resolutions for the region/time of interest
 
     Parameters
@@ -120,6 +120,21 @@ def ozwald_daily(variables=["VPeff", "Uavg"], lat=-34.3890427, lon=148.469499, b
         ds_concat.to_netcdf(filename)
         print("Saved:", filename)
             
+    if plot:
+        import matplotlib.pyplot as plt
+        variables = list(ds_concat.data_vars)
+        figsize = (10, 2 * len(variables))
+        ds_point = ds_concat.median(dim=['latitude', 'longitude'])
+        fig, axes = plt.subplots(nrows=len(variables), figsize=figsize, sharex=True)
+        if len(variables) == 1: 
+            axes = [axes]
+        for ax, var in zip(axes, variables):
+            ds_point[var].plot(ax=ax, add_legend=False)
+            ax.set_xlabel("")
+        filename = os.path.join(outdir, f'{stub}_ozwald_daily.png')
+        plt.savefig(filename, dpi=300, bbox_inches='tight')
+        print("Saved:", filename)
+
     return ds_concat
 
 
@@ -137,6 +152,7 @@ def parse_arguments():
     parser.add_argument('--stub', default='TEST', help='The name to be prepended to each file download. (default: TEST)')
     parser.add_argument('--tmpdir', default='.', help='The directory that the temporary NetCDFs get saved when downloading from Thredds. This does not get used if Thredds=False. (default is the current directory)')
     parser.add_argument('--nci', default=False, action="store_true", help='A boolean flag to choose between using the public facing Thredds API (slower but works locally), or running directly on NCI (requires access to the ub8 project). (default is to use Thredds)')
+    parser.add_argument('--plot', default=False, action="store_true", help='Boolean flag to generate a time series plot of the downloaded variables (default: False)')
     return parser.parse_args()
 # -
 
@@ -155,6 +171,7 @@ if __name__ == '__main__':
     stub = args.stub
     tmpdir = args.tmpdir
     thredds = not args.nci
+    plot = args.plot
     
-    ozwald_daily([variable], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds=thredds)
+    ozwald_daily([variable], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds=thredds, plot=plot)
     

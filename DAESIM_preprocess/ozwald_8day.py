@@ -87,7 +87,7 @@ def ozwald_8day_multiyear(var="Ssoil", latitude=-34.3890427, longitude=148.46949
     return ds_concat
 
 
-def ozwald_8day(variables=["Ssoil", "GPP"], lat=-34.3890427, lon=148.469499, buffer=0.01, start_year="2020", end_year="2021", outdir=".", stub="TEST", tmpdir=None, thredds=True, save_netcdf=True):
+def ozwald_8day(variables=["Ssoil", "GPP"], lat=-34.3890427, lon=148.469499, buffer=0.01, start_year="2020", end_year="2021", outdir=".", stub="TEST", tmpdir=None, thredds=True, save_netcdf=True, plot=True):
     """Download 8day variables from OzWald at 500m resolution for the region/time of interest
 
     Parameters
@@ -120,6 +120,21 @@ def ozwald_8day(variables=["Ssoil", "GPP"], lat=-34.3890427, lon=148.469499, buf
         ds_concat.to_netcdf(filename)
         print("Saved:", filename)
 
+    if plot:
+        import matplotlib.pyplot as plt
+        variables = list(ds_concat.data_vars)
+        figsize = (10, 2 * len(variables))
+        ds_point = ds_concat.median(dim=['latitude', 'longitude'])
+        fig, axes = plt.subplots(nrows=len(variables), figsize=figsize, sharex=True)
+        if len(variables) == 1: 
+            axes = [axes]
+        for ax, var in zip(axes, variables):
+            ds_point[var].plot(ax=ax, add_legend=False)
+            ax.set_xlabel("")
+        filename = os.path.join(outdir, f'{stub}_ozwald_8day.png')
+        plt.savefig(filename, dpi=300, bbox_inches='tight')
+        print("Saved:", filename)
+
     return ds_concat
 
 def parse_arguments():
@@ -135,7 +150,8 @@ def parse_arguments():
     parser.add_argument('--outdir', default='.', help='Directory for the output NetCDF file (default is the current directory)')
     parser.add_argument('--stub', default='TEST', help='The name to be prepended to each file download. (default: TEST)')
     parser.add_argument('--thredds', default=True, help='A boolean flag to choose between using the public facing Thredds API (slower but works locally), or running directly on NCI (requires access to the ub8 project). (default: True)')
-    
+    parser.add_argument('--plot', default=False, action="store_true", help='Boolean flag to generate a time series plot of the downloaded variables (default: False)')
+
     return parser.parse_args()
 # -
 
@@ -153,6 +169,7 @@ if __name__ == '__main__':
     outdir = args.outdir
     stub = args.stub
     thredds=args.thredds
-    
-    ozwald_8day([variable], lat, lon, buffer, start_year, end_year, outdir, stub, thredds=thredds)
+    plot = args.plot
+
+    ozwald_8day([variable], lat, lon, buffer, start_year, end_year, outdir, stub, thredds=thredds, plot=plot)
     

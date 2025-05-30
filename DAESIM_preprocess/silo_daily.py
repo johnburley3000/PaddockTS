@@ -174,7 +174,7 @@ if __name__ == '__main__':
     outdir = args.outdir
     stub = args.stub
     tmpdir = args.tmpdir
-    plot=args.plot
+    plot = args.plot
     
-    silo_daily([variable], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir)
+    silo_daily([variable], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, plot)
     
