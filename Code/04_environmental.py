@@ -92,7 +92,7 @@ def main(args):
     stub = args.stub
     start_year = args.start_time[:4]
     end_year = args.end_time[:4]
-    outdir = args.outdir
+    outdir = args.tmpdir  # Using tmpdir instead of outdir so just the visuals go to outdir when running the full pipeline
     tmpdir = args.tmpdir
     thredds = ~args.nci  # Thredds is a public facing interface that can be used when not running the code directly on NCI
 

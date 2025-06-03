@@ -37,12 +37,20 @@ for d in "$wd" "$dir" "$tmpdir"; do
 done
 
 # params to specify Region/Timeframe of interest
-stub=CANAWINDRAb # e.g. <site name>_<buffer>_<years>
-lat=-33.457
-lon=148.679
-buffer=0.01 #this distance in all directions from (lat,lon). 0.01 degrees is ~1km in each direction which woul mean 2kmx2km total
-start='2023-04-01'
-end='2023-08-01'
+# stub=CANAWINDRAb # e.g. <site name>_<buffer>_<years>
+# lat=-33.457
+# lon=148.679
+# buffer=0.01 #this distance in all directions from (lat,lon). 0.01 degrees is ~1km in each direction which woul mean 2kmx2km total
+# start='2023-04-01'
+# end='2023-08-01'
+
+# params to specify Region/Timeframe of interest
+stub=ARBO_taia # e.g. <site name>_<buffer>_<years>
+lat=-35.285
+lon=149.0662
+buffer=0.03 #this distance in all directions from (lat,lon). 0.01 degrees is ~1km in each direction which woul mean 2kmx2km total
+start='2024-03-01'
+end='2025-03-31'
 
 # params for paddock filtering
 min_area_ha=10
@@ -74,118 +82,118 @@ echo "  Saving results to:          $dir"
 echo "  Saving temporary files to:  $tmpdir"
 echo "====================================================================="
 
-# check if model exists and download it if not, then download it to tmp
-if [ -f "${tmpdir}/${samgeo_model}" ]; then
-  echo "SAMGeo Model found: ${tmpdir}/${samgeo_model}"  
-else
-  echo "SAMGeo Model not found: ${tmpdir}/${samgeo_model}"
-  echo "Downloading model from https://dl.fbaipublicfiles.com/segment_anything/${samgeo_model}..."
-  wget "https://dl.fbaipublicfiles.com/segment_anything/${samgeo_model}" -O "${tmpdir}/${samgeo_model}"
-  if [ $? -eq 0 ]; then
-    echo "Download samgeo complete."
-  else
-    echo "Download samgeo failed."
-    exit 1
-  fi
-fi
-t0=$(date +%s)
+# # check if model exists and download it if not, then download it to tmp
+# if [ -f "${tmpdir}/${samgeo_model}" ]; then
+#   echo "SAMGeo Model found: ${tmpdir}/${samgeo_model}"  
+# else
+#   echo "SAMGeo Model not found: ${tmpdir}/${samgeo_model}"
+#   echo "Downloading model from https://dl.fbaipublicfiles.com/segment_anything/${samgeo_model}..."
+#   wget "https://dl.fbaipublicfiles.com/segment_anything/${samgeo_model}" -O "${tmpdir}/${samgeo_model}"
+#   if [ $? -eq 0 ]; then
+#     echo "Download samgeo complete."
+#   else
+#     echo "Download samgeo failed."
+#     exit 1
+#   fi
+# fi
+# t0=$(date +%s)
 
-####
-## SEQUENTIALLY RUN THE SCRIPTS
-####
+# ####
+# ## SEQUENTIALLY RUN THE SCRIPTS
+# ####
 
-echo "Step 1: Download Sentinel-2 data from the specified source."
-case "$S2_mode" in
+# echo "Step 1: Download Sentinel-2 data from the specified source."
+# case "$S2_mode" in
 
-  "NCI")
-    echo "Running in NCI mode..."
-    echo "Assumes user is on NCI via ssh, and has access to projects v10, k08."
-    module use /g/data/v10/public/modules/modulefiles
-    module load dea/20231204
-    python Code/01_get_Sentinel2_DEA.py \
-      --stub "$stub" \
-      --outdir "$dir" \
-      --lat "$lat" \
-      --lon "$lon" \
-      --buffer "$buffer" \
-      --start_time "$start" \
-      --end_time "$end"
-    module purge
-    ;;
+#   "NCI")
+#     echo "Running in NCI mode..."
+#     echo "Assumes user is on NCI via ssh, and has access to projects v10, k08."
+#     module use /g/data/v10/public/modules/modulefiles
+#     module load dea/20231204
+#     python Code/01_get_Sentinel2_DEA.py \
+#       --stub "$stub" \
+#       --outdir "$dir" \
+#       --lat "$lat" \
+#       --lon "$lon" \
+#       --buffer "$buffer" \
+#       --start_time "$start" \
+#       --end_time "$end"
+#     module purge
+#     ;;
 
-  "DEA_ODC")
-    echo "Running in DEA_ODC mode..."
-    echo "Hasn't been made yet.. exiting"
-    exit 1
-    # Insert commands/environment setup for DEA_ODC here
+#   "DEA_ODC")
+#     echo "Running in DEA_ODC mode..."
+#     echo "Hasn't been made yet.. exiting"
+#     exit 1
+#     # Insert commands/environment setup for DEA_ODC here
 
-    ;;
+#     ;;
 
-  "MPC")
-    echo "Running in MPC mode..."
-    echo "Hasn't been made yet.. exiting"
-    exit 1
-    # Insert commands/environment setup for MPC here
+#   "MPC")
+#     echo "Running in MPC mode..."
+#     echo "Hasn't been made yet.. exiting"
+#     exit 1
+#     # Insert commands/environment setup for MPC here
 
-    ;;
+#     ;;
 
-  *)
-    echo "Unknown mode: $S2_mode"
-    exit 1
-    ;;
-esac
-echo "Step 1 complete."
-echo
-t1=$(date +%s)
-# Results: 
-# Pickle file representing an xarray object of time series Sentinel2 data downloaded from DEA (<stub>_ds2.pkl)
-# TO DO: should we normalise data so it doesn't matter if it is NBART or just plain L2A?
-# Some metadata about the download (<stub>_ds2_query.pkl)
+#   *)
+#     echo "Unknown mode: $S2_mode"
+#     exit 1
+#     ;;
+# esac
+# echo "Step 1 complete."
+# echo
+# t1=$(date +%s)
+# # Results: 
+# # Pickle file representing an xarray object of time series Sentinel2 data downloaded from DEA (<stub>_ds2.pkl)
+# # TO DO: should we normalise data so it doesn't matter if it is NBART or just plain L2A?
+# # Some metadata about the download (<stub>_ds2_query.pkl)
 
-echo "Step 2: Download Sentinel-1 data from MPC"
-# The current version will obtain RIO/RIO from the ds2_query.pkl file generated by Code/01_getSentinel2_DEA.py
-# this could be modified to create an RIO directory from the config settings. 
-source /g/data/xe2/John/geospatenv/bin/activate
-python Code/download_S1.py $stub $dir
-deactivate
-echo "Step 2 complete."
-echo
-t2=$(date +%s)
+# echo "Step 2: Download Sentinel-1 data from MPC"
+# # The current version will obtain RIO/RIO from the ds2_query.pkl file generated by Code/01_getSentinel2_DEA.py
+# # this could be modified to create an RIO directory from the config settings. 
+# source /g/data/xe2/John/geospatenv/bin/activate
+# python Code/download_S1.py $stub $dir
+# deactivate
+# echo "Step 2 complete."
+# echo
+# t2=$(date +%s)
 
-# Results: 
-# Pickle file representing an xarray object of time series Sentinel1 data downloaded from RIO (<stub>_ds1.pkl)
-# Note: some processed steps required. 
-# Issue: I get random network errors on some runs. Seems that certain scenes are included in the order but then can't be accessed, so it quits. 
+# # Results: 
+# # Pickle file representing an xarray object of time series Sentinel1 data downloaded from RIO (<stub>_ds1.pkl)
+# # Note: some processed steps required. 
+# # Issue: I get random network errors on some runs. Seems that certain scenes are included in the order but then can't be accessed, so it quits. 
 
-echo "Step 3: calculate indices (and vegetation fractional cover)"
-# This seems to screw up if the modules and python env are not loaded in the right order. Dependency on tensorflow2.15.0 will become an issue for portability
-module load tensorflow/2.15.0 # req for veg frac model
-source /g/data/xe2/John/geospatenv/bin/activate
-python3 Code/02_indices-vegfrac.py --stub $stub --outdir $dir
-module purge
-deactivate
-echo "Step 3 complete."
-echo
-t3=$(date +%s)
-# Results:
-# (<stub>_ds2i.pkl) updated with vegetation indices and vegetation fractional cover.
+# echo "Step 3: calculate indices (and vegetation fractional cover)"
+# # This seems to screw up if the modules and python env are not loaded in the right order. Dependency on tensorflow2.15.0 will become an issue for portability
+# module load tensorflow/2.15.0 # req for veg frac model
+# source /g/data/xe2/John/geospatenv/bin/activate
+# python3 Code/02_indices-vegfrac.py --stub $stub --outdir $dir
+# module purge
+# deactivate
+# echo "Step 3 complete."
+# echo
+# t3=$(date +%s)
+# # Results:
+# # (<stub>_ds2i.pkl) updated with vegetation indices and vegetation fractional cover.
 
-echo "Step 4: segment paddocks"
-source /g/data/xe2/John/geospatenv/bin/activate
-python3 Code/03_segment_paddocks.py $stub $dir \
-    --model $tmpdir/$samgeo_model \
-    --min_area_ha $min_area_ha \
-    --max_area_ha $max_area_ha \
-    --max_perim_area_ratio $max_perim_area_ratio
-deactivate
-echo "Complete."
-echo
-t4=$(date +%s)
-# Results:
-# a 3-band image representing Fourier Transform of NDWI time series (<stub>.tif)
-# an image showing thesegmentaiton mask (<stub>_segment.tif)
-# a shapefile of the paddocks (<stub>_segment.gpkg)
-# a shapefile of the paddocks after filtering (<stub>_filt.gpkg) [CHANGE THIS TO <stub>_segment_filt.gpkg]
+# echo "Step 4: segment paddocks"
+# source /g/data/xe2/John/geospatenv/bin/activate
+# python3 Code/03_segment_paddocks.py $stub $dir \
+#     --model $tmpdir/$samgeo_model \
+#     --min_area_ha $min_area_ha \
+#     --max_area_ha $max_area_ha \
+#     --max_perim_area_ratio $max_perim_area_ratio
+# deactivate
+# echo "Complete."
+# echo
+# t4=$(date +%s)
+# # Results:
+# # a 3-band image representing Fourier Transform of NDWI time series (<stub>.tif)
+# # an image showing thesegmentaiton mask (<stub>_segment.tif)
+# # a shapefile of the paddocks (<stub>_segment.gpkg)
+# # a shapefile of the paddocks after filtering (<stub>_filt.gpkg) [CHANGE THIS TO <stub>_segment_filt.gpkg]
 
 echo "Step 5: Get environmental variables"
 module load gdal/3.6.4 # [check if this is still needed, Chris thought not]
@@ -213,7 +221,7 @@ echo "Step 5.5: Generate topographic plots"
 # This generates topographic visuals based on the imagery stack, paddock boundaries, and terrain tiff.
 module load gdal/3.6.4
 source /g/data/xe2/John/geospatenv/bin/activate
-python3 Code/topographic_plots.py $stub $dir
+python3 Code/topographic_plots.py $stub $dir $tmpdir
 module purge
 deactivate
 echo "Complete."

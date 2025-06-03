@@ -36,12 +36,13 @@ def parse_arguments():
 Example usage:
 python3 Code/topographic_plots.py TEST6 /g/data/xe2/John/Data/PadSeg/ """)
     parser.add_argument('stub', type=str, help='Stub name for file naming.')
-    parser.add_argument('base_directory', type=str, help='Base directory for input/output files.')
+    parser.add_argument('outdir', type=str, help='Directory for final plots')
+    parser.add_argument('tmpdir', type=str, help='Directory for intermediate files')
     return parser.parse_args()
 
-def add_tiff_band(ds, variable, resampling_method, out_dir, stub):
+def add_tiff_band(ds, variable, resampling_method, outdir, stub):
     """Add a new band to the xarray from a tiff file using the given resampling method"""
-    filename = os.path.join(out_dir, f"{stub}_{variable}.tif")
+    filename = os.path.join(outdir, f"{stub}_{variable}.tif")
     array = rxr.open_rasterio(filename)
     reprojected = array.rio.reproject_match(ds, resampling=resampling_method)
     ds[variable] = reprojected.isel(band=0).drop_vars('band')
@@ -50,23 +51,22 @@ def add_tiff_band(ds, variable, resampling_method, out_dir, stub):
 def main():
     args = parse_arguments()
     stub = args.stub
-    out_dir = args.base_directory
-
-    tmpdir = out_dir
+    outdir = args.outdir
+    tmpdir = args.tmpdir
 
     # Load the imagery stack
-    filename = os.path.join(out_dir, f"{stub}_ds2.pkl")
+    filename = os.path.join(outdir, f"{stub}_ds2.pkl")
     with open(filename, 'rb') as file:
         ds_original = pickle.load(file)
     ds = ds_original
 
     # Load the paddocks
-    pol = gpd.read_file(out_dir+stub+'_filt.gpkg')
+    pol = gpd.read_file(outdir+stub+'_filt.gpkg')
     pol['paddock'] = range(1,len(pol)+1)
     pol['paddock'] = pol.paddock.astype('category')
 
     # Gaussian smooth the dem before processing with pysheds (because values are stored as ints in terrain tiles)
-    filename = os.path.join(out_dir, f"{stub}_terrain.tif")
+    filename = os.path.join(tmpdir, f"{stub}_terrain.tif")
     with rasterio.open(filename) as src:
         dem = src.read(1)  
         transform = src.transform  
@@ -78,7 +78,7 @@ def main():
     sigma = 10  # Adjust this value to control how much smoothing gets applied
 
     dem_smooth = gaussian_filter(dem.astype(float), sigma=sigma)
-    filename = os.path.join(out_dir, f"{stub}_terrain_smoothed.tif")
+    filename = os.path.join(tmpdir, f"{stub}_terrain_smoothed.tif")
     with rasterio.open(filename, 'w', driver='GTiff', height=height, width=width,
                     count=1, dtype=dem_smooth.dtype, crs=crs, transform=transform,
                     nodata=nodata) as dst:
@@ -233,7 +233,30 @@ def main():
     plt.savefig(filepath)
     print(filepath)
     # -
-    
+
 
 if __name__ == '__main__':
     main()
+
+
+
+# +
+# stub = 'ARBO_taia'
+# outdir = '/g/data/xe2/cb8590/PaddockTS_Results/'
+# tmpdir = '/scratch/xe2/cb8590/tmp3'
+
+# # Load the imagery stack
+# filename = os.path.join(outdir, f"{stub}_ds2.pkl")
+# with open(filename, 'rb') as file:
+#     ds_original = pickle.load(file)
+# ds = ds_original
+
+# # Load the paddocks
+# pol = gpd.read_file(outdir+stub+'_filt.gpkg')
+# pol['paddock'] = range(1,len(pol)+1)
+# pol['paddock'] = pol.paddock.astype('category')
+# -
+
+
+
+

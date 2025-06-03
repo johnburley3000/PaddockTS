@@ -22,3 +22,4 @@ __pycache__
 *.xml
 gdalwmscache
 *__pycache__*
+*.pyc

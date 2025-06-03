@@ -47,6 +47,9 @@ def ozwald_8day_singleyear_thredds(var="Ssoil", latitude=-34.3890427, longitude=
     url = f"https://thredds.nci.org.au/thredds/dodsC/ub8/au/OzWALD/8day/{var}/OzWALD.{var}.{year}.nc"
     ds = open_dataset_silently(url)
 
+    if not ds:
+        return None
+
     bbox = [longitude - buffer, latitude - buffer, longitude + buffer, latitude + buffer]
     ds_region = ds.sel(latitude=slice(bbox[3], bbox[1]), longitude=slice(bbox[0], bbox[2]))
 
