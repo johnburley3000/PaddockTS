@@ -50,12 +50,10 @@ def ozwald_8day_singleyear_thredds(var="Ssoil", latitude=-34.3890427, longitude=
     bbox = [longitude - buffer, latitude - buffer, longitude + buffer, latitude + buffer]
     ds_region = ds.sel(latitude=slice(bbox[3], bbox[1]), longitude=slice(bbox[0], bbox[2]))
 
-    # If the buffer was smaller than the pixel size, than just assign a single lat and lon coordinate
-    if len(ds_region.latitude) == 0:
-        ds_region = ds_region.drop_dims('latitude').expand_dims(latitude=1).assign_coords(latitude=[latitude])
-    if len(ds_region.longitude) == 0:
-        ds_region = ds_region.drop_dims('longitude').expand_dims(longitude=1).assign_coords(longitude=[longitude])
-        
+    if buffer < 0.03:
+        # Find a single point but keep the lat and lon dimensions for consistency
+        ds_region = ds.sel(latitude=[latitude], longitude=[longitude], method='nearest')
+    
     return ds_region
 
 
@@ -72,12 +70,10 @@ def ozwald_8day_singleyear_gdata(var="Ssoil", latitude=-34.3890427, longitude=14
     bbox = [longitude - buffer, latitude - buffer, longitude + buffer, latitude + buffer]
     ds_region = ds.sel(latitude=slice(bbox[3], bbox[1]), longitude=slice(bbox[0], bbox[2]))
 
-    # If the buffer was smaller than the pixel size, than just assign a single lat and lon coordinate
-    if len(ds_region.lat) == 0:
-        ds_region = ds_region.drop_dims('latitude').expand_dims(latitude=1).assign_coords(latitude=[latitude])
-    if len(ds_region.lon) == 0:
-        ds_region = ds_region.drop_dims('longitude').expand_dims(longitude=1).assign_coords(longitude=[longitude])
-        
+    if buffer < 0.03:
+        # Find a single point but keep the lat and lon dimensions for consistency
+        ds_region = ds.sel(latitude=[latitude], longitude=[longitude], method='nearest')
+    
     return ds_region
 
 

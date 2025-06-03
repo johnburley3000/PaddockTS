@@ -22,7 +22,6 @@ silo_abbreviations = {
         "vp_deficit": "Vapour pressure deficit, hPa",
         "evap_pan": "Class A pan evaporation, mm",
         "evap_syn": "Synthetic estimate, mm",
-        "evap_comb": "Combination: synthetic estimate pre-1970, class A pan 1970 onwards, mm",
         "evap_morton_lake": "Morton's shallow lake evaporation, mm",
         "radiation": "Solar radiation: Solar exposure, consisting of both direct and diffuse components, MJ/m2",
         "rh_tmax": "Relative humidity:	Relative humidity at the time of maximum temperature, %",

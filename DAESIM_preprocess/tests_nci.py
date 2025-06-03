@@ -112,29 +112,16 @@ assert set(ds.data_vars) == {'min_temp'}
 
 ds = silo_daily(variables=["monthly_rain"], lat=-34.3890427, lon=148.469499, buffer=0.1, start_year="2020", end_year="2020", outdir="outdir", stub="TEST", tmpdir="/g/data/xe2/datasets/Climate_SILO", thredds=None, save_netcdf=True, plot=True)
 assert set(ds.coords) == {'time', 'lat', 'lon'}  
-assert set(ds.data_vars) == {'min_monthly_raintemp'}
+assert set(ds.data_vars) == {'monthly_rain'}
 
 ds = silo_daily(variables=['daily_rain', 'min_temp', "max_temp", "et_morton_actual", "et_morton_potential"], lat=-34.3890427, lon=148.469499, buffer=0.1, start_year="2020", end_year="2020", outdir="outdir", stub="TEST", tmpdir="/g/data/xe2/datasets/Climate_SILO", thredds=None, save_netcdf=True, plot=True)
 assert set(ds.coords) == {'time', 'lat', 'lon'}  
 assert set(ds.data_vars) == {'daily_rain', 'min_temp', "max_temp", "et_morton_actual", "et_morton_potential"}
 
-ds = silo_daily(variables=['daily_rain', 'min_temp', "max_temp", "et_morton_actual", "et_morton_potential"], lat=-34.3890427, lon=148.469499, buffer=0.1, start_year="2020", end_year="2020", outdir="outdir", stub="TEST", tmpdir="/g/data/xe2/datasets/Climate_SILO", thredds=None, save_netcdf=True, plot=True)
+ds = silo_daily(variables=["vp", "vp_deficit", "evap_pan", "evap_syn", "evap_morton_lake"], lat=-34.3890427, lon=148.469499, buffer=0.1, start_year="2020", end_year="2020", outdir="outdir", stub="TEST", tmpdir="/g/data/xe2/datasets/Climate_SILO", thredds=None, save_netcdf=True, plot=True)
 assert set(ds.coords) == {'time', 'lat', 'lon'}  
-assert set(ds.data_vars) == {'daily_rain', 'min_temp', "max_temp", "et_morton_actual", "et_morton_potential"}
+assert set(ds.data_vars) == {"vp", "vp_deficit", "evap_pan", "evap_syn", "evap_morton_lake"}
 
-
-silo_abbreviations = {
-
-        "vp": "Vapour pressure, hPa",
-        "vp_deficit": "Vapour pressure deficit, hPa",
-        "evap_pan": "Class A pan evaporation, mm",
-        "evap_syn": "Synthetic estimate, mm",
-        "evap_comb": "Combination: synthetic estimate pre-1970, class A pan 1970 onwards, mm",
-        "evap_morton_lake": "Morton's shallow lake evaporation, mm",
-        "rh_tmax": "Relative humidity:	Relative humidity at the time of maximum temperature, %",
-        "rh_tmin": "Relative humidity at the time of minimum temperature, %",
-        "et_short_crop": "Evapotranspiration FAO564 short crop, mm",
-        "et_tall_crop": "ASCE5 tall crop6, mm",
-        "et_morton_wet": "Morton's wet-environment areal potential evapotranspiration over land, mm",
-        "mslp": "Mean sea level pressure Mean sea level pressure, hPa",
-    }
+ds = silo_daily(variables=["rh_tmax", "rh_tmin", "et_short_crop", "et_tall_crop", "et_morton_wet", "mslp"], lat=-34.3890427, lon=148.469499, buffer=0.1, start_year="2020", end_year="2020", outdir="outdir", stub="TEST", tmpdir="/g/data/xe2/datasets/Climate_SILO", thredds=None, save_netcdf=True, plot=True)
+assert set(ds.coords) == {'time', 'lat', 'lon'}  
+assert set(ds.data_vars) == {"rh_tmax", "rh_tmin", "et_short_crop", "et_tall_crop", "et_morton_wet", "mslp"}
