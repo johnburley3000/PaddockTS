@@ -233,7 +233,7 @@ t5=$(date +%s)
 ## Checkpoint plots.
 module load ffmpeg/4.3.1 # for .mp4 generation
 source /g/data/xe2/John/geospatenv/bin/activate
-python3 Code/checkpoint_plots.py $stub $dir
+python3 Code/checkpoint_plots.py $stub $dir $tmpdir
 t6=$(date +%s)
 # Results:
 # Set of plots with <stub>_<plot-description>.tif
