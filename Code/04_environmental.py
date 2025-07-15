@@ -117,7 +117,7 @@ def main(args):
 
     # Merge the SILO and OzWald climate data into DAESim_forcing.csv
     # By default, for variables available in both datasets (vapour pressure, temperature, rainfall), the OzWald variables get used for consistency with the 8day variables
-    df_climate = daesim_forcing(outdir, stub, tmp_dir)
+    df_climate = daesim_forcing(outdir, stub, tmpdir)
 
     # Download soil variables from SLGA at 90m resolution
     variables = ['Clay', 'Silt', 'Sand', 'pH_CaCl2', 'Bulk_Density', 'Available_Water_Capacity', 'Effective_Cation_Exchange_Capacity', 'Total_Nitrogen', 'Total_Phosphorus']
@@ -145,5 +145,4 @@ if __name__ == "__main__":
 
     args = parse_arguments()
     main(args)
-
 
