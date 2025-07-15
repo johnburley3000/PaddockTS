@@ -37,12 +37,12 @@ for d in "$wd" "$dir" "$tmpdir"; do
 done
 
 # params to specify Region/Timeframe of interest
-stub=ARBO_taia # e.g. <site name>_<buffer>_<years>
-lat=-35.285
-lon=149.0662
-buffer=0.03 #this distance in all directions from (lat,lon). 0.01 degrees is ~1km in each direction which woul mean 2kmx2km total
-start='2024-03-01'
-end='2025-03-31'
+stub=MILG_b04_2018-2024 # e.g. <site name>_<buffer>_<years>
+lat=-34.3957
+lon=148.4669
+buffer=0.04 #this distance in all directions from (lat,lon). 0.01 degrees is ~1km in each direction which woul mean 2kmx2km total
+start='2018-01-01'
+end='2024-12-31'
 
 # params for paddock filtering
 min_area_ha=10
