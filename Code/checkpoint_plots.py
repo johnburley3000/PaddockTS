@@ -59,21 +59,22 @@ def main():
     pf.plot_silo_daily(silo, ds, out_dir, stub)
     pf.plot_env_ts(silo, ds, Ssoil, out_dir, stub)
 
-    # Save the RGB image as a TIFF file
-    output_name_rgb = os.path.join(out_dir, f'{stub}_thumbs_rgb.tif')
-    rgb(ds, 
-        bands=['nbart_red', 'nbart_green', 'nbart_blue'], 
-        col="time", 
-        col_wrap=len(ds.time),
-        savefig_path=output_name_rgb)
+    # The thumbnail plots dont work for very long TOI because of image size constraints. 
+    # # Save the RGB image as a TIFF file
+    # output_name_rgb = os.path.join(out_dir, f'{stub}_thumbs_rgb.tif')
+    # rgb(ds, 
+    #     bands=['nbart_red', 'nbart_green', 'nbart_blue'], 
+    #     col="time", 
+    #     col_wrap=len(ds.time),
+    #     savefig_path=output_name_rgb)
     
-    # Save the veg fraction image as a TIFF file
-    output_name_vegfrac = os.path.join(out_dir, f'{stub}_thumbs_vegfrac.tif')
-    rgb(ds, 
-        bands=['bg', 'pv', 'npv'],
-        col="time", 
-        col_wrap=len(ds.time),
-        savefig_path=output_name_vegfrac)
+    # # Save the veg fraction image as a TIFF file
+    # output_name_vegfrac = os.path.join(out_dir, f'{stub}_thumbs_vegfrac.tif')
+    # rgb(ds, 
+    #     bands=['bg', 'pv', 'npv'],
+    #     col="time", 
+    #     col_wrap=len(ds.time),
+    #     savefig_path=output_name_vegfrac)
 
     # Save the time lapses of RGB and veg fract with paddocks overlaid
     output_path = out_dir+stub+'_manpad_RGB.mp4'
