@@ -37,10 +37,10 @@ for d in "$wd" "$dir" "$tmpdir"; do
 done
 
 # params to specify Region/Timeframe of interest
-stub=MILG_b04_2018-2024 # e.g. <site name>_<buffer>_<years>
-lat=-34.3957
-lon=148.4669
-buffer=0.04 #this distance in all directions from (lat,lon). 0.01 degrees is ~1km in each direction which woul mean 2kmx2km total
+stub=MILGADARA_b03_2018-2024 # e.g. <site name>_<buffer>_<years>
+lat=-34.3997
+lon=148.4753
+buffer=0.03 #this distance in all directions from (lat,lon). 0.01 degrees is ~1km in each direction which woul mean 2kmx2km total
 start='2018-01-01'
 end='2024-12-31'
 
